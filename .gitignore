@@ -1,0 +1,33 @@
+# Respuestas del docente
+respuestas.md
+
+# Archivos y carpetas temporales
+.tmp*/
+tmp/
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# Archivos auxiliares de LaTeX / Beamer
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.nav
+*.out
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
+*.xdv
+
+# Archivos del sistema y editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+# ...salvo la receta de compilacion (xelatex -> build/), que es parte del proyecto
+!.vscode/settings.json
+

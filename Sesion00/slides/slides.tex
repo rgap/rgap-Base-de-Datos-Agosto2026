@@ -1,0 +1,127 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+
+\title{Base de Datos}
+\subtitle{Presentación del curso}
+\date{Sesión 00}
+\author{Rel Guzman}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}{El curso prepara para diseñar y gestionar bases de datos relacionales}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+\begin{block}{Logro general de aprendizaje}
+\small Al finalizar el curso, el estudiante aplica técnicas de diseño y manipulación de bases de datos estructuradas para gestionar información, utilizando SQL y considerando criterios de integridad y normalización de datos.
+\end{block}
+\begin{exampleblock}{Naturaleza del curso}
+\small El curso es práctico: integra modelamiento y diseño de datos, definición y manipulación de objetos con SQL, y nociones de administración de bases de datos.
+\end{exampleblock}
+\column{.40\textwidth}
+\small
+\begin{tabular}{>{\bfseries}p{1.65cm}p{3.0cm}}
+\toprule
+Carreras & Sistemas e Informática / Software\\
+\midrule
+Créditos & 3\\
+Modalidad & Virtual en vivo\\
+Horas & 4 semanales\\
+\bottomrule
+\end{tabular}
+\end{columns}
+\end{frame}
+
+% 3 ---------------------------------------------------------------------
+\begin{frame}{Tres unidades organizan el recorrido del curso}
+\begin{center}
+\begin{tikzpicture}[node distance=5mm]
+  \node[cajaazul,text width=3.35cm,minimum height=2.25cm] (u1)
+    {\textbf{Unidad 1}\\Semanas 1--5\\[3pt]Introducción y diseño del modelo de datos};
+  \node[cajaverde,text width=3.35cm,minimum height=2.25cm,right=of u1] (u2)
+    {\textbf{Unidad 2}\\Semanas 6--12\\[3pt]Definición y manipulación de objetos de BD};
+  \node[cajanaranja,text width=3.35cm,minimum height=2.25cm,right=of u2] (u3)
+    {\textbf{Unidad 3}\\Semanas 13--18\\[3pt]Transact-SQL y administración de BD};
+  \draw[flecha] (u1)--(u2); \draw[flecha] (u2)--(u3);
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\begin{block}{Progresión indicada en el sílabo}
+\small Modelar y normalizar $\rightarrow$ crear y consultar con SQL $\rightarrow$ programar, proteger y administrar bases de datos.
+\end{block}
+\end{frame}
+
+% 4 ---------------------------------------------------------------------
+\begin{frame}{La práctica avanza del modelo de datos a su administración}
+\begin{columns}[T,onlytextwidth]
+\column{.32\textwidth}
+\begin{block}{Unidad 1}
+\footnotesize
+\begin{itemize}\setlength\itemsep{2pt}
+  \item Conceptos de BD relacionales
+  \item Diseño conceptual, lógico y físico
+  \item Modelo E--R y tipos de relaciones
+  \item Claves, dependencias y normalización
+\end{itemize}
+\end{block}
+\column{.32\textwidth}
+\begin{exampleblock}{Unidad 2}
+\footnotesize
+\begin{itemize}\setlength\itemsep{2pt}
+  \item DDL y DML
+  \item Consultas y vistas
+  \item JOIN e índices
+  \item Agregaciones, subconsultas y funciones
+\end{itemize}
+\end{exampleblock}
+\column{.32\textwidth}
+\begin{alertblock}{Unidad 3}
+\footnotesize
+\begin{itemize}\setlength\itemsep{2pt}
+  \item Funciones, variables y cursores
+  \item Procedimientos, transacciones y triggers
+  \item Backups, seguridad, usuarios y roles
+  \item SQL frente a NoSQL
+\end{itemize}
+\end{alertblock}
+\end{columns}
+\vspace{0.2cm}
+\small Cada semana combina exposición docente con ejercicios de modelamiento, consultas SQL y administración.
+\end{frame}
+
+% 5 ---------------------------------------------------------------------
+\begin{frame}{Cinco evidencias distribuyen la evaluación durante el ciclo}
+\begin{columns}[T,onlytextwidth]
+\column{.58\textwidth}
+\small
+\begin{tabular}{>{\bfseries}p{3.35cm}cc}
+\toprule
+Evaluación & Peso & Semana\\
+\midrule
+Práctica calificada 1 & 20\% & 5\\
+Práctica calificada 2 & 20\% & 10\\
+Práctica calificada 3 & 20\% & 15\\
+Participación en clase & 10\% & 17\\
+Examen final & 30\% & 18\\
+\bottomrule
+\end{tabular}
+\column{.38\textwidth}
+\begin{block}{Fórmula del promedio final}
+\centering\small
+20\% PC1 + 20\% PC2 + 20\% PC3\\
++ 10\% PA + 30\% EXFN
+\end{block}
+\begin{alertblock}{Dato del sílabo}
+\small La nota mínima aprobatoria final es 12.
+\end{alertblock}
+\end{columns}
+\vspace{0.25cm}
+\small Todas las evidencias de evaluación son individuales. El sílabo contempla examen de rezagado y reemplazo automático de una PC no rendida bajo las condiciones establecidas.
+\end{frame}
+
+\end{document}
