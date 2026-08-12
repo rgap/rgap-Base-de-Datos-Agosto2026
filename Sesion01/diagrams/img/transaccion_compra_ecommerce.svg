@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 780" width="1000" height="780" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <rect width="1000" height="780" fill="#f7f8fb"/>
+
+  <text x="500" y="42" text-anchor="middle" font-size="25" font-weight="700" fill="#1f2a44">Registro de transacciones — una compra en el e-commerce</text>
+  <text x="500" y="70" text-anchor="middle" font-size="16" fill="#5a6683">O se hacen todas las operaciones, o no se hace ninguna</text>
+
+  <!-- BEGIN -->
+  <rect x="380" y="100" width="240" height="52" rx="26" fill="#2f6fb5"/>
+  <text x="500" y="132" text-anchor="middle" font-size="17" font-weight="700" fill="#ffffff">BEGIN TRANSACTION</text>
+  <text x="640" y="132" font-size="12.5" fill="#5a6683">Ana confirma su compra</text>
+
+  <path d="M 500 152 L 500 182" stroke="#2f6fb5" stroke-width="2.5"/>
+  <polygon points="500,186 493,173 507,173" fill="#2f6fb5"/>
+
+  <!-- OPERACIONES -->
+  <rect x="290" y="186" width="420" height="200" rx="12" fill="#ffffff" stroke="#2f6fb5" stroke-width="2"/>
+  <rect x="290" y="186" width="420" height="36" rx="12" fill="#2f6fb5"/>
+  <rect x="290" y="210" width="420" height="12" fill="#2f6fb5"/>
+  <text x="500" y="211" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">OPERACIONES (una sola unidad)</text>
+
+  <circle cx="322" cy="252" r="13" fill="#dbeafe"/>
+  <text x="322" y="257" text-anchor="middle" font-size="12" font-weight="700" fill="#2f6fb5">1</text>
+  <text x="346" y="257" font-size="13.5" fill="#1f2a44">INSERT en PEDIDOS — se crea el pedido 1024</text>
+
+  <circle cx="322" cy="296" r="13" fill="#dbeafe"/>
+  <text x="322" y="301" text-anchor="middle" font-size="12" font-weight="700" fill="#2f6fb5">2</text>
+  <text x="346" y="301" font-size="13.5" fill="#1f2a44">INSERT en DETALLE_PEDIDO — 1 Audífono X</text>
+
+  <circle cx="322" cy="340" r="13" fill="#dbeafe"/>
+  <text x="322" y="345" text-anchor="middle" font-size="12" font-weight="700" fill="#2f6fb5">3</text>
+  <text x="346" y="345" font-size="13.5" fill="#1f2a44">UPDATE en PRODUCTOS — stock 42 → 41</text>
+
+  <!-- bifurcacion -->
+  <path d="M 500 386 L 500 416" stroke="#5a6683" stroke-width="2.5"/>
+  <path d="M 250 416 L 750 416" stroke="#5a6683" stroke-width="2.5"/>
+  <path d="M 250 416 L 250 452" stroke="#15803d" stroke-width="2.5"/>
+  <path d="M 750 416 L 750 452" stroke="#dc2626" stroke-width="2.5"/>
+  <polygon points="250,456 243,443 257,443" fill="#15803d"/>
+  <polygon points="750,456 743,443 757,443" fill="#dc2626"/>
+  <text x="500" y="440" text-anchor="middle" font-size="13" font-weight="700" fill="#5a6683">¿Todo salió bien?</text>
+
+  <!-- COMMIT -->
+  <rect x="60" y="456" width="380" height="230" rx="12" fill="#f2fdf5" stroke="#15803d" stroke-width="2"/>
+  <rect x="110" y="476" width="280" height="46" rx="23" fill="#15803d"/>
+  <text x="250" y="505" text-anchor="middle" font-size="17" font-weight="700" fill="#ffffff">COMMIT</text>
+  <text x="250" y="548" text-anchor="middle" font-size="14" font-weight="700" fill="#14532d">Sí — se confirma todo</text>
+
+  <circle cx="96" cy="578" r="4" fill="#15803d"/>
+  <text x="112" y="583" font-size="13" fill="#1f2a44">Los 3 cambios quedan permanentes</text>
+  <circle cx="96" cy="606" r="4" fill="#15803d"/>
+  <text x="112" y="611" font-size="13" fill="#1f2a44">El pedido existe con su detalle completo</text>
+  <circle cx="96" cy="634" r="4" fill="#15803d"/>
+  <text x="112" y="639" font-size="13" fill="#1f2a44">El stock refleja la venta real</text>
+  <circle cx="96" cy="662" r="4" fill="#15803d"/>
+  <text x="112" y="667" font-size="13" fill="#1f2a44">La base queda consistente</text>
+
+  <!-- ROLLBACK -->
+  <rect x="560" y="456" width="380" height="230" rx="12" fill="#fff5f5" stroke="#dc2626" stroke-width="2"/>
+  <rect x="610" y="476" width="280" height="46" rx="23" fill="#dc2626"/>
+  <text x="750" y="505" text-anchor="middle" font-size="17" font-weight="700" fill="#ffffff">ROLLBACK</text>
+  <text x="750" y="548" text-anchor="middle" font-size="14" font-weight="700" fill="#7f1d1d">No — se deshace todo</text>
+
+  <circle cx="596" cy="578" r="4" fill="#dc2626"/>
+  <text x="612" y="583" font-size="13" fill="#1f2a44">Falla el pago, o no alcanza el stock</text>
+  <circle cx="596" cy="606" r="4" fill="#dc2626"/>
+  <text x="612" y="611" font-size="13" fill="#1f2a44">Se borra el pedido y su detalle</text>
+  <circle cx="596" cy="634" r="4" fill="#dc2626"/>
+  <text x="612" y="639" font-size="13" fill="#1f2a44">El stock vuelve a 42</text>
+  <circle cx="596" cy="662" r="4" fill="#dc2626"/>
+  <text x="612" y="667" font-size="13" fill="#1f2a44">La base queda como si nada hubiera pasado</text>
+
+  <!-- conclusion -->
+  <rect x="60" y="710" width="880" height="52" rx="10" fill="#ffffff" stroke="#c9d2e3" stroke-width="1.5"/>
+  <text x="500" y="734" text-anchor="middle" font-size="14.5" font-weight="700" fill="#1f2a44">Lo que se evita: un pedido sin detalle, o stock descontado de una venta que nunca ocurrió.</text>
+  <text x="500" y="754" text-anchor="middle" font-size="13" fill="#5a6683">El archivo de log (.LDF) guarda este historial y es lo que hace posible el rollback.</text>
+</svg>

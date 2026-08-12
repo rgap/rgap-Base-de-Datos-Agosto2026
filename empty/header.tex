@@ -1,0 +1,26 @@
+\documentclass[aspectratio=169,10pt,t]{beamer}
+
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{xcolor}
+\usepackage{iftex}
+\usetikzlibrary{arrows.meta}
+
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \renewcommand{\familydefault}{\sfdefault}
+\else
+  \usepackage{fontspec}
+  \IfFontExistsTF{Arial}
+    {\setsansfont{Arial}[BoldFont={Arial Bold}]}
+    {\setsansfont{Helvetica}[BoldFont={Helvetica Bold}]}
+\fi
+
+\graphicspath{{assets/}}
+\definecolor{utpBlack}{HTML}{000000}
+
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{headline}{}
+\setbeamertemplate{footline}{}
+\setbeamercolor{normal text}{fg=utpBlack,bg=white}
+\setbeamertemplate{background canvas}{\color{white}\rule{\paperwidth}{\paperheight}}

@@ -1,0 +1,43 @@
+erDiagram
+    CLIENTES ||--o{ PEDIDOS : "realiza"
+    PEDIDOS  ||--|{ DETALLE_PEDIDO : "contiene"
+    PRODUCTOS ||--o{ DETALLE_PEDIDO : "aparece en"
+    CATEGORIAS ||--o{ PRODUCTOS : "clasifica"
+
+    CLIENTES {
+        int id_cliente PK
+        string nombre
+        string correo
+        string direccion
+        string telefono
+    }
+
+    PEDIDOS {
+        int id_pedido PK
+        date fecha
+        string estado
+        decimal total
+        int id_cliente FK
+    }
+
+    DETALLE_PEDIDO {
+        int id_detalle PK
+        int id_pedido FK
+        int id_producto FK
+        int cantidad
+        decimal precio_unitario
+    }
+
+    PRODUCTOS {
+        int id_producto PK
+        string nombre
+        decimal precio
+        int stock
+        int id_categoria FK
+    }
+
+    CATEGORIAS {
+        int id_categoria PK
+        string nombre
+        string descripcion
+    }

@@ -1,0 +1,27 @@
+graph TD
+    C1["CLIENTE 001<br/>Ana Ríos"]
+    C2["CLIENTE 002<br/>Luis Paz"]
+
+    P1["PEDIDO 1001<br/>12/03"]
+    P2["PEDIDO 1002<br/>28/03"]
+    P3["PEDIDO 1003<br/>02/04"]
+
+    A["PRODUCTO<br/>Audífonos X<br/>S/ 250 - stock 40"]
+    M["PRODUCTO<br/>Mouse Z<br/>S/ 90 - stock 15"]
+
+    C1 -->|set: hace| P1
+    C1 -->|set: hace| P2
+    C2 -->|set: hace| P3
+
+    P1 -->|set: incluye| A
+    P2 -->|set: incluye| M
+    P2 -->|set: incluye| A
+    P3 -->|set: incluye| A
+
+    classDef cliente fill:#2e75b6,stroke:#1f3864,color:#ffffff
+    classDef pedido fill:#9dc3e6,stroke:#2e75b6,color:#000000
+    classDef producto fill:#ffe699,stroke:#bf8f00,color:#000000
+
+    class C1,C2 cliente
+    class P1,P2,P3 pedido
+    class A,M producto

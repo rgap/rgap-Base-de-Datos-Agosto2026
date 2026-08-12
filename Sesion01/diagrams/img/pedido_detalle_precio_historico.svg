@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 720" width="980" height="720" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <rect width="980" height="720" fill="#f7f8fb"/>
+
+  <text x="490" y="42" text-anchor="middle" font-size="25" font-weight="700" fill="#1f2a44">PEDIDOS y DETALLE_PEDIDO</text>
+  <text x="490" y="70" text-anchor="middle" font-size="16" fill="#5a6683">Por qué el precio se guarda dos veces (redundancia intencional)</text>
+
+  <!-- ============ PEDIDOS ============ -->
+  <g>
+    <rect x="40" y="105" width="360" height="150" rx="10" fill="#ffffff" stroke="#2f6fb5" stroke-width="2"/>
+    <rect x="40" y="105" width="360" height="38" rx="10" fill="#2f6fb5"/>
+    <rect x="40" y="130" width="360" height="13" fill="#2f6fb5"/>
+    <text x="220" y="131" text-anchor="middle" font-size="17" font-weight="700" fill="#ffffff">PEDIDOS</text>
+
+    <text x="58" y="168" font-size="14" fill="#1f2a44"><tspan font-weight="700" fill="#b8860b">PK</tspan>  id_pedido = 1024</text>
+    <text x="58" y="194" font-size="14" fill="#1f2a44">      fecha = 15/03/2026</text>
+    <text x="58" y="220" font-size="14" fill="#1f2a44">      estado = Entregado</text>
+    <text x="58" y="246" font-size="14" fill="#1f2a44"><tspan font-weight="700" fill="#2f6fb5">FK</tspan>  id_cliente = 7 (Ana)</text>
+  </g>
+
+  <!-- 1 a N -->
+  <path d="M 220 255 L 220 300" stroke="#2f6fb5" stroke-width="2" fill="none"/>
+  <text x="234" y="272" font-size="13" font-weight="700" fill="#2f6fb5">1</text>
+  <text x="234" y="298" font-size="13" font-weight="700" fill="#2f6fb5">N</text>
+  <polygon points="220,300 214,288 226,288" fill="#2f6fb5"/>
+  <text x="252" y="286" font-size="12" fill="#5a6683">un pedido tiene varias líneas</text>
+
+  <!-- ============ DETALLE_PEDIDO ============ -->
+  <g>
+    <rect x="40" y="300" width="360" height="185" rx="10" fill="#ffffff" stroke="#c2410c" stroke-width="2"/>
+    <rect x="40" y="300" width="360" height="38" rx="10" fill="#c2410c"/>
+    <rect x="40" y="325" width="360" height="13" fill="#c2410c"/>
+    <text x="220" y="326" text-anchor="middle" font-size="17" font-weight="700" fill="#ffffff">DETALLE_PEDIDO</text>
+
+    <text x="58" y="363" font-size="14" fill="#1f2a44"><tspan font-weight="700" fill="#b8860b">PK</tspan>  id_detalle = 5001</text>
+    <text x="58" y="389" font-size="14" fill="#1f2a44"><tspan font-weight="700" fill="#2f6fb5">FK</tspan>  id_pedido = 1024</text>
+    <text x="58" y="415" font-size="14" fill="#1f2a44"><tspan font-weight="700" fill="#2f6fb5">FK</tspan>  id_producto = 88</text>
+    <text x="58" y="441" font-size="14" fill="#1f2a44">      cantidad = 1</text>
+
+    <rect x="50" y="452" width="340" height="26" rx="6" fill="#fff2e6" stroke="#c2410c" stroke-width="1.5"/>
+    <text x="58" y="470" font-size="14" font-weight="700" fill="#c2410c">      precio_unitario = S/ 250.00</text>
+  </g>
+
+  <!-- ============ PRODUCTOS ============ -->
+  <g>
+    <rect x="580" y="300" width="360" height="185" rx="10" fill="#ffffff" stroke="#15803d" stroke-width="2"/>
+    <rect x="580" y="300" width="360" height="38" rx="10" fill="#15803d"/>
+    <rect x="580" y="325" width="360" height="13" fill="#15803d"/>
+    <text x="760" y="326" text-anchor="middle" font-size="17" font-weight="700" fill="#ffffff">PRODUCTOS</text>
+
+    <text x="598" y="363" font-size="14" fill="#1f2a44"><tspan font-weight="700" fill="#b8860b">PK</tspan>  id_producto = 88</text>
+    <text x="598" y="389" font-size="14" fill="#1f2a44">      nombre = Audífonos X</text>
+    <text x="598" y="415" font-size="14" fill="#1f2a44">      stock = 42</text>
+
+    <rect x="590" y="426" width="340" height="26" rx="6" fill="#e9f7ee" stroke="#15803d" stroke-width="1.5"/>
+    <text x="598" y="444" font-size="14" font-weight="700" fill="#15803d">      precio = S/ 300.00  (hoy)</text>
+    <text x="598" y="472" font-size="12" fill="#5a6683">El precio actual cambia cuando la tienda lo actualiza</text>
+  </g>
+
+  <!-- flecha FK detalle -> producto -->
+  <path d="M 400 415 L 580 415" stroke="#15803d" stroke-width="2" fill="none" stroke-dasharray="6,4"/>
+  <polygon points="580,415 568,409 568,421" fill="#15803d"/>
+  <text x="490" y="405" text-anchor="middle" font-size="12" fill="#15803d">FK id_producto</text>
+
+  <!-- comparacion precios -->
+  <path d="M 400 465 C 470 465 470 439 580 439" stroke="#8b5cf6" stroke-width="2" fill="none"/>
+  <text x="490" y="500" text-anchor="middle" font-size="13" font-weight="700" fill="#8b5cf6">S/ 250 ≠ S/ 300</text>
+
+  <!-- ============ CAJA EXPLICATIVA ============ -->
+  <rect x="40" y="530" width="900" height="160" rx="12" fill="#ffffff" stroke="#c9d2e3" stroke-width="1.5"/>
+  <text x="64" y="562" font-size="16" font-weight="700" fill="#1f2a44">¿Por qué esta redundancia SÍ es correcta?</text>
+
+  <circle cx="72" cy="590" r="5" fill="#c2410c"/>
+  <text x="90" y="595" font-size="14" fill="#1f2a44">Ana compró en marzo a <tspan font-weight="700">S/ 250</tspan>. Ese valor queda congelado en el detalle: es un hecho histórico.</text>
+
+  <circle cx="72" cy="620" r="5" fill="#15803d"/>
+  <text x="90" y="625" font-size="14" fill="#1f2a44">En abril la tienda subió el producto a <tspan font-weight="700">S/ 300</tspan>. Ese es el precio vigente, no el que ella pagó.</text>
+
+  <circle cx="72" cy="650" r="5" fill="#8b5cf6"/>
+  <text x="90" y="655" font-size="14" fill="#1f2a44">Sin el precio en el detalle, la boleta de Ana se "reescribiría" sola cada vez que cambie el catálogo.</text>
+
+  <text x="90" y="680" font-size="13" font-style="italic" fill="#5a6683">Regla: repetir un mismo hecho (dirección del cliente) = redundancia mala. Guardar un valor histórico = redundancia buena.</text>
+</svg>

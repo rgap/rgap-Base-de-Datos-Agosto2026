@@ -1,0 +1,86 @@
+classDiagram
+    class Persona {
+        <<abstracta>>
+        #int id
+        #String nombre
+        #String correo
+        +autenticar() bool
+        +actualizarPerfil() void
+    }
+
+    class Cliente {
+        -String direccion
+        -List~Pedido~ pedidos
+        +realizarPedido() Pedido
+        +verHistorial() List~Pedido~
+    }
+
+    class Vendedor {
+        -String zona
+        +registrarProducto() void
+    }
+
+    class Pedido {
+        -int idPedido
+        -Date fecha
+        -String estado
+        -List~LineaPedido~ lineas
+        +calcularTotal() Decimal
+        +cancelar() void
+        +agregarLinea(Producto, int) void
+    }
+
+    class LineaPedido {
+        -int cantidad
+        -Decimal precioUnitario
+        +subtotal() Decimal
+    }
+
+    class Producto {
+        <<abstracta>>
+        #int idProducto
+        #String nombre
+        #Decimal precio
+        #int stock
+        +descontarStock(int) void
+        +calcularIGV() Decimal
+    }
+
+    class ProductoFisico {
+        -Decimal peso
+        -Decimal volumen
+        +calcularEnvio() Decimal
+    }
+
+    class ProductoDigital {
+        -Decimal tamanioMB
+        -String urlDescarga
+        +generarLicencia() String
+    }
+
+    class Pago {
+        <<interfaz>>
+        +procesar(Decimal) bool
+    }
+
+    class PagoTarjeta {
+        -String numeroEnmascarado
+        +procesar(Decimal) bool
+    }
+
+    class PagoYape {
+        -String celular
+        +procesar(Decimal) bool
+    }
+
+    Persona <|-- Cliente : herencia
+    Persona <|-- Vendedor : herencia
+    Producto <|-- ProductoFisico : herencia
+    Producto <|-- ProductoDigital : herencia
+    Pago <|.. PagoTarjeta : implementa
+    Pago <|.. PagoYape : implementa
+
+    Cliente "1" --> "0..*" Pedido : realiza
+    Pedido "1" *-- "1..*" LineaPedido : composicion
+    LineaPedido "0..*" --> "1" Producto : referencia
+    Pedido "1" --> "1" Pago : se salda con

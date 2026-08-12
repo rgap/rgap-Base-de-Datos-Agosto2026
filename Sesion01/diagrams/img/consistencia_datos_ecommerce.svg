@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 760" width="980" height="760" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <rect width="980" height="760" fill="#f7f8fb"/>
+
+  <text x="490" y="42" text-anchor="middle" font-size="25" font-weight="700" fill="#1f2a44">Consistencia de datos — caso e-commerce</text>
+  <text x="490" y="70" text-anchor="middle" font-size="16" fill="#5a6683">El stock de los Audífonos X después de vender 1 unidad</text>
+
+  <!-- ================= PANEL IZQUIERDO: INCONSISTENTE ================= -->
+  <rect x="30" y="95" width="440" height="500" rx="12" fill="#fff5f5" stroke="#dc2626" stroke-width="2"/>
+  <rect x="30" y="95" width="440" height="42" rx="12" fill="#dc2626"/>
+  <rect x="30" y="120" width="440" height="17" fill="#dc2626"/>
+  <text x="250" y="123" text-anchor="middle" font-size="17" font-weight="700" fill="#ffffff">✗  DATO REPETIDO → INCONSISTENCIA</text>
+
+  <!-- tabla tienda -->
+  <rect x="60" y="165" width="180" height="110" rx="8" fill="#ffffff" stroke="#2f6fb5" stroke-width="2"/>
+  <rect x="60" y="165" width="180" height="30" rx="8" fill="#2f6fb5"/>
+  <rect x="60" y="188" width="180" height="7" fill="#2f6fb5"/>
+  <text x="150" y="186" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">PRODUCTOS (web)</text>
+  <text x="74" y="216" font-size="12.5" fill="#1f2a44">id_producto = 88</text>
+  <text x="74" y="238" font-size="12.5" fill="#1f2a44">nombre = Audífonos X</text>
+  <rect x="68" y="248" width="164" height="20" rx="4" fill="#fee2e2"/>
+  <text x="74" y="262" font-size="12.5" font-weight="700" fill="#dc2626">stock = 41</text>
+
+  <!-- tabla almacen -->
+  <rect x="262" y="165" width="180" height="110" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="2"/>
+  <rect x="262" y="165" width="180" height="30" rx="8" fill="#7c3aed"/>
+  <rect x="262" y="188" width="180" height="7" fill="#7c3aed"/>
+  <text x="352" y="186" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">INVENTARIO (almacén)</text>
+  <text x="276" y="216" font-size="12.5" fill="#1f2a44">id_producto = 88</text>
+  <text x="276" y="238" font-size="12.5" fill="#1f2a44">ubicacion = Pasillo 3</text>
+  <rect x="270" y="248" width="164" height="20" rx="4" fill="#fee2e2"/>
+  <text x="276" y="262" font-size="12.5" font-weight="700" fill="#dc2626">stock = 42</text>
+
+  <!-- choque -->
+  <path d="M 240 220 L 262 220" stroke="#dc2626" stroke-width="2"/>
+  <text x="250" y="310" text-anchor="middle" font-size="30" font-weight="700" fill="#dc2626">41  ≠  42</text>
+  <text x="250" y="336" text-anchor="middle" font-size="14" fill="#7f1d1d">¿Cuál es el stock verdadero?</text>
+
+  <!-- consecuencias -->
+  <rect x="60" y="360" width="382" height="205" rx="10" fill="#ffffff" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="80" y="390" font-size="14" font-weight="700" fill="#7f1d1d">Qué pasó</text>
+  <text x="80" y="415" font-size="13" fill="#1f2a44">Se vendió 1 unidad. La web descontó el stock,</text>
+  <text x="80" y="435" font-size="13" fill="#1f2a44">pero el sistema de almacén no se actualizó.</text>
+
+  <text x="80" y="470" font-size="14" font-weight="700" fill="#7f1d1d">Consecuencias</text>
+  <circle cx="88" cy="493" r="4" fill="#dc2626"/>
+  <text x="102" y="498" font-size="13" fill="#1f2a44">Se venden productos que ya no existen</text>
+  <circle cx="88" cy="518" r="4" fill="#dc2626"/>
+  <text x="102" y="523" font-size="13" fill="#1f2a44">Reportes que se contradicen entre áreas</text>
+  <circle cx="88" cy="543" r="4" fill="#dc2626"/>
+  <text x="102" y="548" font-size="13" fill="#1f2a44">Nadie confía en la base de datos</text>
+
+  <!-- ================= PANEL DERECHO: CONSISTENTE ================= -->
+  <rect x="510" y="95" width="440" height="500" rx="12" fill="#f2fdf5" stroke="#15803d" stroke-width="2"/>
+  <rect x="510" y="95" width="440" height="42" rx="12" fill="#15803d"/>
+  <rect x="510" y="120" width="440" height="17" fill="#15803d"/>
+  <text x="730" y="123" text-anchor="middle" font-size="17" font-weight="700" fill="#ffffff">✓  DATO ÚNICO → CONSISTENCIA</text>
+
+  <!-- tabla unica -->
+  <rect x="620" y="165" width="220" height="130" rx="8" fill="#ffffff" stroke="#15803d" stroke-width="2.5"/>
+  <rect x="620" y="165" width="220" height="30" rx="8" fill="#15803d"/>
+  <rect x="620" y="188" width="220" height="7" fill="#15803d"/>
+  <text x="730" y="186" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">PRODUCTOS</text>
+  <text x="636" y="216" font-size="12.5" fill="#1f2a44"><tspan font-weight="700" fill="#b8860b">PK</tspan> id_producto = 88</text>
+  <text x="636" y="238" font-size="12.5" fill="#1f2a44">nombre = Audífonos X</text>
+  <text x="636" y="260" font-size="12.5" fill="#1f2a44">ubicacion = Pasillo 3</text>
+  <rect x="628" y="270" width="204" height="20" rx="4" fill="#dcfce7"/>
+  <text x="636" y="284" font-size="12.5" font-weight="700" fill="#15803d">stock = 41   (único)</text>
+
+  <!-- consumidores -->
+  <path d="M 620 230 L 570 230 L 570 330" stroke="#15803d" stroke-width="2" fill="none"/>
+  <path d="M 840 230 L 890 230 L 890 330" stroke="#15803d" stroke-width="2" fill="none"/>
+  <path d="M 730 295 L 730 330" stroke="#15803d" stroke-width="2" fill="none"/>
+
+  <rect x="522" y="330" width="96" height="42" rx="6" fill="#ffffff" stroke="#15803d"/>
+  <text x="570" y="356" text-anchor="middle" font-size="12.5" fill="#1f2a44">Web</text>
+  <rect x="682" y="330" width="96" height="42" rx="6" fill="#ffffff" stroke="#15803d"/>
+  <text x="730" y="356" text-anchor="middle" font-size="12.5" fill="#1f2a44">Almacén</text>
+  <rect x="842" y="330" width="96" height="42" rx="6" fill="#ffffff" stroke="#15803d"/>
+  <text x="890" y="356" text-anchor="middle" font-size="12.5" fill="#1f2a44">Reportes</text>
+
+  <text x="730" y="400" text-anchor="middle" font-size="14" fill="#14532d">Todos leen la misma fuente: no hay contradicción posible</text>
+
+  <!-- ventajas -->
+  <rect x="540" y="425" width="382" height="140" rx="10" fill="#ffffff" stroke="#86efac" stroke-width="1.5"/>
+  <text x="560" y="455" font-size="14" font-weight="700" fill="#14532d">Cómo se logra</text>
+  <circle cx="568" cy="480" r="4" fill="#15803d"/>
+  <text x="582" y="485" font-size="13" fill="#1f2a44">Cada dato se guarda en un solo lugar</text>
+  <circle cx="568" cy="505" r="4" fill="#15803d"/>
+  <text x="582" y="510" font-size="13" fill="#1f2a44">Las demás tablas lo referencian por FK</text>
+  <circle cx="568" cy="530" r="4" fill="#15803d"/>
+  <text x="582" y="535" font-size="13" fill="#1f2a44">Una sola actualización sirve para todos</text>
+  <circle cx="568" cy="555" r="4" fill="#15803d"/>
+  <text x="582" y="560" font-size="13" fill="#1f2a44">El SGBD protege las reglas de integridad</text>
+
+  <!-- conclusion -->
+  <rect x="30" y="620" width="920" height="110" rx="12" fill="#ffffff" stroke="#c9d2e3" stroke-width="1.5"/>
+  <text x="490" y="655" text-anchor="middle" font-size="16" font-weight="700" fill="#1f2a44">La consistencia no se "arregla": se diseña</text>
+  <text x="490" y="683" text-anchor="middle" font-size="14" fill="#1f2a44">La redundancia descontrolada es la causa; la inconsistencia es el síntoma.</text>
+  <text x="490" y="708" text-anchor="middle" font-size="14" fill="#1f2a44">Si el dato existe una sola vez, es imposible que se contradiga consigo mismo.</text>
+</svg>

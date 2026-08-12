@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="470" viewBox="0 0 900 470" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <rect width="900" height="470" fill="#ffffff"/>
+
+  <!-- Titulo -->
+  <text x="450" y="38" text-anchor="middle" font-size="21" font-weight="600" fill="#1f3864">Modelo relacional — tabla PRODUCTOS</text>
+  <text x="450" y="60" text-anchor="middle" font-size="13" fill="#666666">Terminología formal (Codd)</text>
+
+  <defs>
+    <marker id="flecha" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 z" fill="#c00000"/>
+    </marker>
+    <marker id="flechaAzul" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 z" fill="#2e75b6"/>
+    </marker>
+  </defs>
+
+  <!-- Etiqueta ATRIBUTO (arriba) -->
+  <text x="405" y="100" text-anchor="middle" font-size="14" font-weight="600" fill="#2e75b6">Atributo (columna)</text>
+  <line x1="405" y1="108" x2="405" y2="150" stroke="#2e75b6" stroke-width="2" marker-end="url(#flechaAzul)"/>
+
+  <!-- Cabecera de la tabla -->
+  <rect x="180" y="155" width="520" height="42" fill="#1f3864"/>
+  <line x1="310" y1="155" x2="310" y2="197" stroke="#ffffff" stroke-width="1"/>
+  <line x1="510" y1="155" x2="510" y2="197" stroke="#ffffff" stroke-width="1"/>
+  <line x1="610" y1="155" x2="610" y2="197" stroke="#ffffff" stroke-width="1"/>
+  <text x="245" y="181" text-anchor="middle" font-size="13" font-weight="600" fill="#ffffff">id_producto</text>
+  <text x="410" y="181" text-anchor="middle" font-size="13" font-weight="600" fill="#ffffff">nombre</text>
+  <text x="560" y="181" text-anchor="middle" font-size="13" font-weight="600" fill="#ffffff">precio</text>
+  <text x="655" y="181" text-anchor="middle" font-size="13" font-weight="600" fill="#ffffff">stock</text>
+
+  <!-- Fila 1 -->
+  <rect x="180" y="197" width="520" height="40" fill="#eaf1fa" stroke="#b8cce4"/>
+  <text x="245" y="222" text-anchor="middle" font-size="13" fill="#000000">1</text>
+  <text x="410" y="222" text-anchor="middle" font-size="13" fill="#000000">Audífonos X</text>
+  <text x="560" y="222" text-anchor="middle" font-size="13" fill="#000000">250.00</text>
+  <text x="655" y="222" text-anchor="middle" font-size="13" fill="#000000">40</text>
+
+  <!-- Fila 2 (resaltada) -->
+  <rect x="180" y="237" width="520" height="40" fill="#ffe699" stroke="#bf8f00" stroke-width="2"/>
+  <text x="245" y="262" text-anchor="middle" font-size="13" fill="#000000">2</text>
+  <text x="410" y="262" text-anchor="middle" font-size="13" fill="#000000">Mouse Z</text>
+  <text x="560" y="262" text-anchor="middle" font-size="13" fill="#000000">90.00</text>
+  <text x="655" y="262" text-anchor="middle" font-size="13" fill="#000000">15</text>
+
+  <!-- Fila 3 -->
+  <rect x="180" y="277" width="520" height="40" fill="#eaf1fa" stroke="#b8cce4"/>
+  <text x="245" y="302" text-anchor="middle" font-size="13" fill="#000000">3</text>
+  <text x="410" y="302" text-anchor="middle" font-size="13" fill="#000000">Teclado K</text>
+  <text x="560" y="302" text-anchor="middle" font-size="13" fill="#000000">180.00</text>
+  <text x="655" y="302" text-anchor="middle" font-size="13" fill="#000000">28</text>
+
+  <!-- Separadores verticales cuerpo -->
+  <line x1="310" y1="197" x2="310" y2="317" stroke="#b8cce4"/>
+  <line x1="510" y1="197" x2="510" y2="317" stroke="#b8cce4"/>
+  <line x1="610" y1="197" x2="610" y2="317" stroke="#b8cce4"/>
+
+  <!-- Llave ENCABEZADO -->
+  <path d="M172,155 L162,155 L162,197 L172,197" fill="none" stroke="#548235" stroke-width="2"/>
+  <text x="152" y="172" text-anchor="end" font-size="13" font-weight="600" fill="#548235">Encabezado</text>
+  <text x="152" y="188" text-anchor="end" font-size="12" fill="#548235">(heading)</text>
+
+  <!-- Llave CUERPO -->
+  <path d="M172,197 L162,197 L162,317 L172,317" fill="none" stroke="#548235" stroke-width="2"/>
+  <text x="152" y="252" text-anchor="end" font-size="13" font-weight="600" fill="#548235">Cuerpo</text>
+  <text x="152" y="268" text-anchor="end" font-size="12" fill="#548235">(body)</text>
+
+  <!-- Etiqueta TUPLA (derecha) -->
+  <line x1="800" y1="257" x2="712" y2="257" stroke="#c00000" stroke-width="2" marker-end="url(#flecha)"/>
+  <text x="808" y="253" font-size="14" font-weight="600" fill="#c00000">Tupla</text>
+  <text x="808" y="270" font-size="12" fill="#c00000">(fila / registro)</text>
+
+  <!-- Clave primaria -->
+  <rect x="182" y="199" width="126" height="116" fill="none" stroke="#c00000" stroke-width="2" stroke-dasharray="5,3"/>
+  <text x="245" y="342" text-anchor="middle" font-size="12" font-weight="600" fill="#c00000">Clave primaria (PK)</text>
+  <text x="245" y="358" text-anchor="middle" font-size="11" fill="#c00000">valores únicos, no se repiten</text>
+
+  <!-- Llave RELACION -->
+  <path d="M180,378 L180,388 L700,388 L700,378" fill="none" stroke="#1f3864" stroke-width="2"/>
+  <text x="440" y="410" text-anchor="middle" font-size="15" font-weight="600" fill="#1f3864">Relación / relvar = la tabla completa</text>
+
+  <!-- Nota inferior -->
+  <text x="450" y="443" text-anchor="middle" font-size="12" fill="#666666">Grado = número de atributos (4)     •     Cardinalidad = número de tuplas (3)</text>
+</svg>

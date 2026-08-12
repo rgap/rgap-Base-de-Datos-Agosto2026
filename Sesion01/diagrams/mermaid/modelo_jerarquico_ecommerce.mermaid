@@ -1,0 +1,25 @@
+graph TD
+    T["TIENDA (raíz)"]
+
+    T --> C1["CLIENTE 001<br/>Ana Ríos"]
+    T --> C2["CLIENTE 002<br/>Luis Paz"]
+
+    C1 --> P1["PEDIDO 1001<br/>12/03 - S/ 250"]
+    C1 --> P2["PEDIDO 1002<br/>28/03 - S/ 90"]
+    C2 --> P3["PEDIDO 1003<br/>02/04 - S/ 250"]
+
+    P1 --> D1["PRODUCTO<br/>Audífonos X - 1 und<br/>S/ 250"]
+    P2 --> D2["PRODUCTO<br/>Mouse Z - 1 und<br/>S/ 90"]
+    P3 --> D3["PRODUCTO<br/>Audífonos X - 1 und<br/>S/ 250"]
+
+    D1 -.->|"mismo producto<br/>repetido"| D3
+
+    classDef raiz fill:#1f3864,stroke:#0d1b2a,color:#ffffff
+    classDef nivel2 fill:#2e75b6,stroke:#1f3864,color:#ffffff
+    classDef nivel3 fill:#9dc3e6,stroke:#2e75b6,color:#000000
+    classDef nivel4 fill:#ffe699,stroke:#bf8f00,color:#000000
+
+    class T raiz
+    class C1,C2 nivel2
+    class P1,P2,P3 nivel3
+    class D1,D2,D3 nivel4

@@ -1,0 +1,21 @@
+graph TD
+    subgraph COL1["Colección: clientes"]
+        D1["Documento &#123;<br/>  _id: 'CLI001',<br/>  nombre: 'Ana Ríos',<br/>  correo: 'ana@mail.com',<br/>  direcciones: [<br/>    &#123; tipo:'casa', calle:'Av. Perú 123' &#125;,<br/>    &#123; tipo:'oficina', calle:'Jr. Lima 45' &#125;<br/>  ]<br/>&#125;"]
+    end
+
+    subgraph COL2["Colección: pedidos"]
+        D2["Documento &#123;<br/>  _id: 'PED1001',<br/>  fecha: '2026-03-12',<br/>  estado: 'entregado',<br/>  cliente: &#123; id:'CLI001', nombre:'Ana Ríos' &#125;,<br/>  items: [<br/>    &#123; sku:'AUD-X', nombre:'Audífonos X',<br/>      cantidad:1, precio:250 &#125;,<br/>    &#123; sku:'MOU-Z', nombre:'Mouse Z',<br/>      cantidad:2, precio:90 &#125;<br/>  ],<br/>  total: 430,<br/>  pago: &#123; metodo:'Yape', estado:'OK' &#125;<br/>&#125;"]
+
+        D3["Documento &#123;<br/>  _id: 'PED1003',<br/>  fecha: '2026-04-02',<br/>  estado: 'en camino',<br/>  cliente: &#123; id:'CLI002', nombre:'Luis Paz' &#125;,<br/>  items: [<br/>    &#123; sku:'AUD-X', nombre:'Audífonos X',<br/>      cantidad:1, precio:250 &#125;<br/>  ],<br/>  total: 250,<br/>  cupon: 'CYBER10'<br/>&#125;"]
+    end
+
+    subgraph COL3["Colección: productos"]
+        D4["Documento &#123;<br/>  _id: 'AUD-X',<br/>  nombre: 'Audífonos X',<br/>  precio: 250,<br/>  stock: 40,<br/>  specs: &#123; bluetooth:true, bateria:'20h' &#125;<br/>&#125;"]
+    end
+
+    D2 -.->|"referencia por _id"| D1
+    D2 -.->|"referencia por sku"| D4
+    D3 -.->|"referencia por sku"| D4
+
+    classDef doc fill:#fff8e1,stroke:#bf8f00,color:#000000,text-align:left
+    class D1,D2,D3,D4 doc

@@ -1,0 +1,45 @@
+classDiagram
+    direction LR
+
+    class Cliente {
+        +id_cliente : int «PK»
+        nombre : varchar(80)
+        correo : varchar(100)
+        telefono : varchar(15)
+        direccion : varchar(150)
+    }
+
+    class Pedido {
+        +id_pedido : int «PK»
+        fecha : date
+        estado : varchar(20)
+        total : decimal(10,2)
+        -id_cliente : int «FK»
+    }
+
+    class DetallePedido {
+        +id_detalle : int «PK»
+        cantidad : int
+        precio_unitario : decimal(10,2)
+        -id_pedido : int «FK»
+        -id_producto : int «FK»
+    }
+
+    class Producto {
+        +id_producto : int «PK»
+        nombre : varchar(100)
+        precio : decimal(10,2)
+        stock : int
+        -id_categoria : int «FK»
+    }
+
+    class Categoria {
+        +id_categoria : int «PK»
+        nombre : varchar(50)
+        descripcion : varchar(200)
+    }
+
+    Cliente "1" -- "0..*" Pedido : realiza
+    Pedido "1" -- "1..*" DetallePedido : contiene
+    Producto "1" -- "0..*" DetallePedido : figura en
+    Categoria "1" -- "0..*" Producto : clasifica

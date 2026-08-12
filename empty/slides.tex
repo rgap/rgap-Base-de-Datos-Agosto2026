@@ -1,0 +1,28 @@
+\input{header.tex}
+
+\begin{document}
+
+% Unica diapositiva: conserva el fondo de portada de la plantilla UTP.
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{utp-cover-bg.jpeg}%
+  }
+  \begin{frame}[plain]
+    \begin{tikzpicture}[remember picture,overlay]
+      \draw[-{Stealth[length=7mm,width=6mm]},line width=2.2pt,utpBlack]
+        ([yshift=-35mm]current page.north) --
+        ([yshift=-15mm]current page.north);
+
+      \node[
+        anchor=north,
+        align=center,
+        text=utpBlack,
+        text width=150mm,
+        font=\bfseries\fontsize{23}{28}\selectfont
+      ] at ([yshift=-43mm]current page.north)
+        {\large Los slides actualizados est\'an en el enlace};
+    \end{tikzpicture}
+  \end{frame}
+}
+
+\end{document}

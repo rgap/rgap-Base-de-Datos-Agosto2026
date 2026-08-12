@@ -1,0 +1,43 @@
+erDiagram
+    CLIENTE ||--o{ PEDIDO : "realiza"
+    PEDIDO ||--|{ DETALLE_PEDIDO : "contiene"
+    PRODUCTO ||--o{ DETALLE_PEDIDO : "figura en"
+    CATEGORIA ||--o{ PRODUCTO : "clasifica"
+
+    CLIENTE {
+        int id_cliente PK "identifica al cliente"
+        varchar nombre
+        varchar correo
+        varchar telefono
+        varchar direccion
+    }
+
+    PEDIDO {
+        int id_pedido PK "identifica al pedido"
+        date fecha
+        varchar estado
+        decimal total
+        int id_cliente FK "apunta a CLIENTE"
+    }
+
+    DETALLE_PEDIDO {
+        int id_detalle PK "identifica la linea"
+        int cantidad
+        decimal precio_unitario
+        int id_pedido FK "apunta a PEDIDO"
+        int id_producto FK "apunta a PRODUCTO"
+    }
+
+    PRODUCTO {
+        int id_producto PK "identifica al producto"
+        varchar nombre
+        decimal precio
+        int stock
+        int id_categoria FK "apunta a CATEGORIA"
+    }
+
+    CATEGORIA {
+        int id_categoria PK "identifica la categoria"
+        varchar nombre
+        varchar descripcion
+    }

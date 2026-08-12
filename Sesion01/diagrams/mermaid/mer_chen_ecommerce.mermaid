@@ -1,0 +1,74 @@
+graph TD
+    %% ===== ENTIDADES (rectangulos) =====
+    CLI[CLIENTE]
+    PED[PEDIDO]
+    PRO[PRODUCTO]
+    CAT[CATEGORIA]
+
+    %% ===== RELACIONES (rombos) =====
+    R1{REALIZA}
+    R2{CONTIENE}
+    R3{PERTENECE_A}
+
+    %% ===== Atributos de CLIENTE =====
+    CA1(["id_cliente"])
+    CA2(["nombre"])
+    CA3(["correo"])
+    CA4(["direccion"])
+    CLI --- CA1
+    CLI --- CA2
+    CLI --- CA3
+    CLI --- CA4
+
+    %% ===== Atributos de PEDIDO =====
+    PA1(["id_pedido"])
+    PA2(["fecha"])
+    PA3(["estado"])
+    PA4(["total"])
+    PED --- PA1
+    PED --- PA2
+    PED --- PA3
+    PED --- PA4
+
+    %% ===== Atributos de PRODUCTO =====
+    RA1(["id_producto"])
+    RA2(["nombre"])
+    RA3(["precio"])
+    RA4(["stock"])
+    PRO --- RA1
+    PRO --- RA2
+    PRO --- RA3
+    PRO --- RA4
+
+    %% ===== Atributos de CATEGORIA =====
+    TA1(["id_categoria"])
+    TA2(["nombre"])
+    CAT --- TA1
+    CAT --- TA2
+
+    %% ===== Atributos DE LA RELACION (propio de Chen) =====
+    RR1(["cantidad"])
+    RR2(["precio_unitario"])
+    R2 --- RR1
+    R2 --- RR2
+
+    %% ===== Cardinalidades =====
+    CLI ---|1| R1
+    R1 ---|N| PED
+
+    PED ---|M| R2
+    R2 ---|N| PRO
+
+    PRO ---|N| R3
+    R3 ---|1| CAT
+
+    %% ===== Estilos =====
+    classDef entidad fill:#2e75b6,stroke:#1f3864,stroke-width:2px,color:#ffffff
+    classDef relacion fill:#ffe699,stroke:#bf8f00,stroke-width:2px,color:#000000
+    classDef atributo fill:#eaf1fa,stroke:#2e75b6,color:#000000
+    classDef atribrel fill:#fff2cc,stroke:#bf8f00,color:#000000
+
+    class CLI,PED,PRO,CAT entidad
+    class R1,R2,R3 relacion
+    class CA1,CA2,CA3,CA4,PA1,PA2,PA3,PA4,RA1,RA2,RA3,RA4,TA1,TA2 atributo
+    class RR1,RR2 atribrel

@@ -1,0 +1,43 @@
+graph LR
+    C1(("Cliente<br/>Ana Ríos<br/>ciudad: Lima"))
+    C2(("Cliente<br/>Luis Paz<br/>ciudad: Arequipa"))
+
+    P1(("Pedido 1001<br/>12/03/2026"))
+    P3(("Pedido 1003<br/>02/04/2026"))
+
+    A(("Producto<br/>Audífonos X<br/>S/ 250"))
+    M(("Producto<br/>Mouse Z<br/>S/ 90"))
+    T(("Producto<br/>Teclado K<br/>S/ 180"))
+
+    CAT(("Categoría<br/>Accesorios"))
+    MAR(("Marca<br/>TechPro"))
+
+    C1 -->|REALIZA| P1
+    C2 -->|REALIZA| P3
+
+    P1 -->|CONTIENE<br/>cantidad: 1| A
+    P1 -->|CONTIENE<br/>cantidad: 2| M
+    P3 -->|CONTIENE<br/>cantidad: 1| A
+
+    A -->|PERTENECE_A| CAT
+    M -->|PERTENECE_A| CAT
+    T -->|PERTENECE_A| CAT
+
+    A -->|FABRICADO_POR| MAR
+    T -->|FABRICADO_POR| MAR
+
+    C1 -->|CALIFICO<br/>estrellas: 5| A
+    C2 -->|CALIFICO<br/>estrellas: 4| A
+    C1 -->|VIO<br/>fecha: 05/04| T
+
+    C1 -.->|SIGUE_A| C2
+
+    classDef cliente fill:#2e75b6,stroke:#1f3864,color:#ffffff
+    classDef pedido fill:#9dc3e6,stroke:#2e75b6,color:#000000
+    classDef producto fill:#ffe699,stroke:#bf8f00,color:#000000
+    classDef meta fill:#c5e0b4,stroke:#548235,color:#000000
+
+    class C1,C2 cliente
+    class P1,P3 pedido
+    class A,M,T producto
+    class CAT,MAR meta
