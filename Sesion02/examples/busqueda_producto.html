@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Caja - Búsqueda de producto</title>
+    <style>
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        font-family: Arial, sans-serif;
+        background: #f1f5f9;
+        color: #1e293b;
+      }
+
+      main {
+        width: min(760px, 100%);
+        background: white;
+        border: 1px solid #dbe3ec;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      }
+
+      h1 { margin: 0 0 6px; font-size: 24px; }
+      .subtitulo { margin: 0 0 24px; color: #64748b; }
+
+      .busqueda {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+      }
+
+      input, select, button {
+        padding: 11px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 7px;
+        font-size: 15px;
+      }
+
+      button {
+        border: 0;
+        background: #2563eb;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+      }
+
+      button:hover { background: #1d4ed8; }
+
+      .mensaje {
+        min-height: 22px;
+        margin: 10px 0;
+        color: #dc2626;
+        font-size: 14px;
+      }
+
+      .producto {
+        display: none;
+        grid-template-columns: 1fr auto auto;
+        gap: 14px;
+        align-items: end;
+        padding: 16px;
+        margin-bottom: 20px;
+        background: #eff6ff;
+        border-radius: 8px;
+      }
+
+      .producto.visible { display: grid; }
+      .producto p { margin: 4px 0 0; color: #475569; }
+      .producto label { display: block; margin-bottom: 5px; font-size: 13px; }
+      .producto input { width: 80px; }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 8px 0 20px;
+      }
+
+      th, td {
+        padding: 10px 8px;
+        border-bottom: 1px solid #e2e8f0;
+        text-align: left;
+      }
+
+      th { color: #64748b; font-size: 13px; }
+      th:last-child, td:last-child { text-align: right; }
+      .vacio { color: #94a3b8; text-align: center !important; }
+
+      .resumen {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 20px;
+        padding-top: 4px;
+      }
+
+      .resumen label { display: block; margin-bottom: 6px; font-size: 14px; }
+      .total { text-align: right; }
+      .total span { display: block; color: #64748b; font-size: 13px; }
+      .total strong { font-size: 28px; }
+
+      #generar { width: 100%; margin-top: 20px; background: #16a34a; }
+      #generar:hover { background: #15803d; }
+
+      @media (max-width: 600px) {
+        .producto { grid-template-columns: 1fr; align-items: stretch; }
+        .producto input { width: 100%; }
+        .resumen { align-items: stretch; flex-direction: column; }
+        .resumen select { width: 100%; }
+        .total { width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Caja de tienda</h1>
+      <p class="subtitulo">Busca un producto por su ID para consultar el precio.</p>
+
+      <form id="form-busqueda" class="busqueda">
+        <input id="producto-id" type="text" placeholder="Ejemplo: P001" autocomplete="off" />
+        <button type="submit">Buscar</button>
+      </form>
+
+      <p id="mensaje" class="mensaje">IDs de prueba: P001, P002, P003</p>
+
+      <section id="producto" class="producto">
+        <div>
+          <strong id="producto-nombre"></strong>
+          <p>Precio: S/ <span id="producto-precio"></span></p>
+        </div>
+        <div>
+          <label for="cantidad">Cantidad</label>
+          <input id="cantidad" type="number" min="1" value="1" />
+        </div>
+        <button id="agregar" type="button">Agregar</button>
+      </section>
+
+      <h2>Detalle de venta</h2>
+      <table>
+        <thead>
+          <tr><th>Producto</th><th>Cant.</th><th>Subtotal</th></tr>
+        </thead>
+        <tbody id="detalle">
+          <tr><td colspan="3" class="vacio">Todavía no hay productos</td></tr>
+        </tbody>
+      </table>
+
+      <div class="resumen">
+        <div>
+          <label for="comprobante">Comprobante</label>
+          <select id="comprobante">
+            <option>Boleta</option>
+            <option>Factura</option>
+          </select>
+        </div>
+        <div class="total">
+          <span>Total a pagar</span>
+          <strong>S/ <span id="total">0.00</span></strong>
+        </div>
+      </div>
+
+      <button id="generar" type="button">Generar comprobante</button>
+    </main>
+
+    <script>
+      // Simula los registros de una tabla PRODUCTO de la base de datos.
+      const productos = {
+        P001: { nombre: "Arroz 1 kg", precio: 4.50 },
+        P002: { nombre: "Leche evaporada", precio: 3.80 },
+        P003: { nombre: "Aceite vegetal 1 L", precio: 9.90 }
+      };
+
+      let productoActual = null;
+      const venta = [];
+
+      const formulario = document.querySelector("#form-busqueda");
+      const panelProducto = document.querySelector("#producto");
+      const mensaje = document.querySelector("#mensaje");
+
+      formulario.addEventListener("submit", (evento) => {
+        evento.preventDefault();
+        const id = document.querySelector("#producto-id").value.trim().toUpperCase();
+        productoActual = productos[id];
+
+        if (!productoActual) {
+          panelProducto.classList.remove("visible");
+          mensaje.textContent = "Producto no encontrado.";
+          mensaje.style.color = "#dc2626";
+          return;
+        }
+
+        document.querySelector("#producto-nombre").textContent = productoActual.nombre;
+        document.querySelector("#producto-precio").textContent = productoActual.precio.toFixed(2);
+        document.querySelector("#cantidad").value = 1;
+        mensaje.textContent = "Producto encontrado.";
+        mensaje.style.color = "#15803d";
+        panelProducto.classList.add("visible");
+      });
+
+      document.querySelector("#agregar").addEventListener("click", () => {
+        const cantidad = Number(document.querySelector("#cantidad").value);
+        if (!productoActual || cantidad < 1) return;
+
+        venta.push({ ...productoActual, cantidad });
+        mostrarVenta();
+      });
+
+      function mostrarVenta() {
+        const detalle = document.querySelector("#detalle");
+        detalle.innerHTML = venta.map((item) => `
+          <tr>
+            <td>${item.nombre}</td>
+            <td>${item.cantidad}</td>
+            <td>S/ ${(item.precio * item.cantidad).toFixed(2)}</td>
+          </tr>
+        `).join("");
+
+        const total = venta.reduce((suma, item) => suma + item.precio * item.cantidad, 0);
+        document.querySelector("#total").textContent = total.toFixed(2);
+      }
+
+      document.querySelector("#generar").addEventListener("click", () => {
+        if (venta.length === 0) {
+          alert("Agrega al menos un producto.");
+          return;
+        }
+
+        const tipo = document.querySelector("#comprobante").value;
+        alert(`${tipo} generada correctamente.`);
+      });
+    </script>
+  </body>
+</html>
