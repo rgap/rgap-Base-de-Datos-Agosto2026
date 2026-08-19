@@ -18,6 +18,8 @@ Ingresa aquí el caso de estudio.
 - Incluye doble label en cada relación: uno en cada extremo, iniciando cada etiqueta desde su respectivo extremo.
 - No agregues elementos adicionales fuera de: tablas, atributos, relaciones, cardinalidades y etiquetas de las relaciones.
 - Asegurate del espaciado entre tablas para que no se sobrepongan las entidades ni las relaciones ni las cardinalidades, ni los labels.
+- Que los labels no se sobrepongan con las relaciones.
+- Que los espaciados entre tablas sean x1.5 veces los tamaños de los labels juntos.
 - Representa las cardinalidades utilizando la siguiente notación:
 
 | Notación | Significado     |
