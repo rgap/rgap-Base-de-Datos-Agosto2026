@@ -1,0 +1,32 @@
+Actúa como un experto Modelador de Bases de Datos Relacionales.
+
+Realiza un modelo entidad-relación (ER) a partir del siguiente caso de estudio:
+
+[caso_de_estudio]
+
+Ingresa aquí el caso de estudio.
+
+[/caso_de_estudio]
+
+**Especificaciones:**
+
+- Sin leyenda.
+- Sin título ni subtítulo.
+- Sin tipos de datos.
+- Sin indicar PK ni FK.
+- Utiliza notación de pata de gallo.
+- Incluye doble label en cada relación: uno en cada extremo, iniciando cada etiqueta desde su respectivo extremo.
+- No agregues elementos adicionales fuera de: tablas, atributos, relaciones, cardinalidades y etiquetas de las relaciones.
+- Asegurate del espaciado entre tablas para que no se sobrepongan las entidades ni las relaciones ni las cardinalidades, ni los labels.
+- Representa las cardinalidades utilizando la siguiente notación:
+
+| Notación | Significado     |
+| -------- | --------------- |
+| **0..1** | Cero o uno      |
+| **1..1** | Exactamente uno |
+| **0..N** | Cero o muchos   |
+| **1..N** | Uno o muchos    |
+
+**Formato de salida:**
+
+- Graphviz DOT
