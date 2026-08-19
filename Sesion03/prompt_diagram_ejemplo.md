@@ -28,6 +28,7 @@ Realice el modelo entidad -relación bajo las siguientes premisas:
 - Incluye doble label en cada relación: uno en cada extremo, iniciando cada etiqueta desde su respectivo extremo.
 - No agregues elementos adicionales fuera de: tablas, atributos, relaciones, cardinalidades y etiquetas de las relaciones.
 - Maximo una relacion entre par de tablas.
+- Asegurate del espaciado entre tablas para que no se sobrepongan las entidades ni las relaciones ni las cardinalidades, ni los labels.
 - Representa las cardinalidades utilizando la siguiente notación:
 
 | Notación | Significado     |
