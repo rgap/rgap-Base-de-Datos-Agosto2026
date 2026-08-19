@@ -16,14 +16,15 @@ Realice el modelo entidad -relación bajo las siguientes premisas:
 
 [/caso_de_estudio]
 
-Especificaciones:
+**Especificaciones:**
 
-- Sin leyenda
-- Sin titulo ni subtitulo
-- Sin tipos de datos 
-- Sin decir PK, FK
+- Sin leyenda.
+- Sin título ni subtítulo.
+- Sin tipos de datos.
+- Sin indicar PK ni FK.
 - Utiliza notación de pata de gallo.
-- Incluye doble label en cada relación: uno en cada extremo.
+- Incluye doble label en cada relación: uno en cada extremo, iniciando cada etiqueta desde su respectivo extremo.
+- No agregues elementos adicionales fuera de: tablas, atributos, relaciones, cardinalidades y etiquetas de las relaciones.
 - Representa las cardinalidades utilizando la siguiente notación:
 
 | Notación | Significado     |
@@ -33,6 +34,6 @@ Especificaciones:
 | **0..N** | Cero o muchos   |
 | **1..N** | Uno o muchos    |
 
-Formato de salida:
+**Formato de salida:**
 
 - SVG
