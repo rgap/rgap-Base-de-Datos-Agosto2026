@@ -1,0 +1,809 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+
+\title{Normalización avanzada: FNBC, 4FN y 5FN}
+\subtitle{Repaso de las tres primeras formas y qué corrigen las que siguen}
+\date{Semana 05 - Sesión 09}
+\author{Rel Guzman}
+
+% Flecha de dependencia funcional y espacio en blanco para completar
+\newcommand{\fdep}{$\rightarrow$}
+\newcommand{\mvdep}{$\twoheadrightarrow$}
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Tabla ancha
+\newenvironment{tablaventa}{\footnotesize\setlength\tabcolsep{4.5pt}}{}
+% Insignia de forma normal (1FN, 2FN, 3FN, FNBC, 4FN, 5FN)
+\newcommand{\fn}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\small,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+\newcommand{\tblb}[1]{\textcolor{utpNaranja}{\textbf{\texttt{#1}}}}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás \textbf{repasar} las tres primeras formas normales con ejemplos simples y reconocer cuándo una tabla, ya en 3FN, todavía necesita \textbf{FNBC}, \textbf{4FN} o \textbf{5FN}.
+\end{block}
+\end{frame}
+
+% =====================================================================
+% PARTE TEÓRICA · Repaso de normalización
+% =====================================================================
+
+% 3 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{140mm}{!}{\bfseries\color{utpNegro}Repaso de normalización}};
+    \node[anchor=north,inner sep=0pt] at ([yshift=-15mm]current page.center)
+      {\color{utpRojo}\rule{140mm}{1.6pt}};
+  \end{tikzpicture}
+\end{frame}
+
+% 4 ---------------------------------------------------------------------
+\begin{frame}{Repaso: qué problema resuelve normalizar}
+\small Una sola tabla, con una fila por línea de pedido:
+\vspace{0.2cm}
+\begin{center}
+\footnotesize\setlength\tabcolsep{7pt}
+\begin{tabular}{ccccc}
+\toprule
+\bfseries id\_pedido & \bfseries cliente & \bfseries telefono & \bfseries producto & \bfseries precio \\
+\midrule
+1 & Ana  & 999111222 & Mouse   & 50 \\
+2 & Ana  & 999111222 & Teclado & 100 \\
+3 & Luis & 988777666 & Mouse   & 50 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.35cm}
+\begin{alertblock}{Lo que se repite}
+\small \textbf{Ana} y su teléfono aparecen en cada fila suya; el precio del Mouse aparece cada vez que alguien compra un Mouse. Si Ana cambia de número, hay que corregir \textbf{varias filas}, y basta olvidar una para quedar con dos teléfonos distintos.
+\end{alertblock}
+\end{frame}
+
+% 5 ---------------------------------------------------------------------
+\begin{frame}{\fn{1FN} Primera forma normal: una celda, un dato}
+\begin{columns}[T,onlytextwidth]
+\column{.46\textwidth}
+\begin{alertblock}{Rompe la 1FN}
+\centering\footnotesize
+\begin{tabular}{cc}
+\toprule
+\bfseries cliente & \bfseries productos \\
+\midrule
+Ana & Mouse, Teclado, Monitor \\
+\bottomrule
+\end{tabular}
+\end{alertblock}
+\column{.49\textwidth}
+\begin{exampleblock}{Cumple la 1FN}
+\centering\footnotesize
+\begin{tabular}{cc}
+\toprule
+\bfseries cliente & \bfseries producto \\
+\midrule
+Ana & Mouse \\
+Ana & Teclado \\
+Ana & Monitor \\
+\bottomrule
+\end{tabular}
+\end{exampleblock}
+\end{columns}
+\vspace{0.3cm}
+\small \textbf{Cómo se detecta:} si para usar una celda tienes que \textit{cortarla} tú mismo (por comas, por espacios), esa celda no guarda un solo valor.
+\end{frame}
+
+% 6 ---------------------------------------------------------------------
+\begin{frame}{\fn{2FN} Segunda forma normal: depender de toda la clave}
+\begin{center}
+\footnotesize\setlength\tabcolsep{7pt}
+\begin{tabular}{cccc}
+\toprule
+\bfseries pedido\_id & \bfseries producto\_id & \bfseries producto\_nombre & \bfseries cantidad \\
+\midrule
+1 & 10 & Mouse   & 2 \\
+1 & 20 & Teclado & 1 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\small Clave: \{\texttt{pedido\_id}, \texttt{producto\_id}\}. Pero \texttt{producto\_nombre} depende \textbf{solo} de \texttt{producto\_id}: no hace falta el pedido para saber que 10 es ``Mouse''.
+\vspace{0.1cm}
+\begin{exampleblock}{La corrección}
+\small \tbl{producto}\texttt{(producto\_id, nombre)} por un lado, \tbl{detalle\_pedido}\texttt{(pedido\_id, producto\_id, cantidad)} por otro.
+\end{exampleblock}
+\end{frame}
+
+% 7 ---------------------------------------------------------------------
+\begin{frame}{\fn{3FN} Tercera forma normal: sin depender de otras columnas}
+\begin{center}
+\footnotesize\setlength\tabcolsep{7pt}
+\begin{tabular}{cccc}
+\toprule
+\bfseries cliente\_id & \bfseries cliente & \bfseries ciudad\_id & \bfseries ciudad \\
+\midrule
+1 & Ana & 10 & Lima \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\small \texttt{ciudad} depende de \texttt{ciudad\_id}, no directamente de \texttt{cliente\_id}. Para llegar a ``Lima'' desde el cliente hay que \textbf{pasar por} \texttt{ciudad\_id}.
+\vspace{0.15cm}
+\begin{exampleblock}{La corrección}
+\small \tbl{cliente}\texttt{(cliente\_id, nombre, ciudad\_id)} y \tbl{ciudad}\texttt{(ciudad\_id, nombre)}. ``Lima'' queda escrito una sola vez.
+\end{exampleblock}
+\end{frame}
+
+% 8 ---------------------------------------------------------------------
+\begin{frame}{Repaso}
+\begin{center}
+\footnotesize\hyphenpenalty=10000\exhyphenpenalty=10000
+\begin{tabular}{>{\bfseries}p{1.4cm}>{\raggedright\arraybackslash}p{10.5cm}}
+\toprule
+Forma & Regla \\
+\midrule
+1FN & No metas listas dentro de una celda. \\[4pt]
+2FN & Cada columna debe depender de \textbf{toda} la clave primaria. \\[4pt]
+3FN & Las columnas deben depender de \textbf{la clave}, no de otras columnas. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.35cm}
+\begin{block}{En una frase}
+\centering\large Una cosa, en un lugar, una sola vez.
+\end{block}
+\vspace{0.2cm}
+\small Eso es casi toda la filosofía. Lo que viene ahora son casos donde una tabla \textbf{ya cumple esas tres reglas} y aun así sigue repitiendo datos.
+\end{frame}
+
+% =====================================================================
+% FNBC
+% =====================================================================
+
+% 9 ---------------------------------------------------------------------
+\begin{frame}{\fn{FNBC} Forma normal de Boyce-Codd}
+\small En una academia, \textbf{cada profesor enseña un solo idioma}. Esta tabla anota qué alumno tiene clase con qué profesor:
+\vspace{0.25cm}
+\begin{center}
+\footnotesize
+\begin{tabular}{ccc}
+\toprule
+\bfseries alumno & \bfseries idioma & \bfseries profesor \\
+\midrule
+Sara & Inglés  & Gómez \\
+Toni & Inglés  & Gómez \\
+Sara & Francés & Ruiz \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\small Fíjate: cada vez que el profesor es \textbf{Gómez}, el idioma es \textbf{Inglés}. El nombre del profesor \textbf{ya dice} el idioma de la clase, y aun así lo repetimos en cada fila.
+\vspace{0.15cm}
+\begin{alertblock}{Por qué molesta}
+\small Si Gómez pasa a enseñar Alemán, hay que corregir \textbf{todas sus filas}. Si olvidas una, Gómez queda con dos idiomas distintos.
+\end{alertblock}
+\end{frame}
+
+% 10 ---------------------------------------------------------------------
+\begin{frame}{\fn{FNBC} La corrección: sacar el dato que se repite}
+\small El idioma es del \textbf{profesor}, no de cada clase. Lo guardamos una sola vez, en su propia tabla:
+\vspace{0.25cm}
+\begin{columns}[T,onlytextwidth]
+\column{.46\textwidth}
+\centering\footnotesize\tblb{profesor}\\[3pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries nombre & \bfseries idioma \\
+\midrule
+Gómez & Inglés \\
+Ruiz  & Francés \\
+\bottomrule
+\end{tabular}
+\column{.5\textwidth}
+\centering\footnotesize\tblb{clase}\\[3pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries alumno & \bfseries profesor \\
+\midrule
+Sara & Gómez \\
+Toni & Gómez \\
+Sara & Ruiz \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.3cm}
+\small Ahora el idioma de Gómez está escrito \textbf{una vez}. Si cambia de idioma, se corrige en un solo lugar; y para saber el idioma de una clase, se mira al profesor.
+\vspace{0.15cm}
+\ojo{Este caso es raro. La señal: una columna que \textbf{ya dice} el valor de otra, y esa otra apareciendo repetida sin necesidad.}
+\end{frame}
+
+% =====================================================================
+% 4FN
+% =====================================================================
+
+% 11 ---------------------------------------------------------------------
+\begin{frame}{\fn{4FN} Cuarta forma normal: dos listas independientes}
+\small Sara tiene \textbf{dos teléfonos} y \textbf{dos correos}. Los guardamos todos en una tabla:
+\vspace{0.2cm}
+\begin{center}
+\footnotesize
+\begin{tabular}{ccc}
+\toprule
+\bfseries persona & \bfseries telefono & \bfseries correo \\
+\midrule
+Sara & 555-1111 & sara@correo \\
+Sara & 555-1111 & sara@trabajo \\
+Sara & 555-2222 & sara@correo \\
+Sara & 555-2222 & sara@trabajo \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.25cm}
+\small Ningún par teléfono--correo significa nada: \texttt{sara@trabajo} no va con un teléfono más que con el otro. Los cruzamos solo porque están en la misma tabla.
+\vspace{0.15cm}
+\concepto{Dos listas sueltas en la misma tabla}{Sara lleva a \textbf{una lista} de teléfonos y a \textbf{otra lista} de correos, y las dos no se relacionan. La tabla acaba guardando \textbf{todas las parejas}: 2 y 2 se vuelven 4 filas, y un tercer correo obliga a repetirlo con cada teléfono.}
+\end{frame}
+
+% 12 ---------------------------------------------------------------------
+\begin{frame}{\fn{4FN} La corrección: una tabla por cada lista}
+\small Cada lista va sola, con la persona a la que pertenece:
+\vspace{0.3cm}
+\begin{columns}[T,onlytextwidth]
+\column{.46\textwidth}
+\centering\footnotesize\tblb{telefono}\\[3pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries persona & \bfseries numero \\
+\midrule
+Sara & 555-1111 \\
+Sara & 555-2222 \\
+\bottomrule
+\end{tabular}
+\column{.46\textwidth}
+\centering\footnotesize\tblb{correo}\\[3pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries persona & \bfseries direccion \\
+\midrule
+Sara & sara@correo \\
+Sara & sara@trabajo \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.35cm}
+\small De 4 filas pasamos a 2 + 2. Un correo nuevo es \textbf{una} fila, no una por teléfono. Las dos listas ya no se cruzan.
+\end{frame}
+
+% =====================================================================
+% 5FN
+% =====================================================================
+
+% 13 ---------------------------------------------------------------------
+\begin{frame}{\fn{5FN} Quinta forma normal: dos tablas no bastan}
+\small Un vendedor trabaja con ciertas \textbf{marcas}, cada marca fabrica ciertos \textbf{productos}, y el vendedor ofrece ciertos productos. El trío existe \textbf{solo si} se cumplen las tres cosas a la vez.
+\vspace{0.15cm}
+\begin{center}
+\footnotesize
+\begin{tabular}{ccc}
+\toprule
+\bfseries vendedor & \bfseries marca & \bfseries producto \\
+\midrule
+Ana  & Sony & Televisor \\
+Ana  & Sony & Audífonos \\
+Ana  & LG   & Televisor \\
+Luis & Sony & Televisor \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\small Aquí no es que haya dos listas sueltas: las tres columnas se condicionan \textbf{de a pares}. Separar en \textbf{dos} tablas pierde o inventa filas al volver a unir.
+\end{frame}
+
+% 14 ---------------------------------------------------------------------
+\begin{frame}{\fn{5FN} La corrección: tres tablas binarias}
+\concepto{Quinta forma normal (5FN)}{La tabla no repite datos por ninguno de los motivos anteriores; y además \textbf{no se puede partir en tablas más chicas y volver a unir} sin que aparezcan filas de más o de menos. Si al reunir dos pedazos sale una fila que no estaba, faltaba un tercer pedazo.}
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.32\textwidth}
+\centering\footnotesize\tblb{vendedor\_marca}\\[3pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries vendedor & \bfseries marca \\
+\midrule
+Ana  & Sony \\
+Ana  & LG \\
+Luis & Sony \\
+\bottomrule
+\end{tabular}
+\column{.32\textwidth}
+\centering\footnotesize\tblb{marca\_producto}\\[3pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries marca & \bfseries producto \\
+\midrule
+Sony & Televisor \\
+Sony & Audífonos \\
+LG   & Televisor \\
+\bottomrule
+\end{tabular}
+\column{.32\textwidth}
+\centering\footnotesize\tblb{vendedor\_producto}\\[3pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries vendedor & \bfseries producto \\
+\midrule
+Ana  & Televisor \\
+Ana  & Audífonos \\
+Luis & Televisor \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.3cm}
+\small Solo al unir las \textbf{tres} se recupera la tabla original, sin filas de más. Este caso es muy poco frecuente en la práctica.
+\end{frame}
+
+% =====================================================================
+% Cierre teórico
+% =====================================================================
+
+% 15 ---------------------------------------------------------------------
+\begin{frame}{Las seis formas, en un solo cuadro}
+\begin{center}
+\footnotesize\hyphenpenalty=10000\exhyphenpenalty=10000
+\begin{tabular}{>{\bfseries}p{1.3cm}>{\raggedright\arraybackslash}p{6.4cm}>{\raggedright\arraybackslash}p{4.0cm}}
+\toprule
+Forma & Qué asegura, todo junto & Se rompe cuando\ldots \\
+\midrule
+1FN  & un valor por casilla & una celda guarda una lista \\[3pt]
+2FN  & un valor por casilla; y nada se sabe con media clave & el nombre del producto sale solo de \texttt{producto\_id} \\[3pt]
+3FN  & \ldots y a nada se llega pasando por otra columna & la ciudad sale de \texttt{ciudad\_id}, no del cliente \\[3pt]
+FNBC & \ldots y si una columna ya dice el valor de otra, esa otra no se repite & el profesor ya dice el idioma, y el idioma va repetido \\[3pt]
+4FN  & \ldots y no hay dos listas sueltas en la misma tabla & teléfonos y correos de una persona juntos \\[3pt]
+5FN  & \ldots y no se puede partir y volver a unir sin errores & vendedor, marca y producto se condicionan de a pares \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\begin{block}{¿Esto se usa en la práctica?}
+\small En el trabajo diario casi todo llega hasta \textbf{3FN} (a veces FNBC). 4FN y 5FN se estudian para reconocer el patrón, pero rara vez se aplican a mano.
+\end{block}
+\end{frame}
+
+% =====================================================================
+% PARTE PRÁCTICA · Identificar la forma normal
+% =====================================================================
+
+% P0 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{90mm}{!}{\bfseries\color{utpNegro}Práctica}};
+    \node[anchor=north,inner sep=0pt] at ([yshift=-13mm]current page.center)
+      {\color{utpRojo}\rule{90mm}{1.6pt}};
+  \end{tikzpicture}
+\end{frame}
+
+% P-instr ---------------------------------------------------------------
+\begin{frame}{Cómo resolver cada ejemplo}
+\begin{itemize}\setlength\itemsep{10pt}
+  \item Mira el esquema: la clave va \underline{subrayada}.
+  \item Revisa las dependencias y los datos de muestra.
+  \item Responde: \textbf{¿en qué forma normal está?} (la más alta que cumple).
+\end{itemize}
+\vspace{0.3cm}
+\small Recuerda que son acumulativas: si algo rompe la 2FN, la respuesta es ``1FN''.
+\end{frame}
+
+% P1 ---------------------------------------------------------------------
+\begin{frame}{Ejemplo 1}
+\begin{center}
+\small \tblb{alumno}\texttt{(\underline{codigo}, nombre, cursos)}
+\end{center}
+\vspace{0.2cm}
+\begin{center}
+\footnotesize\setlength\tabcolsep{7pt}
+\begin{tabular}{ccc}
+\toprule
+\bfseries codigo & \bfseries nombre & \bfseries cursos \\
+\midrule
+U001 & Ana  & Base de Datos, Redes, SO \\
+U002 & Luis & Base de Datos \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4cm}
+\small ¿En qué forma normal está? \bl[3cm]
+\end{frame}
+
+% P2 ---------------------------------------------------------------------
+\begin{frame}{Ejemplo 2}
+\begin{center}
+\small \tblb{matricula}\texttt{(\underline{alumno\_id}, \underline{curso\_id}, nota, nombre\_curso)}
+\end{center}
+\vspace{0.15cm}
+\begin{center}
+\footnotesize\setlength\tabcolsep{7pt}
+\begin{tabular}{cccc}
+\toprule
+\bfseries alumno\_id & \bfseries curso\_id & \bfseries nota & \bfseries nombre\_curso \\
+\midrule
+1 & 10 & 15 & Base de Datos \\
+2 & 10 & 18 & Base de Datos \\
+2 & 20 & 12 & Redes \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\small Dependencias: \{\texttt{alumno\_id}, \texttt{curso\_id}\} \fdep{} \texttt{nota}\hspace{6mm} \texttt{curso\_id} \fdep{} \texttt{nombre\_curso}
+\vspace{0.35cm}
+
+\small ¿En qué forma normal está? \bl[3cm]
+\end{frame}
+
+% P3 ---------------------------------------------------------------------
+\begin{frame}{Ejemplo 3}
+\begin{center}
+\small \tblb{empleado}\texttt{(\underline{id}, nombre, depto\_id, depto\_nombre)}
+\end{center}
+\vspace{0.15cm}
+\begin{center}
+\footnotesize\setlength\tabcolsep{7pt}
+\begin{tabular}{cccc}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries depto\_id & \bfseries depto\_nombre \\
+\midrule
+1 & Ana  & 5 & Ventas \\
+2 & Luis & 5 & Ventas \\
+3 & Elsa & 8 & Sistemas \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\small Dependencias: \texttt{id} \fdep{} \texttt{depto\_id} \hspace{4mm} \texttt{depto\_id} \fdep{} \texttt{depto\_nombre}
+\vspace{0.35cm}
+
+\small ¿En qué forma normal está? \bl[3cm]
+\end{frame}
+
+% P4 ---------------------------------------------------------------------
+\begin{frame}{Ejemplo 4}
+\begin{center}
+\small \tblb{producto}\texttt{(\underline{id}, nombre, precio, categoria\_id)} \quad + \quad \tblb{categoria}\texttt{(\underline{id}, nombre)}
+\end{center}
+\vspace{0.15cm}
+\begin{center}
+\footnotesize\setlength\tabcolsep{7pt}
+\begin{tabular}{cccc}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries precio & \bfseries categoria\_id \\
+\midrule
+1 & Mouse   & 50  & 3 \\
+2 & Teclado & 100 & 3 \\
+3 & Monitor & 400 & 4 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\small Dependencias: \texttt{id} \fdep{} \texttt{nombre}, \texttt{precio}, \texttt{categoria\_id}. Nada más.
+\vspace{0.35cm}
+
+\small ¿En qué forma normal está? \bl[3cm]
+\end{frame}
+
+% P5 ---------------------------------------------------------------------
+\begin{frame}{Ejemplo 5}
+\begin{center}
+\small \tblb{clase}\texttt{(\underline{alumno}, \underline{idioma}, profesor)}
+\end{center}
+\vspace{0.1cm}
+\small Regla de la academia: cada profesor enseña un solo idioma.
+\begin{center}
+\footnotesize\setlength\tabcolsep{7pt}
+\begin{tabular}{ccc}
+\toprule
+\bfseries alumno & \bfseries idioma & \bfseries profesor \\
+\midrule
+Sara & Inglés  & Gómez \\
+Toni & Inglés  & Gómez \\
+Sara & Francés & Ruiz \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\small Dependencias: \{\texttt{alumno}, \texttt{idioma}\} \fdep{} \texttt{profesor} \hspace{4mm} \texttt{profesor} \fdep{} \texttt{idioma}
+\vspace{0.3cm}
+
+\small ¿En qué forma normal está? \bl[3cm]
+\end{frame}
+
+% P6 ---------------------------------------------------------------------
+\begin{frame}{Ejemplo 6}
+\begin{center}
+\small \tblb{empleado\_habilidad\_idioma}\texttt{(\underline{empleado}, \underline{habilidad}, \underline{idioma})}
+\end{center}
+\vspace{0.1cm}
+\small Las habilidades de un empleado y los idiomas que habla no dependen entre sí.
+\begin{center}
+\footnotesize\setlength\tabcolsep{7pt}
+\begin{tabular}{ccc}
+\toprule
+\bfseries empleado & \bfseries habilidad & \bfseries idioma \\
+\midrule
+Ana & Python & Español \\
+Ana & Python & Inglés \\
+Ana & SQL    & Español \\
+Ana & SQL    & Inglés \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\small ¿En qué forma normal está? \bl[3cm]
+\end{frame}
+
+% P-idea --------------------------------------------------------------
+\begin{frame}{Normalizar no es una escalera de un solo sentido}
+\begin{alertblock}{El malentendido común}
+\small ``Primero paso todo a 1FN, después reviso todo para 2FN, después para 3FN\ldots'' como una fila de pasos obligatorios.
+\end{alertblock}
+\vspace{0.2cm}
+\begin{block}{Cómo se hace en realidad}
+\small Se mira el modelo actual, se identifica \textbf{qué está fallando} —un dato repetido, una anomalía al actualizar, una lista dentro de una celda— y se corrige aplicando \textbf{el criterio de la forma normal que corresponde a ese problema}, sin recorrer las demás en orden.
+\end{block}
+\vspace{0.2cm}
+\analogia{Es como revisar un texto: no lees una vez solo la ortografía, otra vez solo la puntuación y otra la coherencia. Detectas el error que hay y lo arreglas con la regla que aplica.}
+\vspace{0.15cm}
+\small Las formas normales son un \textbf{vocabulario para nombrar y justificar} la corrección, no una receta de pasos.
+\end{frame}
+
+% =====================================================================
+% DESNORMALIZACIÓN
+% =====================================================================
+
+% D0 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{130mm}{!}{\bfseries\color{utpNegro}Desnormalización}};
+    \node[anchor=north,inner sep=0pt] at ([yshift=-15mm]current page.center)
+      {\color{utpRojo}\rule{130mm}{1.6pt}};
+  \end{tikzpicture}
+\end{frame}
+
+% D-concepto ------------------------------------------------------------
+\begin{frame}{Desnormalización: repetir un dato a propósito}
+\small Normalizar evita repetir, pero cobra un precio: para armar un reporte hay que \textbf{unir muchas tablas} cada vez.
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\begin{exampleblock}{Normalizado}
+\small Cada dato en un solo lugar. Ideal para \textbf{registrar} información que cambia todo el día.
+\end{exampleblock}
+\column{.49\textwidth}
+\begin{alertblock}{Desnormalizado a propósito}
+\small Se \textbf{copia} un dato (un nombre, un total) donde hace falta, para \textbf{leer rápido} sin unir tablas.
+\end{alertblock}
+\end{columns}
+\vspace{0.25cm}
+\enlarealidad{Se normaliza por defecto y se desnormaliza \textbf{a propósito}, casi siempre en reportes o paneles que se leen miles de veces. El costo: si el dato original cambia, la copia queda vieja y hay que mantenerla al día.}
+\end{frame}
+
+% D-instr -------------------------------------------------------------
+\begin{frame}{Para cada modelo: ¿se puede mejorar?}
+\begin{itemize}\setlength\itemsep{10pt}
+  \item Mira el modelo y pregúntate: \textbf{¿hay un dato repetido sin necesidad?} \fdep{} conviene \textbf{normalizar}.
+  \item ¿O es una copia puesta \textbf{a propósito} para leer rápido? \fdep{} está \textbf{desnormalizado}, y puede estar bien.
+  \item A veces la respuesta es: \textbf{ya está bien, no toques nada}.
+\end{itemize}
+\end{frame}
+
+% D1 ---------------------------------------------------------------------
+\begin{frame}{Ejemplo 1}
+\begin{center}
+\small \tblb{cliente}\texttt{(\underline{id}, nombre, ciudad\_id, ciudad\_nombre)}
+\end{center}
+\vspace{0.15cm}
+\begin{center}
+\footnotesize\setlength\tabcolsep{7pt}
+\begin{tabular}{cccc}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries ciudad\_id & \bfseries ciudad\_nombre \\
+\midrule
+1 & Ana  & 10 & Lima \\
+2 & Luis & 10 & Lima \\
+3 & Elsa & 14 & Cusco \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\small Es una tabla para \textbf{registrar} clientes, que cambia todos los días.
+\vspace{0.35cm}
+
+\small ¿Se puede mejorar? ¿Cómo? \bl[6cm]
+\end{frame}
+
+% D2 ---------------------------------------------------------------------
+\begin{frame}{Ejemplo 2}
+\begin{center}
+\small \tblb{panel\_ventas\_dia}\texttt{(\underline{fecha}, \underline{producto\_id}, producto\_nombre, categoria\_nombre, total)}
+\end{center}
+\vspace{0.15cm}
+\begin{center}
+\footnotesize\setlength\tabcolsep{6pt}
+\begin{tabular}{ccccc}
+\toprule
+\bfseries fecha & \bfseries producto\_id & \bfseries producto\_nombre & \bfseries categoria\_nombre & \bfseries total \\
+\midrule
+2025-09-01 & 1 & Audífonos & Audio      & 890 \\
+2025-09-01 & 3 & Mouse     & Accesorios & 135 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\small Es un \textbf{panel} que se abre miles de veces al día. Armarlo desde cero exige unir \tbl{venta}, \tbl{producto} y \tbl{categoria} cada vez.
+\vspace{0.3cm}
+
+\small ¿Se puede mejorar? ¿Cómo? \bl[6cm]
+\end{frame}
+
+% D3 ---------------------------------------------------------------------
+\begin{frame}{Ejemplo 3}
+\begin{center}
+\small \tblb{detalle\_pedido}\texttt{(\underline{pedido\_id}, \underline{producto\_id}, cantidad, precio\_unitario)}\\[3pt]
+\tblb{producto}\texttt{(\underline{id}, nombre, precio)}
+\end{center}
+\vspace{0.15cm}
+\begin{center}
+\footnotesize\setlength\tabcolsep{7pt}
+\begin{tabular}{cccc}
+\toprule
+\bfseries pedido\_id & \bfseries producto\_id & \bfseries cantidad & \bfseries precio\_unitario \\
+\midrule
+1 & 1 & 2 & 85.00 \\
+7 & 1 & 1 & 89.00 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\small Hoy \texttt{producto.precio} de ese producto es \textbf{89.00}. En el pedido 1 se cobró \textbf{85.00}.
+\vspace{0.3cm}
+
+\small ¿Se puede mejorar quitando \texttt{precio\_unitario}? \bl[5cm]
+\end{frame}
+
+% D4 ---------------------------------------------------------------------
+\begin{frame}{Ejemplo 4}
+\begin{center}
+\small \tblb{persona}\texttt{(\underline{id}, nombre, fecha\_nacimiento, edad)}
+\end{center}
+\vspace{0.15cm}
+\begin{center}
+\footnotesize\setlength\tabcolsep{7pt}
+\begin{tabular}{cccc}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries fecha\_nacimiento & \bfseries edad \\
+\midrule
+1 & Ana  & 2000-05-10 & 25 \\
+2 & Luis & 1998-11-02 & 26 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\small \texttt{edad} se saca de \texttt{fecha\_nacimiento} y de la fecha de hoy.
+\vspace{0.35cm}
+
+\small ¿Se puede mejorar? ¿Cómo? \bl[6cm]
+\end{frame}
+
+% D5 ---------------------------------------------------------------------
+\begin{frame}{Ejemplo 5}
+\begin{center}
+\small \tblb{cliente}\texttt{(\underline{id}, nombre, correo)} \quad + \quad \tblb{pedido}\texttt{(\underline{id}, cliente\_id, fecha)}
+\end{center}
+\vspace{0.15cm}
+\begin{center}
+\footnotesize\setlength\tabcolsep{7pt}
+\begin{tabular}{ccc}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries correo \\
+\midrule
+1 & Ana  & ana@correo \\
+2 & Luis & luis@correo \\
+\bottomrule
+\end{tabular}
+\hspace{0.8cm}
+\begin{tabular}{ccc}
+\toprule
+\bfseries id & \bfseries cliente\_id & \bfseries fecha \\
+\midrule
+50 & 1 & 2025-09-01 \\
+51 & 1 & 2025-09-03 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\small Cada dato aparece una sola vez; no hay copias ni listas dentro de una celda.
+\vspace{0.3cm}
+
+\small ¿Se puede mejorar? ¿Cómo? \bl[6cm]
+\end{frame}
+
+% D6 ---------------------------------------------------------------------
+\begin{frame}{Ejemplo 6}
+\begin{center}
+\small \tblb{publicacion}\texttt{(\underline{id}, titulo, autor\_id, num\_comentarios)}\\[3pt]
+\tblb{comentario}\texttt{(\underline{id}, publicacion\_id, texto)}
+\end{center}
+\vspace{0.15cm}
+\begin{center}
+\footnotesize\setlength\tabcolsep{7pt}
+\begin{tabular}{cccc}
+\toprule
+\bfseries id & \bfseries titulo & \bfseries autor\_id & \bfseries num\_comentarios \\
+\midrule
+1 & Hola mundo   & 4 & 12 \\
+2 & Segundo post & 4 & 3 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\small \texttt{num\_comentarios} es cuántas filas de \tbl{comentario} apuntan a esa publicación. El blog muestra ese número en una lista con \textbf{cientos} de publicaciones.
+\vspace{0.25cm}
+
+\small ¿Se puede mejorar? ¿Cómo? \bl[6cm]
+\end{frame}
+
+% 16 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+
+% 17 ---------------------------------------------------------------------
+\begin{frame}{Referencias}
+\footnotesize
+Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración} (9.ª ed.). Cengage Learning.
+
+\vspace{0.35cm}
+Elmasri, R., \& Navathe, S. (2007). \textit{Fundamentos de sistemas de bases de datos} (5.ª ed.). Addison Wesley.
+
+\vspace{0.35cm}
+Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2020). \textit{Database system concepts} (7th ed.). McGraw-Hill.
+\end{frame}
+
+% ---------------------------------------------------------------------
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}

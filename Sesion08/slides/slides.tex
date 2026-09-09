@@ -1,0 +1,708 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+
+\title{Normalización de bases de datos}
+\subtitle{De una tabla con problemas a varias tablas bien formadas}
+\date{Semana 04 - Sesión 08}
+\author{Rel Guzman}
+
+% Flecha de dependencia funcional y espacio en blanco para completar
+\newcommand{\fdep}{$\rightarrow$}
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Tabla ancha de la tienda
+\newenvironment{tablaventa}{\footnotesize\setlength\tabcolsep{4.5pt}}{}
+% Insignia de forma normal (1FN, 2FN, 3FN, FNBC)
+\newcommand{\fn}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\small,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+\newcommand{\tblb}[1]{\textcolor{utpNaranja}{\textbf{\texttt{#1}}}}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás mirar una tabla \textbf{mal diseñada} y decir \textbf{qué regla incumple}; con eso sabrás \textbf{en qué forma normal está} y cómo corregirla.
+\end{block}
+\end{frame}
+
+% 3 ---------------------------------------------------------------------
+\begin{frame}{Repaso 1: la dependencia funcional}
+\concepto{Dependencia funcional}{Al fijar el valor de una columna, queda determinado \textbf{un único} valor de otra.}
+\vspace{0.3cm}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\begin{center}
+\begin{tikzpicture}[node distance=8mm]
+  \node[cajaverde,text width=2.6cm] (a) {\texttt{producto\_id}};
+  \node[cajanaranja,text width=2.2cm,right=11mm of a] (b) {\texttt{precio}};
+  \draw[flecha] (a)--(b);
+  \node[font=\scriptsize,below=1mm of a] {determinante};
+  \node[font=\scriptsize,below=1mm of b] {dependiente};
+\end{tikzpicture}
+\end{center}
+\column{.43\textwidth}
+\small Se escribe \texttt{producto\_id} \fdep{} \texttt{precio}\\[5pt]
+Se lee: \textbf{``sabiendo el producto, sé su precio''}.
+\end{columns}
+\vspace{0.35cm}
+\small \textbf{La prueba de la sesión pasada:} tapa dos columnas; si al fijar la primera siempre queda un único valor en la segunda, la primera manda sobre la segunda.
+\end{frame}
+
+% 4 ---------------------------------------------------------------------
+\begin{frame}{Repaso 2: tres tipos de dependencia}
+\begin{center}
+\footnotesize\hyphenpenalty=10000\exhyphenpenalty=10000
+\begin{tabular}{>{\bfseries\raggedright\arraybackslash}p{2.7cm}>{\raggedright\arraybackslash}p{4.3cm}>{\raggedright\arraybackslash}p{4.1cm}}
+\toprule
+Tipo & En qué consiste & Ejemplo de la tienda \\
+\midrule
+Completa (plena) & Se necesita el determinante entero & \{\texttt{pedido\_id}, \texttt{producto\_id}\} \fdep{} \texttt{cantidad} \\[4pt]
+Transitiva & Se llega pasando por una tercera columna & \texttt{pedido\_id} \fdep{} \texttt{cliente\_id} \fdep{} \texttt{cliente\_nombre} \\[4pt]
+Trivial & Lo pedido ya venía incluido en lo dado & \{\texttt{pedido\_id}, \texttt{producto\_id}\} \fdep{} \texttt{pedido\_id} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\small \textbf{Hoy usamos las dos primeras} para ponerle nombre y número a cada paso de separar una tabla.
+\end{frame}
+
+% 4b ---------------------------------------------------------------------
+\begin{frame}{Repaso: la multivaluada, en un ejemplo simple}
+\small Un cliente puede comprar \textbf{varios productos} y tener \textbf{varios métodos de pago}. Las dos listas son independientes entre sí:
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.44\textwidth}
+\footnotesize\centering\tblb{cliente\_producto\_pago}\\[3pt]
+\begin{tabular}{ccc}
+\toprule
+\bfseries cliente\_id & \bfseries producto & \bfseries metodo\_pago \\
+\midrule
+40285571 & Audífonos & Tarjeta \\
+40285571 & Audífonos & PayPal \\
+40285571 & Cargador  & Tarjeta \\
+40285571 & Cargador  & PayPal \\
+\bottomrule
+\end{tabular}
+\column{.52\textwidth}
+\begin{center}
+\begin{tikzpicture}[node distance=7mm]
+  \node[cajaverde,text width=2.2cm,font=\scriptsize] (cli) {\texttt{cliente\_id}};
+  \node[cajanaranja,text width=2cm,font=\scriptsize,below left=10mm and -4mm of cli] (pro) {\texttt{producto}};
+  \node[cajaazul,text width=2.3cm,font=\scriptsize,below right=10mm and -4mm of cli] (pag) {\texttt{metodo\_pago}};
+  \draw[flecha] (cli)--(pro);
+  \draw[flecha] (cli)--(pag);
+  \draw[dashed,draw=utpGris] (pro)--(pag);
+  \node[font=\tiny,text=utpGris,anchor=north] at ($(pro.south)!0.5!(pag.south)+(0,-1.5mm)$) {independientes entre sí};
+\end{tikzpicture}
+\end{center}
+\scriptsize\color{utpGris} Las dos flechas salen del mismo dato: el \textbf{producto} comprado en un pedido depende del \texttt{cliente\_id}, y el \textbf{método de pago} usado en ese pedido \textbf{también} depende del \texttt{cliente\_id}, pero no uno de otro.
+\end{columns}
+\end{frame}
+
+% 4b-bis ------------------------------------------------------------------
+\begin{frame}{Con más clientes, la mezcla crece rápido}
+\vspace{0.15cm}
+\begin{columns}[T,onlytextwidth]
+\column{.44\textwidth}
+\scriptsize\centering\tblb{cliente\_producto\_pago}\\[2pt]
+\begin{tabular}{ccc}
+\toprule
+\bfseries cliente\_id & \bfseries producto & \bfseries metodo\_pago \\
+\midrule
+40285571 & Audífonos & Tarjeta \\
+40285571 & Audífonos & PayPal \\
+40285571 & Cargador  & Tarjeta \\
+40285571 & Cargador  & PayPal \\
+16458744 & Mouse     & Tarjeta \\
+16458744 & Teclado   & Tarjeta \\
+\bottomrule
+\end{tabular}
+\column{.52\textwidth}
+\small \textbf{La salida de la dependencia multivaluada:} separar en dos tablas hermanas, cada una con \texttt{cliente\_id}, sin ninguna relación entre ellas.
+\vspace{0.15cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=1.8cm,font=\scriptsize,align=left] (cli)
+    {\tblb{cliente}\\ \texttt{id}\\ \texttt{nombre}};
+  \node[cajanaranja,text width=2.4cm,font=\scriptsize,align=left,right=16mm of cli] (pro)
+    {\tblb{producto\_comprado}\\ \texttt{id}\\ \texttt{cliente\_id}\\ \texttt{producto}};
+  \node[cajaazul,text width=2.4cm,font=\scriptsize,align=left,below=12mm of cli] (pag)
+    {\tblb{metodo\_pago}\\ \texttt{id}\\ \texttt{cliente\_id}\\ \texttt{metodo}};
+  \draw[relacion] (cli)--(pro);
+  \draw[relacion] (cli)--(pag);
+  \pic at ($(cli.east)!2.6mm!(pro.west)$) {uno};
+  \pic at ($(pro.west)!2.6mm!(cli.east)$) {muchos};
+  \pic[rotate=90] at ($(cli.south)!2.6mm!(pag.north)$) {uno};
+  \pic[rotate=-90] at ($(pag.north)!2.6mm!(cli.south)$) {muchos};
+\end{tikzpicture}
+\end{center}
+\end{columns}
+\vspace{0.2cm}
+\small Cada \texttt{cliente\_id} aparece \textbf{muchas} veces en \tbl{producto\_comprado} y \textbf{muchas} veces en \tbl{metodo\_pago}: dos relaciones 1:N que nunca se cruzan entre sí.
+\end{frame}
+
+% 4c ---------------------------------------------------------------------
+\begin{frame}{Antes de separar: la tabla única de la tienda}
+\small Así estaba la tabla de la tienda la sesión pasada, con una fila por cada línea de venta:
+\vspace{0.2cm}
+\begin{center}
+\begin{tablaventa}
+\begin{tabular}{ccccccc}
+\toprule
+\bfseries pedido\_id & \bfseries cliente\_id & \bfseries cliente\_nombre & \bfseries producto\_id & \bfseries producto\_nombre & \bfseries precio & \bfseries cantidad \\
+\midrule
+1 & 40285571 & Raúl    & 1 & Audífonos & 89.00 & 2 \\
+1 & 40285571 & Raúl    & 2 & Cargador  & 35.00 & 1 \\
+2 & 16458744 & Mariana & 1 & Audífonos & 89.00 & 1 \\
+2 & 16458744 & Mariana & 3 & Mouse     & 45.00 & 3 \\
+3 & 36547781 & Elena   & 2 & Cargador  & 35.00 & 2 \\
+\bottomrule
+\end{tabular}
+\end{tablaventa}
+\end{center}
+\vspace{0.35cm}
+\begin{alertblock}{El problema que ya conocíamos}
+\small El producto 1 aparece dos veces, y con él su nombre y su precio \textbf{89.00} repetidos. De esta tabla salieron las cuatro que separamos en la sesión pasada.
+\end{alertblock}
+\end{frame}
+
+% 5 ---------------------------------------------------------------------
+\begin{frame}{Repaso 3: así quedó la tienda, separada}
+\small La sesión pasada separamos la tabla única en cuatro, siguiendo las dependencias:
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.20\textwidth}
+\scriptsize\centering\tblb{cliente}\\[2pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries id & \bfseries nombre \\
+\midrule
+40285571 & Raúl \\
+\bottomrule
+\end{tabular}
+\column{.20\textwidth}
+\scriptsize\centering\tblb{pedido}\\[2pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries id & \bfseries cli.\_id \\
+\midrule
+1 & 40285571 \\
+\bottomrule
+\end{tabular}
+\column{.20\textwidth}
+\scriptsize\centering\tblb{producto}\\[2pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries id & \bfseries precio \\
+\midrule
+1 & 89.00 \\
+\bottomrule
+\end{tabular}
+\column{.38\textwidth}
+\scriptsize\centering\tblb{detalle\_pedido}\\[2pt]
+\begin{tabular}{ccc}
+\toprule
+\bfseries pedido\_id & \bfseries producto\_id & \bfseries cantidad \\
+\midrule
+1 & 1 & 2 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.4cm}
+\begin{alertblock}{Lo que todavía no dijimos}
+\small Separamos por instinto, siguiendo las dependencias. Hoy vamos a ponerle \textbf{nombre y número} a cada paso: eso es la \textbf{normalización}.
+\end{alertblock}
+\end{frame}
+
+% 6 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{115mm}{!}{\bfseries\color{utpNegro}Normalización}};
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{115mm}{1.6pt}};
+  \end{tikzpicture}
+\end{frame}
+
+% 7 ---------------------------------------------------------------------
+\begin{frame}{Normalizar es aplicar una lista de chequeo}
+\concepto{Normalización}{Un proceso en pasos: revisar una tabla contra una lista de reglas, y si falla alguna, separarla. Cada paso es una \textbf{forma normal}.}
+\vspace{0.3cm}
+\begin{center}
+\begin{tikzpicture}[node distance=6mm]
+  \node[cajaverde] (a) {\fn{1FN}};
+  \node[cajaverde,right=of a] (b) {\fn{2FN}};
+  \node[cajaverde,right=of b] (c) {\fn{3FN}};
+  \node[cajaverde,right=of c] (d) {\fn{FNBC}};
+  \draw[flecha] (a)--(b);
+  \draw[flecha] (b)--(c);
+  \draw[flecha] (c)--(d);
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\small Son \textbf{acumulativas}: para estar en 3FN una tabla también debe cumplir 1FN y 2FN. Cada forma corrige un problema que la anterior no alcanza a ver.
+\vspace{0.25cm}
+\analogia{Es como revisar un carro antes de un viaje: primero que tenga las cuatro llantas (1FN), luego que frene bien (2FN), luego que no se recaliente (3FN). Pasar la primera revisión no garantiza pasar la segunda.}
+\end{frame}
+
+% 8 ---------------------------------------------------------------------
+\begin{frame}{Antes de normalizar: una tabla con tres problemas}
+\small La tienda, otra vez en una sola tabla, pero ahora con los teléfonos del cliente:
+\vspace{0.2cm}
+\begin{center}
+\begin{tablaventa}
+\begin{tabular}{ccccccc}
+\toprule
+\bfseries pedido\_id & \bfseries cliente\_id & \bfseries cliente\_nombre & \bfseries cliente\_telefonos & \bfseries producto\_id & \bfseries producto\_nombre & \bfseries precio \\
+\midrule
+1 & 40285571 & Raúl & 987654321, 912345678 & 1 & Audífonos & 89.00 \\
+1 & 40285571 & Raúl & 987654321, 912345678 & 2 & Cargador  & 35.00 \\
+2 & 16458744 & Mariana & 998877665 & 1 & Audífonos & 89.00 \\
+\bottomrule
+\end{tabular}
+\end{tablaventa}
+\end{center}
+\vspace{0.35cm}
+\small Guarda esta tabla en la cabeza: en las próximas diapositivas la vamos a corregir \textbf{un problema a la vez}, y cada corrección tiene nombre.
+\end{frame}
+
+% 9 ---------------------------------------------------------------------
+\begin{frame}{\fn{1FN} Primera forma normal: una celda, un valor}
+\concepto{Primera forma normal (1FN)}{Cada celda guarda \textbf{un solo valor}, y no hay columnas repetidas para la misma idea (como \texttt{telefono1}, \texttt{telefono2}).}
+\vspace{0.25cm}
+\begin{columns}[T,onlytextwidth]
+\column{.47\textwidth}
+\begin{alertblock}{Rompe la 1FN}
+\small \texttt{cliente\_telefonos}: \textbf{``987654321, 912345678''} son dos teléfonos metidos en una sola celda.
+\end{alertblock}
+\column{.49\textwidth}
+\begin{exampleblock}{Cumple la 1FN}
+\small Una tabla \tbl{telefono}\texttt{(id, numero, cliente\_id)}, con una \textbf{fila} por cada número.
+\end{exampleblock}
+\end{columns}
+\vspace{0.3cm}
+\small \textbf{Cómo se detecta:} si para leer una celda necesitas \textit{separarla} tú mismo (por comas, por espacios) antes de usarla, esa celda no es atómica.
+\vspace{0.2cm}
+\ojo{No es solo por comas. Guardar \texttt{telefono1} y \texttt{telefono2} como dos columnas también rompe la 1FN: sigue siendo la misma idea repetida, y un tercer teléfono no tiene dónde ir.}
+\end{frame}
+
+% 10 ---------------------------------------------------------------------
+\begin{frame}{Completa: ¿está en 1FN?}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{9cm}p{2.4cm}}
+\toprule
+\bfseries Columna & \bfseries ¿1FN? \\
+\midrule
+\texttt{correo}: ``raul@mail.com'' & \bl[2cm] \\[8pt]
+\texttt{direcciones}: ``Av. Arequipa 100; Jr. Lima 250'' & \bl[2cm] \\[8pt]
+\texttt{categoria1}, \texttt{categoria2}, \texttt{categoria3} & \bl[2cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\small \textbf{Pista:} pregúntate si, para usar el dato, alguien tendría que cortar el texto o mirar varias columnas que dicen lo mismo.
+\end{frame}
+
+% 11 ---------------------------------------------------------------------
+\begin{frame}{Con la 1FN resuelta, así queda la tabla}
+\small Cada teléfono ahora vive en su propia fila, en su propia tabla:
+\vspace{0.2cm}
+\centering\footnotesize\texttt{\textbf{tabla principal (sin \texttt{cliente\_telefonos})}}\\[2pt]
+\begin{center}
+\begin{tablaventa}
+\begin{tabular}{cccccc}
+\toprule
+\bfseries pedido\_id & \bfseries cliente\_id & \bfseries cliente\_nombre & \bfseries producto\_id & \bfseries producto\_nombre & \bfseries precio \\
+\midrule
+1 & 40285571 & Raúl & 1 & Audífonos & 89.00 \\
+1 & 40285571 & Raúl & 2 & Cargador  & 35.00 \\
+2 & 16458744 & Mariana & 1 & Audífonos & 89.00 \\
+\bottomrule
+\end{tabular}
+\end{tablaventa}
+\end{center}
+\vspace{0.2cm}
+\centering\footnotesize\tblb{telefono}\\[2pt]
+\begin{center}
+\footnotesize
+\begin{tabular}{cc}
+\toprule
+\bfseries numero & \bfseries cliente\_id \\
+\midrule
+987654321 & 40285571 \\
+912345678 & 40285571 \\
+998877665 & 16458744 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\begin{alertblock}{Pero la tabla principal todavía tiene problemas}
+\small Fíjate en \texttt{producto\_nombre} y \texttt{precio}: se repiten. Esos son los problemas de las siguientes dos diapositivas.
+\end{alertblock}
+\end{frame}
+
+% 12 ---------------------------------------------------------------------
+\begin{frame}{\fn{2FN} Segunda forma normal: depender de la clave completa}
+\concepto{Segunda forma normal (2FN)}{Está en 1FN, y además \textbf{ninguna columna se conforma con la mitad de la clave}: si de verdad la necesita completa, tiene que usar las dos partes juntas.}
+\vspace{0.2cm}
+\small En la tabla principal la clave es \{\texttt{pedido\_id}, \texttt{producto\_id}\}: dos columnas juntas.
+\vspace{0.15cm}
+\analogia{Es como un asiento de cine: ``fila G'' sola no ubica a nadie, y ``asiento 12'' solo tampoco. Hacen falta las \textbf{dos partes juntas}. Si para ubicar un dato te alcanza con \textbf{una sola} de las dos, esa columna no depende de la clave completa.}
+\vspace{0.15cm}
+\ojo{Esto \textbf{solo aplica cuando la clave tiene dos o más columnas}. Si la clave es una sola columna (como \texttt{id}), la tabla ya está automáticamente en 2FN.}
+\end{frame}
+
+% 12b ---------------------------------------------------------------------
+\begin{frame}{Paso 1: probemos con los datos}
+\small Dos filas con el \textbf{mismo} \texttt{producto\_id} pero \textbf{distinto} \texttt{pedido\_id}:
+\vspace{0.2cm}
+\begin{center}
+\small
+\begin{tabular}{cccc}
+\toprule
+\bfseries pedido\_id & \bfseries producto\_id & \bfseries producto\_nombre & \bfseries precio \\
+\midrule
+1 & 1 & Audífonos & 89.00 \\
+2 & 1 & Audífonos & 89.00 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.25cm}
+\begin{exampleblock}{El pedido cambió y el precio no}
+\small Cambiamos \texttt{pedido\_id} (de 1 a 2) y \texttt{precio} \textbf{se quedó igual}. Eso quiere decir que \texttt{pedido\_id} no hacía falta: con \texttt{producto\_id} solo ya alcanzaba.
+\end{exampleblock}
+\vspace{0.2cm}
+\small \textbf{Conclusión:} \texttt{producto\_nombre} y \texttt{precio} le bastan con \textbf{una sola parte} de la clave, no con las dos. Por la misma prueba, \texttt{cliente\_nombre} le basta con \texttt{pedido\_id} solo.
+\end{frame}
+
+% 13 ---------------------------------------------------------------------
+\begin{frame}{Paso 2: a esas columnas les sobra la mitad de la clave}
+\small \texttt{producto\_nombre} y \texttt{precio} no necesitan el pedido para saberse, con \texttt{producto\_id} basta:
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[caja,text width=2.5cm,font=\footnotesize] (k) {\{\texttt{pedido\_id},\\\texttt{producto\_id}\}};
+  \node[cajaverde,font=\footnotesize,right=20mm of k] (p) {\texttt{producto\_id}};
+  \node[caja,font=\footnotesize,right=20mm of p] (n) {\texttt{precio}};
+  \draw[flecha,draw=utpRojo] (k) to[out=30,in=150] node[midway,above,font=\scriptsize,text=utpRojo]{sobra el pedido} (n);
+  \draw[flecha] (p)--(n) node[midway,below,font=\scriptsize]{directa};
+\end{tikzpicture}
+\end{center}
+\vspace{0.15cm}
+\begin{alertblock}{Por qué molesta}
+\small Audífonos aparece en dos pedidos, y con él su precio 89.00. Si sube a 99.00 hay que corregir \textbf{cada pedido} donde aparece; olvidar uno deja dos precios distintos.
+\end{alertblock}
+\vspace{0.15cm}
+\small \textbf{La corrección:} sacar \texttt{producto\_nombre} y \texttt{precio} a su propia tabla \tbl{producto}\texttt{(id, nombre, precio)}, igual que hicimos la sesión pasada.
+\end{frame}
+
+% 15 ---------------------------------------------------------------------
+\begin{frame}{Con la 2FN resuelta, así queda la tabla}
+\small Ya en 2FN: cada tabla tiene una clave, y todo lo demás depende de ella completa:
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.30\textwidth}
+\footnotesize\centering\tblb{pedido}\\[2pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries id & \bfseries cliente\_id \\
+\midrule
+1 & 40285571 \\
+2 & 16458744 \\
+\bottomrule
+\end{tabular}
+\vspace{4pt}
+
+\footnotesize\centering\tblb{cliente}\\[2pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries id & \bfseries nombre \\
+\midrule
+40285571 & Raúl \\
+16458744 & Mariana \\
+\bottomrule
+\end{tabular}
+\column{.32\textwidth}
+\footnotesize\centering\tblb{producto}\\[2pt]
+\begin{tabular}{ccc}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries precio \\
+\midrule
+1 & Audífonos & 89.00 \\
+2 & Cargador & 35.00 \\
+\bottomrule
+\end{tabular}
+\column{.34\textwidth}
+\footnotesize\centering\tblb{detalle\_pedido}\\[2pt]
+\begin{tabular}{ccc}
+\toprule
+\bfseries pedido\_id & \bfseries producto\_id & \bfseries cantidad \\
+\midrule
+1 & 1 & 2 \\
+1 & 2 & 1 \\
+2 & 1 & 1 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.35cm}
+\begin{alertblock}{Todavía queda un problema, y no está en \tbl{detalle\_pedido}}
+\small Mira las tablas \tbl{pedido} y \tbl{cliente}: para llegar al nombre de Raúl desde el pedido, hay que \textbf{pasar por} \texttt{cliente\_id}. Eso ya lo vimos la sesión pasada con otro nombre.
+\end{alertblock}
+\end{frame}
+
+% 16 ---------------------------------------------------------------------
+\begin{frame}{\fn{3FN} Tercera forma normal: sin rodeos}
+\concepto{Tercera forma normal (3FN)}{Está en 2FN, y además \textbf{ninguna columna depende de otra que no sea la clave}. Nada de dependencias transitivas.}
+\vspace{0.15cm}
+\small Si \texttt{cliente\_nombre} viviera dentro de \tbl{pedido}, la cadena sería:
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,font=\footnotesize] (a) {\texttt{pedido\_id}};
+  \node[caja,font=\footnotesize,right=22mm of a] (b) {\texttt{cliente\_id}};
+  \node[caja,font=\footnotesize,right=22mm of b] (c) {\texttt{cliente\_nombre}};
+  \draw[flecha] (a)--(b) node[midway,above,font=\scriptsize]{directa};
+  \draw[flecha] (b)--(c) node[midway,above,font=\scriptsize]{directa};
+  \draw[flecha,draw=utpRojo] (a) to[out=-32,in=-148]
+    node[midway,below,font=\scriptsize,text=utpRojo]{transitiva: de regalo, con rodeo} (c);
+\end{tikzpicture}
+\end{center}
+\small \textbf{La regla práctica:} si para llegar a un dato hay que pasar por una columna que \textbf{no es la clave}, ese dato pertenece a otra tabla. Por eso \texttt{cliente\_nombre} vive en \tbl{cliente}, no en \tbl{pedido}.
+\vspace{0.1cm}
+\analogia{\small Es como pedir tu vuelto: el cajero no te lo da sabiendo tu nombre, pasa primero por la caja. \tbl{pedido} tampoco debería ``saber'' el nombre del cliente sin pasar por \texttt{cliente\_id}.}
+\end{frame}
+
+% 17 ---------------------------------------------------------------------
+\begin{frame}{Completa: encuentra la dependencia transitiva}
+\small La tabla \tbl{producto} de un catálogo, con el proveedor incluido:
+\vspace{0.2cm}
+\begin{center}
+\footnotesize\setlength\tabcolsep{5pt}
+\begin{tabular}{ccccc}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries proveedor\_id & \bfseries proveedor\_nombre & \bfseries proveedor\_ciudad \\
+\midrule
+1 & Audífonos & 10 & SonidoTop & Lima \\
+2 & Cargador  & 10 & SonidoTop & Lima \\
+3 & Mouse     & 11 & ClickPerú & Arequipa \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\small \textbf{Completa la cadena}, igual que en el ejemplo anterior (\texttt{pedido\_id} \fdep{} \texttt{cliente\_id} \fdep{} \texttt{cliente\_nombre}): en el primer espacio va la columna que \texttt{id} determina \textbf{directamente} y que no es la clave; en el segundo, la columna a la que solo se llega \textbf{pasando por} esa primera.
+\vspace{0.15cm}
+\begin{center}
+\texttt{id} \fdep{} \bl[2.6cm] \fdep{} \texttt{proveedor\_ciudad}
+\end{center}
+\vspace{0.15cm}
+
+\small \textbf{¿Qué tabla nueva hace falta, y qué columna se queda en \tbl{producto} como clave foránea?}\\
+\bl[9cm]
+\end{frame}
+
+% 18 ---------------------------------------------------------------------
+\begin{frame}{Con la 3FN resuelta, así queda el catálogo}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\footnotesize \tblb{producto}\\[3pt]
+\begin{tabular}{ccc}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries proveedor\_id \\
+\midrule
+1 & Audífonos & 10 \\
+2 & Cargador & 10 \\
+3 & Mouse & 11 \\
+\bottomrule
+\end{tabular}
+\column{.46\textwidth}
+\centering\footnotesize \tblb{proveedor}\\[3pt]
+\begin{tabular}{ccc}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries ciudad \\
+\midrule
+10 & SonidoTop & Lima \\
+11 & ClickPerú & Arequipa \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.4cm}
+\begin{block}{Con esto, la tabla \tbl{producto} ya está en 3FN}
+\small Toda columna depende \textbf{directamente} de \texttt{id} y de nada más. Lima queda escrito una sola vez, junto a su proveedor.
+\end{block}
+\vspace{0.2cm}
+\small En la práctica, \textbf{la gran mayoría} de las tablas bien diseñadas se quedan aquí: 3FN alcanza casi siempre.
+\end{frame}
+
+% 19 ---------------------------------------------------------------------
+\begin{frame}{\fn{FNBC} Un caso raro: dos caminos para identificar la fila}
+\small En un instituto, cada profesor dicta un solo curso, pero un curso puede tener varios profesores (uno por sección):
+\vspace{0.15cm}
+\begin{center}
+\footnotesize
+\begin{tabular}{ccc}
+\toprule
+\bfseries estudiante & \bfseries curso & \bfseries profesor \\
+\midrule
+Ana & Base de Datos & García \\
+Luis & Base de Datos & García \\
+Ana & Redes & Pérez \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\small La clave de esta tabla es \{\texttt{estudiante}, \texttt{curso}\}: ya está en 3FN. Pero prueba con los datos, tapando solo \texttt{profesor} y \texttt{curso}:
+\vspace{0.15cm}
+\begin{exampleblock}{Algo curioso}
+\small Cada vez que \texttt{profesor} dice \textbf{García}, \texttt{curso} dice \textbf{Base de Datos}, las dos veces. \texttt{profesor} por sí solo \textbf{también} determina algo. ¿Casualidad, o hay una segunda dependencia escondida?
+\end{exampleblock}
+\end{frame}
+
+% 19b ---------------------------------------------------------------------
+\begin{frame}{\fn{FNBC} Esa segunda dependencia es el problema}
+\small La tabla tiene, en realidad, \textbf{dos} dependencias funcionales:
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}[node distance=8mm]
+  \node[cajaverde,text width=3cm,font=\footnotesize] (k) {\{\texttt{estudiante},\\\texttt{curso}\}};
+  \node[caja,text width=2.2cm,font=\footnotesize,right=18mm of k] (p) {\texttt{profesor}};
+  \draw[flecha] (k)--(p) node[midway,above,font=\scriptsize]{la clave, normal};
+  \node[caja,text width=2.2cm,font=\footnotesize,below=14mm of p] (c) {\texttt{curso}};
+  \draw[flecha,draw=utpRojo] (p)--(c) node[midway,right,font=\scriptsize,text=utpRojo]{¡sorpresa!};
+\end{tikzpicture}
+\end{center}
+\vspace{0.15cm}
+\concepto{Forma normal de Boyce-Codd (FNBC)}{Está en 3FN, y además \textbf{todo determinante es una clave candidata}: una columna (o combinación) que también podría identificar la fila por sí sola.}
+\vspace{0.15cm}
+\small \texttt{profesor} determina a \texttt{curso}, pero \texttt{profesor} solo \textbf{no} identifica la fila (no dice de qué estudiante se trata): no es clave candidata. Por eso esta tabla \textbf{no} cumple FNBC, aunque sí cumpla 3FN.
+\end{frame}
+
+% 19c ---------------------------------------------------------------------
+\begin{frame}{\fn{FNBC} La corrección: separar donde vive el profesor}
+\small Sacamos la dependencia sobrante (\texttt{profesor} \fdep{} \texttt{curso}) a su propia tabla:
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.46\textwidth}
+\centering\footnotesize\tblb{profesor}\\[3pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries nombre & \bfseries curso \\
+\midrule
+García & Base de Datos \\
+Pérez  & Redes \\
+\bottomrule
+\end{tabular}
+\column{.5\textwidth}
+\centering\footnotesize\tblb{inscripcion}\\[3pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries estudiante & \bfseries profesor \\
+\midrule
+Ana  & García \\
+Luis & García \\
+Ana  & Pérez \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.3cm}
+\small Ahora \texttt{curso} vive solo en \tbl{profesor}, junto a su determinante real. En \tbl{inscripcion}, \texttt{profesor} ya no determina nada por su cuenta: \textbf{todo} determinante vuelve a ser clave candidata.
+\vspace{0.15cm}
+\ojo{Este caso es \textbf{raro}: hace falta que una tabla tenga dos claves candidatas que se pisan. Si nunca lo ves, ya estás en FNBC en cuanto llegas a 3FN. Por eso casi no se usa en el trabajo diario.}
+\end{frame}
+
+% 20 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+
+% 21 ---------------------------------------------------------------------
+\begin{frame}{Las cuatro formas, en un solo cuadro}
+\begin{center}
+\footnotesize\hyphenpenalty=10000\exhyphenpenalty=10000
+\begin{tabular}{>{\bfseries\raggedright\arraybackslash}p{1.6cm}>{\raggedright\arraybackslash}p{5.4cm}>{\raggedright\arraybackslash}p{4.3cm}}
+\toprule
+Forma & Exige & Se rompe cuando\ldots \\
+\midrule
+1FN & Celdas con un solo valor, sin columnas repetidas & una celda guarda varios teléfonos \\[4pt]
+2FN & 1FN + depender de la clave \textbf{completa} & el precio depende solo de \texttt{producto\_id}, no del pedido \\[4pt]
+3FN & 2FN + sin depender de una columna que no es la clave & el nombre del cliente se llega pasando por \texttt{cliente\_id} \\[4pt]
+FNBC & 3FN + todo determinante es clave candidata & hay dos claves candidatas que se pisan \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.25cm}
+\begin{block}{¿Esto se usa en la práctica?}
+\small Casi nadie dicta ``normalizo hasta FNBC''. Lo que sí se hace todo el tiempo: diseñar para que cada dato se escriba \textbf{una sola vez}, que es exactamente a dónde llega la 3FN.
+\end{block}
+\end{frame}
+
+% 22 ---------------------------------------------------------------------
+\begin{frame}{¿Y desnormalizar? Cuando sí conviene repetir un dato}
+\small Normalizar evita la redundancia, pero tiene un costo: para armar el pedido completo hay que \textbf{unir} cuatro tablas.
+\vspace{0.25cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\begin{exampleblock}{Normalizado (lo que hicimos hoy)}
+\small Un solo lugar para corregir cada dato. Ideal para \textbf{registrar} ventas todos los días.
+\end{exampleblock}
+\column{.49\textwidth}
+\begin{alertblock}{Desnormalizado (a propósito)}
+\small Copiar \texttt{producto\_nombre} dentro de \tbl{detalle\_pedido} para no unir tablas en un reporte que se lee \textbf{miles de veces}.
+\end{alertblock}
+\end{columns}
+\vspace{0.3cm}
+\enlarealidad{Es una decisión, no un error: se normaliza por defecto y se desnormaliza \textbf{a propósito}, casi siempre en reportes o paneles donde la velocidad de lectura importa más que ahorrar espacio.}
+\end{frame}
+
+% 23 ---------------------------------------------------------------------
+\begin{frame}{Cierre: completa en voz alta}
+\begin{itemize}\setlength\itemsep{14pt}
+  \item Una tabla está en 1FN cuando \bl[6cm]
+  \item Una tabla está en 2FN cuando, además de 1FN, \bl[4.5cm]
+  \item Una tabla está en 3FN cuando, además de 2FN, \bl[4.5cm]
+  \item La forma normal que alcanza casi siempre en la práctica es \bl[2.5cm]
+\end{itemize}
+\end{frame}
+
+% 24 ---------------------------------------------------------------------
+\begin{frame}{Referencias}
+\footnotesize
+Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración} (9.ª ed.). Cengage Learning.
+
+\vspace{0.35cm}
+Elmasri, R., \& Navathe, S. (2007). \textit{Fundamentos de sistemas de bases de datos} (5.ª ed.). Addison Wesley.
+
+\vspace{0.35cm}
+Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2020). \textit{Database system concepts} (7th ed.). McGraw-Hill.
+\end{frame}
+
+% ---------------------------------------------------------------------
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}

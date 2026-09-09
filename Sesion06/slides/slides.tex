@@ -1,0 +1,396 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+
+\title{Dependencias funcionales entre los datos}
+\subtitle{Descubrir qué dato depende de cuál antes de crear las tablas}
+\date{Semana 03 - Sesión 06}
+\author{Rel Guzman}
+
+% Flecha de dependencia funcional y espacio en blanco para completar
+\newcommand{\fdep}{$\rightarrow$}
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Tabla ancha de la tienda
+\newenvironment{tablaventa}{\footnotesize\setlength\tabcolsep{4.5pt}}{}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás mirar una tabla y decir \textbf{qué columna depende de cuál}; con eso podrás \textbf{separarla en varias tablas} sin perder información.
+\end{block}
+\end{frame}
+
+% 3 ---------------------------------------------------------------------
+\begin{frame}{Para empezar: completa la segunda columna}
+\begin{center}
+\small
+\begin{tabular}{p{6.2cm}p{5.2cm}}
+\toprule
+\bfseries En una tienda online, para obtener\ldots & \bfseries necesito conocer\ldots \\
+\midrule
+El precio de un producto & el producto \\[4pt]
+El nombre del cliente de un pedido & \bl[3.6cm] \\[4pt]
+Cuántas unidades se pidieron & \bl[3.6cm] \\[4pt]
+El stock de un producto & \bl[3.6cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.35cm}
+\small La primera fila ya está resuelta. Al completarla notarás algo: \textbf{a veces basta un dato y a veces hacen falta dos}. Ese es el tema de hoy.
+\end{frame}
+
+% 4 ---------------------------------------------------------------------
+\begin{frame}{Tres pedidos de la tienda}
+\begin{columns}[T,onlytextwidth]
+\column{.32\textwidth}
+\begin{center}
+\begin{tikzpicture}
+\node[caja,align=left,text width=3.3cm,inner sep=7pt] {%
+  \footnotesize\textbf{Pedido 1}\\[1pt]
+  {\scriptsize Cliente 40285571 · Raúl}\\[4pt]
+  {\color{utpGrisMedio}\rule{3.3cm}{0.4pt}}\\[3pt]
+  \footnotesize 2 $\times$ Audífonos \hfill 89.00\\[2pt]
+  \footnotesize 1 $\times$ Cargador \hfill 35.00\\[4pt]
+  {\color{utpGrisMedio}\rule{3.3cm}{0.4pt}}\\[3pt]
+  \footnotesize\textbf{Total} \hfill \textbf{213.00}};
+\end{tikzpicture}
+\end{center}
+\column{.32\textwidth}
+\begin{center}
+\begin{tikzpicture}
+\node[caja,align=left,text width=3.3cm,inner sep=7pt] {%
+  \footnotesize\textbf{Pedido 2}\\[1pt]
+  {\scriptsize Cliente 16458744 · Mariana}\\[4pt]
+  {\color{utpGrisMedio}\rule{3.3cm}{0.4pt}}\\[3pt]
+  \footnotesize 1 $\times$ Audífonos \hfill 89.00\\[2pt]
+  \footnotesize 3 $\times$ Mouse \hfill 45.00\\[4pt]
+  {\color{utpGrisMedio}\rule{3.3cm}{0.4pt}}\\[3pt]
+  \footnotesize\textbf{Total} \hfill \textbf{224.00}};
+\end{tikzpicture}
+\end{center}
+\column{.32\textwidth}
+\begin{center}
+\begin{tikzpicture}
+\node[caja,align=left,text width=3.3cm,inner sep=7pt] {%
+  \footnotesize\textbf{Pedido 3}\\[1pt]
+  {\scriptsize Cliente 36547781 · Elena}\\[4pt]
+  {\color{utpGrisMedio}\rule{3.3cm}{0.4pt}}\\[3pt]
+  \footnotesize 2 $\times$ Cargador \hfill 35.00\\[2pt]
+  \footnotesize\phantom{1 $\times$ Cargador}\hfill\phantom{35.00}\\[2pt]
+  {\color{utpGrisMedio}\rule{3.3cm}{0.4pt}}\\[3pt]
+  \footnotesize\textbf{Total} \hfill \textbf{70.00}};
+\end{tikzpicture}
+\end{center}
+\end{columns}
+\vspace{0.45cm}
+\small Tres pedidos, tres clientes y tres productos distintos. En total son \textbf{cinco líneas de venta}: el pedido 1 tiene dos, el pedido 2 tiene dos y el pedido 3 tiene una.
+\end{frame}
+
+% 5 ---------------------------------------------------------------------
+\begin{frame}{El problema: la tienda guarda todo en una sola tabla}
+\small Los mismos tres pedidos, con una fila por cada línea de venta:
+\vspace{0.2cm}
+\begin{center}
+\begin{tablaventa}
+\begin{tabular}{ccccccc}
+\toprule
+\bfseries pedido\_id & \bfseries cliente\_id & \bfseries cliente\_nombre & \bfseries producto\_id & \bfseries producto\_nombre & \bfseries precio & \bfseries cantidad \\
+\midrule
+1 & 40285571 & Raúl    & 1 & Audífonos & 89.00 & 2 \\
+1 & 40285571 & Raúl    & 2 & Cargador  & 35.00 & 1 \\
+2 & 16458744 & Mariana & 1 & Audífonos & 89.00 & 1 \\
+2 & 16458744 & Mariana & 3 & Mouse     & 45.00 & 3 \\
+3 & 36547781 & Elena   & 2 & Cargador  & 35.00 & 2 \\
+\bottomrule
+\end{tabular}
+\end{tablaventa}
+\end{center}
+\vspace{0.4cm}
+\begin{alertblock}{Mira la repetición}
+\small El producto 1 aparece dos veces, y con él su nombre y su precio \textbf{89.00}. Si Audífonos sube a 99.00 y olvidamos corregir una fila, la tienda tendrá \textbf{dos precios} para el mismo producto.
+\end{alertblock}
+\end{frame}
+
+% 6 ---------------------------------------------------------------------
+\begin{frame}{La pregunta de hoy: ``si sé esto, ¿sé aquello?''}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\begin{exampleblock}{Sí funciona}
+\small Te digo \texttt{producto\_id} = \textbf{1}.\\
+¿Cuál es su precio? \textbf{89.00}, siempre.
+\end{exampleblock}
+\column{.48\textwidth}
+\begin{alertblock}{No funciona}
+\small Te digo \texttt{precio} = \textbf{89.00}.\\
+¿Qué producto es? No se puede saber.
+\end{alertblock}
+\end{columns}
+\vspace{0.45cm}
+\begin{block}{La prueba}
+Elige dos columnas y tapa el resto. Si al fijar la primera siempre queda \textbf{un único} valor en la segunda, la primera manda sobre la segunda.
+\end{block}
+\end{frame}
+
+% 7 ---------------------------------------------------------------------
+\begin{frame}{Eso se llama dependencia funcional}
+\concepto{Dependencia funcional}{Al fijar el valor de una columna, queda determinado \textbf{un único} valor de otra.}
+\vspace{0.3cm}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\begin{center}
+\begin{tikzpicture}[node distance=8mm]
+  \node[cajaverde,text width=2.6cm] (a) {\texttt{producto\_id}};
+  \node[cajanaranja,text width=2.2cm,right=11mm of a] (b) {\texttt{precio}};
+  \draw[flecha] (a)--(b);
+  \node[font=\scriptsize,below=1mm of a] {determinante};
+  \node[font=\scriptsize,below=1mm of b] {dependiente};
+\end{tikzpicture}
+\end{center}
+\column{.44\textwidth}
+\small Se escribe \texttt{producto\_id} \fdep{} \texttt{precio}\\[5pt]
+Se lee de dos maneras:
+\begin{itemize}\setlength\itemsep{4pt}\small
+  \item ``sabiendo el \texttt{producto\_id} puedo saber el \texttt{precio}'';
+  \item ``\texttt{producto\_id} determina a \texttt{precio}''.
+\end{itemize}
+\end{columns}
+\vspace{0.4cm}
+\small \textbf{Este es el único ejemplo que hay que tener claro hoy.} Lo demás es aplicar la misma prueba a otras columnas.
+\end{frame}
+
+% 8 ---------------------------------------------------------------------
+\begin{frame}{Completa las dependencias de la tabla}
+\begin{center}
+\begin{tablaventa}
+\begin{tabular}{ccccccc}
+\toprule
+\bfseries pedido\_id & \bfseries cliente\_id & \bfseries cliente\_nombre & \bfseries producto\_id & \bfseries producto\_nombre & \bfseries precio & \bfseries cantidad \\
+\midrule
+1 & 40285571 & Raúl    & 1 & Audífonos & 89.00 & 2 \\
+1 & 40285571 & Raúl    & 2 & Cargador  & 35.00 & 1 \\
+2 & 16458744 & Mariana & 1 & Audífonos & 89.00 & 1 \\
+\bottomrule
+\end{tabular}
+\end{tablaventa}
+\end{center}
+\vspace{0.35cm}
+\begin{columns}[T,onlytextwidth]
+\column{.54\textwidth}
+\small \textbf{Escribe el nombre de la columna que falta:}
+\begin{enumerate}\setlength\itemsep{7pt}\small
+  \item \texttt{producto\_id} \fdep{} \bl
+  \item \texttt{cliente\_id} \fdep{} \bl
+  \item \bl{} \fdep{} \texttt{cliente\_id}
+\end{enumerate}
+\column{.42\textwidth}
+\small \textbf{Responde sí o no:}
+\vspace{4pt}
+
+\small ¿Se cumple \texttt{producto\_id} \fdep{} \texttt{cantidad}?\\[5pt]
+Respuesta: \bl[1.6cm]
+\vspace{7pt}
+
+\small ¿Por qué? \bl[3cm]
+\end{columns}
+\end{frame}
+
+% 9 ---------------------------------------------------------------------
+\begin{frame}{A veces el determinante son dos columnas juntas}
+\begin{columns}[T,onlytextwidth]
+\column{.47\textwidth}
+\begin{alertblock}{Con una sola columna falla}
+\small
+\texttt{pedido\_id} \fdep{} \texttt{cantidad}: en el pedido 1 hay 2 y 1.\\[4pt]
+\texttt{producto\_id} \fdep{} \texttt{cantidad}: del producto 1 hay 2 y 1.
+\end{alertblock}
+\column{.49\textwidth}
+\begin{exampleblock}{Con las dos juntas funciona}
+\small
+\{\texttt{pedido\_id}, \texttt{producto\_id}\} \fdep{} \texttt{cantidad}\\[4pt]
+``producto 1 en el pedido 1'' da \textbf{2} y nada más.
+\end{exampleblock}
+\end{columns}
+\vspace{0.45cm}
+\analogia{Es como un asiento en el cine: la fila sola no ubica a nadie y el número solo tampoco. ``Fila G, asiento 12'' sí señala un único asiento.}
+\end{frame}
+
+% 10 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+
+% 11 ---------------------------------------------------------------------
+\begin{frame}{Cada dependencia se convierte en una tabla}
+\small Regla: \textbf{cada determinante se lleva consigo a sus dependientes} y se vuelve la clave primaria (\texttt{id}) de su tabla.
+\vspace{0.25cm}
+\begin{columns}[T,onlytextwidth]
+\column{.28\textwidth}
+\footnotesize
+\texttt{\textbf{cliente}} \hfill {\scriptsize \texttt{cliente\_id}\fdep{}\texttt{nombre}}
+\begin{tabular}{cc}
+\toprule
+\bfseries id & \bfseries nombre \\
+\midrule
+40285571 & Raúl \\
+16458744 & Mariana \\
+36547781 & Elena \\
+\bottomrule
+\end{tabular}
+\vspace{8pt}
+
+\texttt{\textbf{pedido}} \hfill {\scriptsize \texttt{pedido\_id}\fdep{}\texttt{cliente\_id}}
+\begin{tabular}{cc}
+\toprule
+\bfseries id & \bfseries cliente\_id \\
+\midrule
+1 & 40285571 \\
+2 & 16458744 \\
+3 & 36547781 \\
+\bottomrule
+\end{tabular}
+\column{.30\textwidth}
+\footnotesize
+\texttt{\textbf{producto}} \hfill {\scriptsize \texttt{producto\_id}\fdep{}\texttt{precio}}
+\begin{tabular}{ccc}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries precio \\
+\midrule
+1 & Audífonos & 89.00 \\
+2 & Cargador & 35.00 \\
+3 & Mouse & 45.00 \\
+\bottomrule
+\end{tabular}
+\column{.38\textwidth}
+\footnotesize
+\texttt{\textbf{detalle\_pedido}}
+\begin{tabular}{ccc}
+\toprule
+\bfseries pedido\_id & \bfseries producto\_id & \bfseries cantidad \\
+\midrule
+1 & 1 & 2 \\
+1 & 2 & 1 \\
+2 & 1 & 1 \\
+2 & 3 & 3 \\
+3 & 2 & 2 \\
+\bottomrule
+\end{tabular}
+{\scriptsize \{\texttt{pedido\_id},\texttt{producto\_id}\}\fdep{}\texttt{cantidad}}
+\end{columns}
+\vspace{0.25cm}
+\small El precio \textbf{89.00} queda escrito una sola vez. Dentro de su tabla el determinante se llama \texttt{id}; cuando aparece en otra lleva el nombre de su tabla más \texttt{\_id} y es una \textbf{clave foránea}, como \texttt{cliente\_id} o \texttt{producto\_id}.
+\end{frame}
+
+% 12 ---------------------------------------------------------------------
+\begin{frame}{Completa la separación del catálogo \textnormal{\small(en grupo)}}
+\begin{center}
+\footnotesize\setlength\tabcolsep{5pt}
+\begin{tabular}{cccccc}
+\toprule
+\bfseries producto\_id & \bfseries producto\_nombre & \bfseries precio & \bfseries proveedor\_id & \bfseries proveedor\_nombre & \bfseries proveedor\_ciudad \\
+\midrule
+1 & Audífonos & 89.00 & 10 & SonidoTop & Lima \\
+2 & Cargador  & 35.00 & 10 & SonidoTop & Lima \\
+3 & Mouse     & 45.00 & 11 & ClickPerú & Arequipa \\
+4 & Teclado   & 79.00 & 11 & ClickPerú & Arequipa \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.35cm}
+\begin{columns}[T,onlytextwidth]
+\column{.50\textwidth}
+\centering\footnotesize \texttt{\textbf{producto}}\\[3pt]
+\begin{tabular}{cccc}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries precio & \bfseries proveedor\_id \\
+\midrule
+1 & Audífonos & 89.00 & 10 \\
+2 & \bl[1.1cm] & \bl[.8cm] & \bl[.7cm] \\
+3 & \bl[1.1cm] & \bl[.8cm] & \bl[.7cm] \\
+4 & \bl[1.1cm] & \bl[.8cm] & \bl[.7cm] \\
+\bottomrule
+\end{tabular}
+\column{.46\textwidth}
+\centering\footnotesize \texttt{\textbf{proveedor}}\\[3pt]
+\begin{tabular}{ccc}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries ciudad \\
+\midrule
+10 & SonidoTop & Lima \\
+11 & \bl[1.5cm] & \bl[1.5cm] \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.4cm}
+\small \textbf{Y escribe las dos dependencias:}\\[5pt]
+\hspace*{1cm}\texttt{producto\_id} \fdep{} \bl[2.8cm] \hspace{1.4cm} \bl[2.8cm] \fdep{} \texttt{proveedor\_nombre}
+\end{frame}
+
+% 13 ---------------------------------------------------------------------
+\begin{frame}{Para saber más: tipos y práctica real\apoyo}
+\begin{center}
+\footnotesize
+\begin{tabular}{>{\bfseries}p{2.1cm}>{\raggedright\arraybackslash}p{3.5cm}>{\raggedright\arraybackslash}p{5.6cm}}
+\toprule
+Tipo & En qué consiste & En la tabla de la tienda \\
+\midrule
+Plena & Se necesita el determinante completo & \{\texttt{pedido\_id}, \texttt{producto\_id}\} \fdep{} \texttt{cantidad} \\
+Transitiva & Se llega pasando por una tercera columna & \texttt{pedido\_id} \fdep{} \texttt{cliente\_id} \fdep{} \texttt{cliente\_nombre} \\
+Trivial & Lo pedido ya venía incluido en lo dado & \{\texttt{pedido\_id}, \texttt{producto\_id}\} \fdep{} \texttt{pedido\_id} \\
+Multivaluada & Un valor lleva a una lista independiente de otra & un cliente guarda varias direcciones y varias tarjetas, sin relación entre sí \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.25cm}
+\begin{block}{¿Esto se usa en la práctica?}
+\small Nadie dice ``esta dependencia es transitiva''; lo que sí se hace es \textbf{preguntar si el dato depende de toda la clave}.
+\end{block}
+\end{frame}
+
+% 14 ---------------------------------------------------------------------
+\begin{frame}{Cierre: completa en voz alta}
+\begin{itemize}\setlength\itemsep{16pt}
+  \item Una columna ``determina'' a otra cuando \bl[5.5cm]
+  \item Una dependencia que necesita dos columnas juntas es \bl[4cm]
+  \item Separamos la tabla en cuatro para que cada dato \bl[4.5cm]
+\end{itemize}
+\end{frame}
+
+% 15 ---------------------------------------------------------------------
+\begin{frame}{Referencias}
+\footnotesize
+Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración} (9.ª ed.). Cengage Learning.
+
+\vspace{0.35cm}
+Elmasri, R., \& Navathe, S. (2007). \textit{Fundamentos de sistemas de bases de datos} (5.ª ed.). Addison Wesley.
+
+\vspace{0.35cm}
+Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2020). \textit{Database system concepts} (7th ed.). McGraw-Hill.
+\end{frame}
+
+% ---------------------------------------------------------------------
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}

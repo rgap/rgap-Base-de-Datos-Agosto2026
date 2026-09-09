@@ -1,0 +1,621 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+
+\title{Cómo escribimos una base de datos}
+\subtitle{Notación para nombrar tablas y columnas, y cómo pasar del dibujo a las tablas}
+\date{Material introductorio}
+\author{Rel Guzman}
+
+% Bloque de código SQL sobre fondo gris
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{5pt}}
+  {\vspace{5pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, sabrás \textbf{escribir una tabla} con nombres y tipos correctos, y \textbf{convertir un dibujo de entidades} en tablas conectadas entre sí.
+\end{block}
+\end{frame}
+
+% 3 ---------------------------------------------------------------------
+\begin{frame}{¿Por qué acordar una forma de nombrar?}
+\begin{center}
+\small
+\begin{tabular}{cccc}
+\toprule
+\multicolumn{4}{c}{\bfseries El mismo dato, escrito por cuatro personas} \\
+\midrule
+\texttt{nombreCliente} & \texttt{NombreDelCliente} & \texttt{nom\_cli} & \texttt{nombre} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.45cm}
+\begin{alertblock}{El problema no es la apariencia, es la memoria}
+\small Los cuatro guardan lo mismo. Pero quien escriba una consulta mañana tiene que \textbf{adivinar} cuál se usó. Acordar una sola forma evita esa adivinanza.
+\end{alertblock}
+\vspace{0.15cm}
+\small En este curso usaremos \textbf{una sola convención}, la misma en todas las sesiones.
+\end{frame}
+
+% 4 ---------------------------------------------------------------------
+\begin{frame}{Tres palabras para leer una tabla}
+\begin{center}
+\small
+\begin{tabular}{ccc}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries correo \\
+\midrule
+1 & Raúl & raul@correo.com \\
+2 & Mariana & mariana@correo.com \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4cm}
+\begin{columns}[T,onlytextwidth]
+\column{.32\textwidth}
+\begin{block}{Tabla}
+\small Todo el cuadro. Guarda datos de un mismo asunto.\\[3pt]
+\textit{Ejemplo:} \texttt{cliente}.
+\end{block}
+\column{.32\textwidth}
+\begin{block}{Columna}
+\small Un tipo de dato que anotamos de todos.\\[3pt]
+\textit{Ejemplo:} \texttt{correo}.
+\end{block}
+\column{.32\textwidth}
+\begin{block}{Fila}
+\small Un caso concreto, leído de izquierda a derecha.\\[3pt]
+\textit{Ejemplo:} ``2, Mariana''.
+\end{block}
+\end{columns}
+\end{frame}
+
+% 5 ---------------------------------------------------------------------
+\begin{frame}{Del dibujo a la tabla: cada cosa tiene su equivalente}
+\begin{center}
+\footnotesize
+\begin{tabular}{>{\raggedright\arraybackslash}p{4.9cm}>{\raggedright\arraybackslash}p{2.9cm}>{\raggedright\arraybackslash}p{3.9cm}}
+\toprule
+\bfseries En el dibujo (diseño conceptual) & \bfseries En la tabla (diseño lógico) & \bfseries Ejemplo en la tienda \\
+\midrule
+\textbf{Entidad} · aquello de lo que guardamos datos & Tabla & \texttt{cliente} \\
+\textbf{Atributo} · un dato de esa entidad & Columna & \texttt{correo} \\
+\textbf{Instancia} · un caso concreto & Fila & ``2, Mariana'' \\
+\textbf{Identificador} · el dato que no se repite nunca & Clave primaria & \texttt{id} \\
+\textbf{Relación} · el vínculo entre dos entidades & Clave foránea & un cliente hace pedidos \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\begin{block}{Cómo usar este cuadro}
+\small Primero se dibuja: entidades, sus atributos y las relaciones entre ellas. Después se traduce: cada entidad pasa a ser una tabla. \textbf{Las tres primeras filas las acabas de ver}; el identificador aparece en unas diapositivas más, y las relaciones son el tema de la segunda parte.
+\end{block}
+\end{frame}
+
+% 6 ---------------------------------------------------------------------
+\begin{frame}{Cada columna guarda un tipo de dato}
+\concepto{Tipo de dato}{Aviso a la base sobre qué clase de valor va en esa columna: número, texto, fecha\ldots}
+\vspace{0.35cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\begin{exampleblock}{Para qué sirve}
+\small Si \texttt{precio} es un número, la base puede sumarlo. Si fuera texto, ``89'' + ``35'' daría ``8935''.
+\end{exampleblock}
+\column{.48\textwidth}
+\begin{alertblock}{Y también protege}
+\small Si \texttt{fecha\_registro} es una fecha, la base rechaza ``ayer por la tarde''. El dato entra bien o no entra.
+\end{alertblock}
+\end{columns}
+\end{frame}
+
+% 7 ---------------------------------------------------------------------
+\begin{frame}{Los cinco tipos que usaremos en el curso}
+\begin{center}
+\small
+\begin{tabular}{>{\ttfamily}p{3.1cm}>{\raggedright\arraybackslash}p{4.6cm}>{\ttfamily}p{3.2cm}}
+\toprule
+\normalfont\bfseries Tipo & \bfseries Guarda & \normalfont\bfseries Ejemplo de valor \\
+\midrule
+INT & números enteros & 42 \\
+VARCHAR(80) & texto de hasta 80 caracteres & 'Mariana' \\
+DECIMAL(10,2) & números con 2 decimales & 89.00 \\
+DATE & una fecha & '2026-03-15' \\
+BOOLEAN & verdadero o falso & TRUE \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\ojo{Para dinero usamos \texttt{DECIMAL(10,2)} y nunca un número con decimales aproximados: 10 dígitos en total, 2 después del punto. Así los centavos salen exactos.}
+\end{frame}
+
+% 8 ---------------------------------------------------------------------
+\begin{frame}{Escribir una tabla: nombre, columnas y tipos}
+\begin{sqlcode}
+\begin{tabular}{@{\hspace{6pt}}l@{\hspace{1.6em}}l@{\hspace{1.6em}}l@{}}
+\multicolumn{3}{@{\hspace{6pt}}l}{CREATE TABLE cliente (}\\
+\hspace{1.2em}nombre         & VARCHAR(80)  & \\
+\hspace{1.2em}apellido       & VARCHAR(80)  & \\
+\hspace{1.2em}correo         & VARCHAR(120) & \\
+\hspace{1.2em}fecha\_registro & DATE         & \\
+\multicolumn{3}{@{\hspace{6pt}}l}{);}\\
+\end{tabular}
+\end{sqlcode}
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\begin{block}{Cómo se lee}
+\small ``Crea una tabla llamada \texttt{cliente} con estas cuatro columnas, y cada una guarda esto''.
+\end{block}
+\column{.48\textwidth}
+\begin{exampleblock}{Lo mínimo}
+\small Un nombre de tabla, y por cada columna un nombre y un tipo. Esta tabla ya funciona; en las próximas dos diapositivas la mejoramos.
+\end{exampleblock}
+\end{columns}
+\end{frame}
+
+% 9 ---------------------------------------------------------------------
+\begin{frame}{Restricciones: reglas que la base hace cumplir sola}
+\concepto{Restricción}{Regla escrita junto a una columna. La base rechaza cualquier dato que la incumpla.}
+\vspace{0.3cm}
+\begin{center}
+\small
+\begin{tabular}{>{\ttfamily}p{2.3cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{5.0cm}}
+\toprule
+\normalfont\bfseries Restricción & \bfseries Qué obliga & \bfseries Ejemplo en \texttt{cliente} \\
+\midrule
+NOT NULL & La columna no puede quedar vacía & Un cliente sin \texttt{nombre} no debería existir \\
+UNIQUE & El valor no se puede repetir & Dos clientes no pueden tener el mismo \texttt{correo} \\
+DEFAULT & Valor que se pone solo si no indicas otro & \texttt{activo} empieza en \texttt{TRUE} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+% 10 ---------------------------------------------------------------------
+\begin{frame}{La clave primaria: la columna \texttt{id}}
+\concepto{Clave primaria}{Columna que identifica a cada fila y nunca repite su valor.}
+\vspace{0.25cm}
+\begin{columns}[T,onlytextwidth]
+\column{.47\textwidth}
+\begin{exampleblock}{Ejemplo}
+\small En \texttt{cliente}, el \texttt{id} \textbf{1} es Raúl y siempre lo será. Nunca habrá dos filas con \texttt{id} \textbf{1}.\\[3pt]
+Aunque haya dos clientes llamados Raúl, sus \texttt{id} son distintos.
+\end{exampleblock}
+\column{.49\textwidth}
+\begin{block}{\texttt{AUTO\_INCREMENT}}
+\small La base pone el siguiente número sola: 1, 2, 3\ldots{} Tú no lo escribes al insertar un cliente nuevo.
+\end{block}
+\end{columns}
+\vspace{0.3cm}
+\small Con la clave primaria y las restricciones, la tabla \texttt{cliente} queda completa. La vemos en la siguiente diapositiva.
+\end{frame}
+
+% 11 ---------------------------------------------------------------------
+\begin{frame}{La tabla \texttt{cliente}, ya completa}
+\begin{sqlcode}
+\begin{tabular}{@{\hspace{6pt}}l@{\hspace{1.6em}}l@{\hspace{1.6em}}l@{}}
+\multicolumn{3}{@{\hspace{6pt}}l}{CREATE TABLE cliente (}\\
+\hspace{1.2em}id             & INT          & PRIMARY KEY AUTO\_INCREMENT,\\
+\hspace{1.2em}nombre         & VARCHAR(80)  & NOT NULL,\\
+\hspace{1.2em}apellido       & VARCHAR(80)  & NOT NULL,\\
+\hspace{1.2em}correo         & VARCHAR(120) & UNIQUE,\\
+\hspace{1.2em}fecha\_registro & DATE,         & \\
+\hspace{1.2em}activo         & BOOLEAN      & DEFAULT TRUE\\
+\multicolumn{3}{@{\hspace{6pt}}l}{);}\\
+\end{tabular}
+\end{sqlcode}
+\vspace{0.1cm}
+\small \textbf{Cómo se lee de corrido:} tabla \texttt{cliente}; su \texttt{id} es un entero que la base numera sola y sirve de clave primaria; el nombre y el apellido son obligatorios; el correo no puede repetirse; la fecha de registro es una fecha; y todo cliente nuevo empieza como activo.
+\end{frame}
+
+% 12 ---------------------------------------------------------------------
+\begin{frame}{Nuestras reglas de nombrado}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{5.5cm}>{\ttfamily}p{2.8cm}>{\ttfamily}p{2.9cm}}
+\toprule
+\bfseries Regla & \normalfont\bfseries Así sí & \normalfont\bfseries Así no \\
+\midrule
+La tabla va en singular y en minúscula & cliente & Clientes \\
+Si el nombre de la tabla lleva varias palabras, se unen con guion bajo & metodo\_pago & MetodosDePago \\
+En las columnas se hace igual & fecha\_registro & fechaRegistro \\
+La clave primaria siempre se llama \texttt{id} & id & id\_cliente \\
+Sin tildes ni ñ en los nombres & anio & año \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.35cm}
+\begin{block}{Falta una regla más}
+\small Algunas tablas tendrán columnas que apuntan a \textbf{otra} tabla. Cómo se llaman esas columnas lo veremos en la segunda parte, cuando aparezca la razón por la que existen.
+\end{block}
+\end{frame}
+
+% 13 ---------------------------------------------------------------------
+\begin{frame}{Práctica: la tabla \texttt{cliente} en MySQL Workbench}
+\begin{columns}[T,onlytextwidth]
+\column{.53\textwidth}
+\small \textbf{Pasos:}
+\begin{enumerate}\setlength\itemsep{4pt}\small
+  \item Abre Workbench: \textit{File $\rightarrow$ New Model} y doble clic en \textit{Add Diagram}.
+  \item Arrastra el ícono de tabla al lienzo y nómbrala \texttt{cliente}.
+  \item Escribe las seis columnas con sus tipos, copiando la diapositiva 11.
+  \item Marca las casillas y escribe \texttt{TRUE} en \textit{Default} de \texttt{activo}.
+  \item Guarda el modelo y toma una captura.
+\end{enumerate}
+\column{.44\textwidth}
+\small \textbf{Las casillas de Workbench:}
+\vspace{3pt}
+
+\footnotesize
+\begin{tabular}{>{\ttfamily}p{0.9cm}>{\raggedright\arraybackslash}p{4.2cm}}
+\toprule
+\normalfont\bfseries Casilla & \bfseries Es la restricción \\
+\midrule
+PK & Clave primaria \\
+AI & \texttt{AUTO\_INCREMENT} \\
+NN & \texttt{NOT NULL} \\
+UQ & \texttt{UNIQUE} \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.3cm}
+\begin{alertblock}{Qué debe verse al terminar}
+\small \texttt{id} con PK y AI · \texttt{nombre} y \texttt{apellido} con NN · \texttt{correo} con UQ · \texttt{activo} con \texttt{TRUE} por defecto.
+\end{alertblock}
+\end{frame}
+
+% 14 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+
+% 15 ---------------------------------------------------------------------
+\begin{frame}{Antes de las tablas hay un dibujo}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\concepto{Entidad}{Algo del mundo real del que queremos guardar datos.}
+\vspace{2pt}
+\small \textit{Ejemplo:} un \texttt{cliente}, un \texttt{pedido}. \textbf{Cada entidad será una tabla.}
+\column{.48\textwidth}
+\concepto{Relación}{El vínculo entre dos entidades, con un \textbf{verbo en cada sentido}.}
+\vspace{2pt}
+\small \textit{Ejemplo:} un cliente \textbf{hace} pedidos; un pedido \textbf{pertenece a} un cliente.
+\end{columns}
+\vspace{0.4cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=2.3cm] (c) {\texttt{cliente}};
+  \node[cajanaranja,text width=2.3cm,right=40mm of c] (p) {\texttt{pedido}};
+  \draw[relacion] (c)--(p);
+  \pic at ($(c.east)!2.6mm!(p.west)$) {uno};
+  \pic at ($(p.west)!2.6mm!(c.east)$) {muchos};
+  \node[anchor=south west,font=\scriptsize,inner sep=1.5pt] at ($(c.east)!5mm!(p.west)$) {hace $\rightarrow$};
+  \node[anchor=north east,font=\scriptsize,inner sep=1.5pt] at ($(p.west)!5mm!(c.east)$) {$\leftarrow$ pertenece a};
+\end{tikzpicture}
+\end{center}
+\vspace{0.25cm}
+\centering\small La marca \simbuno{} significa \textbf{uno} y la pata de gallo \simbmuchos{} significa \textbf{muchos}.
+\end{frame}
+
+% 16 ---------------------------------------------------------------------
+\begin{frame}{Cardinalidad: ¿cuántos hay de cada lado?}
+\concepto{Cardinalidad}{Cuántos elementos de una entidad se relacionan con cuántos de la otra. Se pregunta \textbf{dos veces}, una por cada lado.}
+\vspace{0.3cm}
+\begin{center}
+\small
+\begin{tabular}{>{\bfseries}p{1.3cm}>{\raggedright\arraybackslash}p{5.1cm}>{\raggedright\arraybackslash}p{4.9cm}}
+\toprule
+Nombre & Ejemplo de todos los días & En la tienda \\
+\midrule
+1:N & Una madre tiene varios hijos, pero cada hijo tiene una madre & Un cliente y sus pedidos \\
+N:M & Un alumno lleva varios cursos y un curso tiene varios alumnos & Un pedido y sus productos \\
+1:1 & Una persona tiene un DNI y ese DNI es de una sola persona & Un cliente y su clave de acceso \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.25cm}
+\small Se lee ``uno a muchos'', ``muchos a muchos'' y ``uno a uno''. \textbf{La cardinalidad decide cómo quedan las tablas}: veremos los tres casos en ese orden, y de cada uno haremos el diagrama.
+\end{frame}
+
+% 17 ---------------------------------------------------------------------
+\begin{frame}{Uno a muchos (1:N): aparece la clave foránea}
+\begin{columns}[c,onlytextwidth]
+\column{.42\textwidth}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=2.2cm] (c) {\texttt{cliente}};
+  \node[cajanaranja,text width=2.2cm,below=20mm of c] (p) {\texttt{pedido}};
+  \draw[relacion] (c)--(p);
+  \pic[rotate=90] at ($(c.south)!2.6mm!(p.north)$) {uno};
+  \pic[rotate=-90] at ($(p.north)!2.6mm!(c.south)$) {muchos};
+  \node[anchor=west,font=\scriptsize,inner sep=2pt,xshift=2mm] at ($(c.south)!4mm!(p.north)$) {hace $\downarrow$};
+  \node[anchor=west,font=\scriptsize,inner sep=2pt,xshift=2mm] at ($(p.north)!4mm!(c.south)$) {$\uparrow$ pertenece a};
+\end{tikzpicture}
+\end{center}
+\column{.54\textwidth}
+\small Un cliente hace \textbf{muchos} pedidos; cada pedido es de \textbf{un solo} cliente.\\[6pt]
+\concepto{Clave foránea}{Columna que guarda el \texttt{id} de otra tabla, para saber a qué fila pertenece.}
+\end{columns}
+\vspace{0.2cm}
+\begin{alertblock}{La regla, y de dónde sale su nombre}
+\small La clave foránea va en la tabla del lado de la \textbf{pata de gallo}: en \texttt{pedido}, no en \texttt{cliente}. Y se llama como la tabla a la que apunta más \texttt{\_id}: \textbf{\texttt{cliente\_id}}. En los dibujos la marcaremos \textbf{FK}, igual que \textbf{PK} marca la clave primaria.
+\end{alertblock}
+\end{frame}
+
+% 18 ---------------------------------------------------------------------
+\begin{frame}{1:N con datos: el \texttt{id} del cliente se repite en \texttt{pedido}}
+\begin{columns}[T,onlytextwidth]
+\column{.36\textwidth}
+\centering
+\footnotesize\texttt{\textbf{cliente}}\\[4pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries id & \bfseries nombre \\
+\midrule
+1 & Raúl \\
+2 & Mariana \\
+\bottomrule
+\end{tabular}\\[3pt]
+{\scriptsize \texttt{id} es la clave primaria}
+\column{.60\textwidth}
+\centering
+\footnotesize\texttt{\textbf{pedido}}\\[4pt]
+\begin{tabular}{ccc}
+\toprule
+\bfseries id & \bfseries cliente\_id & \bfseries fecha\_pedido \\
+\midrule
+1 & 1 & 2026-03-01 \\
+2 & 1 & 2026-03-05 \\
+3 & 2 & 2026-03-07 \\
+\bottomrule
+\end{tabular}\\[3pt]
+{\scriptsize \texttt{cliente\_id} es la clave foránea}
+\end{columns}
+\vspace{0.4cm}
+\small \textbf{Léelo en los datos:} el cliente \textbf{1} aparece en dos filas de \texttt{pedido}, así que Raúl hizo dos pedidos. Pero cada fila de \texttt{pedido} nombra a \textbf{un solo} cliente, porque en esa celda cabe un valor. Ahí está el ``uno a muchos''.
+\end{frame}
+
+% 19 ---------------------------------------------------------------------
+\begin{frame}{Práctica 1:N: conecta \texttt{pedido} con \texttt{cliente}}
+\begin{columns}[T,onlytextwidth]
+\column{.53\textwidth}
+\small \textbf{Sobre el diagrama que ya tienes:}
+\begin{enumerate}\setlength\itemsep{4pt}\small
+  \item Crea la tabla \texttt{pedido} con \texttt{id}, \texttt{fecha\_pedido} y \texttt{total}. \textbf{No escribas \texttt{cliente\_id}}.
+  \item En la barra de herramientas elige \textit{1:n Non-Identifying Relationship}.
+  \item Clic primero en \texttt{pedido} y después en \texttt{cliente}.
+  \item Mira lo que pasó: Workbench creó \texttt{cliente\_id} solo.
+\end{enumerate}
+\column{.44\textwidth}
+\begin{alertblock}{El orden de los clics importa}
+\small Primero la tabla que \textbf{recibe} la clave foránea (el lado muchos), después la tabla a la que \textbf{apunta}. Al revés, la columna aparece en \texttt{cliente} y la relación queda invertida.
+\end{alertblock}
+\end{columns}
+\vspace{0.3cm}
+\begin{exampleblock}{Qué debe verse al terminar}
+\small Una línea entre las dos tablas, y dentro de \texttt{pedido} una columna \texttt{cliente\_id} que tú no escribiste, marcada como clave foránea.
+\end{exampleblock}
+\end{frame}
+
+% 20 ---------------------------------------------------------------------
+\begin{frame}{Muchos a muchos (N:M): hace falta una tabla en medio}
+\small Un pedido lleva \textbf{muchos} productos y un producto aparece en \textbf{muchos} pedidos.
+\vspace{0.25cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=2.0cm] (p) {\texttt{pedido}};
+  \node[caja,text width=2.6cm,right=30mm of p] (d) {\texttt{detalle\_pedido}};
+  \node[cajaverde,text width=2.0cm,right=30mm of d] (pr) {\texttt{producto}};
+  \draw[relacion] (p)--(d); \draw[relacion] (d)--(pr);
+  \pic at ($(p.east)!2.6mm!(d.west)$) {uno};
+  \pic at ($(d.west)!2.6mm!(p.east)$) {muchos};
+  \pic[rotate=180] at ($(d.east)!2.6mm!(pr.west)$) {muchos};
+  \pic at ($(pr.west)!2.6mm!(d.east)$) {uno};
+  \node[anchor=south west,font=\scriptsize,inner sep=1.5pt] at ($(p.east)!5mm!(d.west)$) {contiene $\rightarrow$};
+  \node[anchor=north east,font=\scriptsize,inner sep=1.5pt] at ($(d.west)!5mm!(p.east)$) {$\leftarrow$ pertenece a};
+  \node[anchor=south west,font=\scriptsize,inner sep=1.5pt] at ($(d.east)!5mm!(pr.west)$) {indica $\rightarrow$};
+  \node[anchor=north east,font=\scriptsize,inner sep=1.5pt] at ($(pr.west)!5mm!(d.east)$) {$\leftarrow$ aparece en};
+\end{tikzpicture}
+\end{center}
+\vspace{0.25cm}
+\begin{columns}[T,onlytextwidth]
+\column{.49\textwidth}
+\begin{alertblock}{Por qué no basta una clave foránea}
+\small ¿En cuál de las dos tablas la pondrías? En \texttt{pedido} tendrías que guardar varios \texttt{producto\_id} en una sola celda, y una celda guarda \textbf{un} valor.
+\end{alertblock}
+\column{.47\textwidth}
+\begin{block}{La regla}
+\small Una \textbf{tabla intermedia} —o \textbf{tabla asociativa}— con \textbf{dos} claves foráneas. Ahí caben además los datos de la combinación, como la \texttt{cantidad}.
+\end{block}
+\end{columns}
+\end{frame}
+
+% 21 ---------------------------------------------------------------------
+\begin{frame}{N:M con datos: los dos \texttt{id} se repiten}
+\begin{columns}[T,onlytextwidth]
+\column{.26\textwidth}
+\centering
+\footnotesize\texttt{\textbf{pedido}}\\[4pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries id & \bfseries cliente\_id \\
+\midrule
+1 & 1 \\
+2 & 2 \\
+\bottomrule
+\end{tabular}
+\vspace{10pt}
+
+\footnotesize\texttt{\textbf{producto}}\\[4pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries id & \bfseries nombre \\
+\midrule
+1 & Audífonos \\
+2 & Cargador \\
+\bottomrule
+\end{tabular}
+\column{.68\textwidth}
+\centering
+\footnotesize\texttt{\textbf{detalle\_pedido}}\\[4pt]
+\begin{tabular}{cccc}
+\toprule
+\bfseries id & \bfseries pedido\_id & \bfseries producto\_id & \bfseries cantidad \\
+\midrule
+1 & 1 & 1 & 2 \\
+2 & 1 & 2 & 1 \\
+3 & 2 & 1 & 1 \\
+\bottomrule
+\end{tabular}\\[4pt]
+{\scriptsize \texttt{pedido\_id} y \texttt{producto\_id} son las dos claves foráneas}
+\end{columns}
+\vspace{0.35cm}
+\small \textbf{Léelo en los datos:} el pedido \textbf{1} aparece dos veces (llevó dos productos) y el producto \textbf{1} aparece dos veces (estuvo en dos pedidos). Que \textbf{ambos} se repitan es lo que hace ``muchos a muchos''. La \texttt{cantidad} vive aquí porque solo tiene sentido para esa combinación.
+\end{frame}
+
+% 22 ---------------------------------------------------------------------
+\begin{frame}{Práctica N:M: Workbench arma la tabla asociativa}
+\begin{columns}[T,onlytextwidth]
+\column{.53\textwidth}
+\small \textbf{Sobre el mismo diagrama:}
+\begin{enumerate}\setlength\itemsep{4pt}\small
+  \item Crea \texttt{producto} con \texttt{id}, \texttt{nombre} y \texttt{precio}.
+  \item En la barra de herramientas elige \textit{n:m Identifying Relationship}.
+  \item Clic en \texttt{pedido} y después en \texttt{producto}.
+  \item Workbench crea sola una tabla en el medio, con una clave foránea hacia cada lado.
+  \item Renómbrala \texttt{detalle\_pedido} y agrégale \texttt{cantidad} y \texttt{precio\_unitario}.
+\end{enumerate}
+\column{.44\textwidth}
+\begin{block}{¿Por qué la crea sola?}
+\small Porque una relación N:M \textbf{no se puede guardar entre dos tablas}: siempre hace falta una tercera. La herramienta hace lo mismo que harías a mano, y no te deja saltarte ese paso.
+\end{block}
+\end{columns}
+\vspace{0.3cm}
+\begin{alertblock}{Dos cosas que hay que corregir a mano}
+\small \textbf{El nombre:} la crea como \texttt{pedido\_has\_producto}, que rompe nuestras reglas de nombrado. \textbf{La clave primaria:} Workbench usa la pareja \texttt{pedido\_id} + \texttt{producto\_id}; en nuestro esquema le agregamos además un \texttt{id} propio.
+\end{alertblock}
+\end{frame}
+
+% 23 ---------------------------------------------------------------------
+\begin{frame}{Uno a uno (1:1): clave foránea que no se puede repetir}
+\begin{columns}[c,onlytextwidth]
+\column{.42\textwidth}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=2.4cm] (c) {\texttt{cliente}};
+  \node[cajanaranja,text width=2.4cm,below=20mm of c] (cr) {\texttt{credencial}};
+  \draw[relacion] (c)--(cr);
+  \pic[rotate=90] at ($(c.south)!2.6mm!(cr.north)$) {uno};
+  \pic[rotate=90] at ($(cr.north)!2.6mm!(c.south)$) {uno};
+  \node[anchor=west,font=\scriptsize,inner sep=2pt,xshift=2mm] at ($(c.south)!4mm!(cr.north)$) {tiene $\downarrow$};
+  \node[anchor=west,font=\scriptsize,inner sep=2pt,xshift=2mm] at ($(cr.north)!4mm!(c.south)$) {$\uparrow$ pertenece a};
+\end{tikzpicture}
+\end{center}
+\column{.54\textwidth}
+\small Un cliente tiene \textbf{una} clave de acceso, y esa clave es de \textbf{un solo} cliente: las dos marcas son de \textbf{uno}.\\[6pt]
+\begin{block}{La regla}
+\small Clave foránea en cualquiera de las dos tablas, pero con \texttt{UNIQUE}: así ningún cliente puede tener dos credenciales.
+\end{block}
+\end{columns}
+\vspace{0.2cm}
+\begin{alertblock}{Sin el \texttt{UNIQUE} no es 1:1}
+\small Nada impediría que el mismo \texttt{cliente\_id} apareciera en dos filas de \texttt{credencial}: la tabla aceptaría 1:N aunque el dibujo diga 1:1.
+\end{alertblock}
+\end{frame}
+
+% 24 ---------------------------------------------------------------------
+\begin{frame}{1:1 con datos: ningún \texttt{id} se repite}
+\begin{columns}[T,onlytextwidth]
+\column{.36\textwidth}
+\centering
+\footnotesize\texttt{\textbf{cliente}}\\[4pt]
+\begin{tabular}{cc}
+\toprule
+\bfseries id & \bfseries nombre \\
+\midrule
+1 & Raúl \\
+2 & Mariana \\
+\bottomrule
+\end{tabular}
+\column{.60\textwidth}
+\centering
+\footnotesize\texttt{\textbf{credencial}}\\[4pt]
+\begin{tabular}{ccc}
+\toprule
+\bfseries id & \bfseries cliente\_id & \bfseries usuario \\
+\midrule
+1 & 1 & raulg \\
+2 & 2 & marianap \\
+\bottomrule
+\end{tabular}\\[3pt]
+{\scriptsize \texttt{cliente\_id} es clave foránea \textbf{y} \texttt{UNIQUE}}
+\end{columns}
+\vspace{0.4cm}
+\small \textbf{Léelo en los datos:} compara con la tabla \texttt{pedido} de hace unas diapositivas. Allí el \texttt{cliente\_id} \textbf{1} salía dos veces; aquí no puede salir dos veces. Esa es toda la diferencia entre 1:N y 1:1, y la impone el \texttt{UNIQUE}.
+\end{frame}
+
+% 25 ---------------------------------------------------------------------
+\begin{frame}{Práctica 1:1: conecta \texttt{credencial} con \texttt{cliente}}
+\begin{columns}[T,onlytextwidth]
+\column{.53\textwidth}
+\small \textbf{Sobre el mismo diagrama:}
+\begin{enumerate}\setlength\itemsep{4pt}\small
+  \item Crea \texttt{credencial} con \texttt{id} y \texttt{usuario}.
+  \item Elige \textit{1:1 Non-Identifying Relationship}.
+  \item Clic primero en \texttt{credencial} y después en \texttt{cliente}.
+  \item Abre la columna \texttt{cliente\_id} que apareció y comprueba que tenga marcada la casilla \texttt{UQ}.
+\end{enumerate}
+\column{.44\textwidth}
+\begin{alertblock}{La casilla que hace la diferencia}
+\small Si \texttt{UQ} no quedó marcada, márcala tú. Sin ella el dibujo dice 1:1 pero la tabla se comporta como 1:N.
+\end{alertblock}
+\end{columns}
+\vspace{0.3cm}
+\begin{exampleblock}{Qué debe verse al terminar}
+\small Cinco tablas conectadas: \texttt{cliente}, \texttt{pedido}, \texttt{producto}, \texttt{detalle\_pedido} y \texttt{credencial}. Guarda el modelo y toma una captura del diagrama completo.
+\end{exampleblock}
+\end{frame}
+
+% 26 ---------------------------------------------------------------------
+\begin{frame}{Referencias}
+\footnotesize
+Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración} (9.ª ed.). Cengage Learning.
+
+\vspace{0.35cm}
+Elmasri, R., \& Navathe, S. (2007). \textit{Fundamentos de sistemas de bases de datos} (5.ª ed.). Addison Wesley.
+
+\vspace{0.35cm}
+Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2020). \textit{Database system concepts} (7th ed.). McGraw-Hill.
+\end{frame}
+
+% ---------------------------------------------------------------------
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}
