@@ -4,22 +4,24 @@
 
 En esta práctica elaborarán el diseño lógico de datos de cada uno de los siete casos de estudio presentados a continuación. A partir del problema, el alcance, los supuestos y los roles, deberán determinar qué información necesita conservar cada aplicación y cómo organizarla en un modelo relacional coherente.
 
-El objetivo es representar los datos necesarios y sus relaciones, justificando las decisiones de modelado. La entrega corresponde al diseño lógico: no se requiere programar la aplicación, crear una base de datos ni presentar scripts SQL.
+El objetivo es representar los datos necesarios y sus relaciones, justificando las decisiones de modelado. La entrega corresponde al diseño lógico (sin tipos de datos): no se requiere programar la aplicación, crear una base de datos ni presentar scripts SQL.
 
 ## Indicaciones
 
 1. Lean cada caso y revisen su demo.
 2. Identifiquen las tablas y sus atributos, claves primarias y foráneas.
-3. Dibujen las relaciones entre las tablas e indiquen sus cardinalidades.
+3. Dibujen las relaciones entre las tablas e indiquen sus cardinalidades (con pata de gallo).
 4. Eviten guardar información repetida y expliquen brevemente sus decisiones.
 
-Si un caso no necesita guardar datos, expliquen por qué. Pueden usar la herramienta de diagramación que prefieran.
+Si un caso no necesita guardar datos, expliquen por qué.
+
+Pueden usar la herramienta de diagramación que prefieran.
 
 ## Entregables
 
-Entreguen un solo documento con sus nombres y, para cada caso:
+Entreguen un solo documento PC1_Nombre_Apellido.pdf con sus nombres y, para cada caso:
 
-- El diagrama del diseño lógico.
+- El diagrama del diseño lógico (captura de pantalla).
 - Una explicación del diseño y los supuestos utilizados.
 
 Si el caso no necesita guardar datos, basta con la explicación.
