@@ -1,0 +1,367 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+
+\title{Repaso corto y Práctica Calificada 1}
+\subtitle{}
+\date{Semana 05 - Sesión 10}
+\author{Rel Guzman}
+
+% Espacio en blanco para completar
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+\newcommand{\tblb}[1]{\textcolor{utpNaranja}{\textbf{\texttt{#1}}}}
+% Insignia de concepto
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\small,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Marcas de clave
+\newcommand{\pk}{{\scriptsize\color{utpRojo}\textbf{PK}}}
+\newcommand{\fk}{{\scriptsize\color{utpGris}\textbf{FK}}}
+
+% ---------- Extremos en notación pata de gallo ----------
+% Cada extremo se dibuja completo (cardinalidad + optatividad) con el origen
+% sobre el borde de la caja y la entidad hacia +x. Se coloca así:
+%   \pic at (ped.west) {cfomuchos};            entidad a la derecha
+%   \pic[rotate=180] at (cli.east) {cfuno};    entidad a la izquierda
+%   \pic[rotate=90]  at (ped.south) {cfuno};   entidad arriba
+%   \pic[rotate=-90] at (det.north) {cfmuchos};entidad abajo
+\tikzset{
+  cfl/.style={line width=.9pt,draw=utpNegro,line cap=round,line join=round},
+  pics/cfuno/.style={code={%
+    \draw[cfl] (-2.3mm,-1.7mm)--(-2.3mm,1.7mm);
+    \draw[cfl] (-4.9mm,-1.7mm)--(-4.9mm,1.7mm);}},
+  pics/cfouno/.style={code={%
+    \draw[cfl] (-2.3mm,-1.7mm)--(-2.3mm,1.7mm);
+    \draw[cfl,fill=white] (-5.1mm,0) circle (1.15mm);}},
+  pics/cfmuchos/.style={code={%
+    \draw[cfl] (-0.6mm,1.9mm)--(-3.6mm,0)--(-0.6mm,-1.9mm);
+    \draw[cfl] (-3.6mm,0)--(0,0);
+    \draw[cfl] (-6.0mm,-1.7mm)--(-6.0mm,1.7mm);}},
+  pics/cfomuchos/.style={code={%
+    \draw[cfl] (-0.6mm,1.9mm)--(-3.6mm,0)--(-0.6mm,-1.9mm);
+    \draw[cfl] (-3.6mm,0)--(0,0);
+    \draw[cfl,fill=white] (-6.2mm,0) circle (1.15mm);}},
+}
+% Símbolo suelto para la tabla de la notación
+\newcommand{\pgsimb}[1]{%
+\begin{tikzpicture}[baseline=-0.6ex]
+  \draw[relacion] (0,0)--(11mm,0);
+  \node[draw=utpGrisMedio,fill=utpGrisClaro,minimum width=7mm,minimum height=6mm,
+        inner sep=0pt,anchor=west] at (11mm,0) {};
+  \pic at (11mm,0) {#1};
+\end{tikzpicture}}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Entender en que consiste la nota de PC1
+\end{block}
+\end{frame}
+
+% =====================================================================
+% PARTE 1 · Repaso de notación y nombrado
+% =====================================================================
+
+% 3 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{140mm}{!}{\bfseries\color{utpNegro}Repaso: cómo se nombra}};
+    \node[anchor=north,inner sep=0pt] at ([yshift=-15mm]current page.center)
+      {\color{utpRojo}\rule{140mm}{1.6pt}};
+  \end{tikzpicture}
+\end{frame}
+
+% 4 ---------------------------------------------------------------------
+\begin{frame}{Nombrar tablas: minúscula, singular y sin tildes}
+\begin{center}
+\small\setlength\tabcolsep{7pt}
+\begin{tabular}{>{\raggedright\arraybackslash}p{5.6cm}p{3.0cm}p{3.0cm}}
+\toprule
+\bfseries Regla & \bfseries Mal & \bfseries Bien \\
+\midrule
+Todo en minúscula                    & \texttt{Cliente}        & \tbl{cliente} \\[3pt]
+En singular: la tabla describe \textbf{una} fila & \texttt{clientes}       & \tbl{cliente} \\[3pt]
+Sin tildes ni ñ                      & \texttt{categoría}      & \tbl{categoria} \\[3pt]
+Palabras unidas con guion bajo       & \texttt{MetodoPago}     & \tbl{metodo\_pago} \\[3pt]
+Sin espacios ni abreviaturas raras   & \texttt{det ped}        & \tbl{detalle\_pedido} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\begin{block}{La prueba del nombre}
+\small Si el nombre de la tabla completa bien la frase ``\textit{cada fila es un\ldots}'', está bien elegido. \textit{Cada fila es un} \tbl{cliente}. \textit{Cada fila es un} \tbl{detalle\_pedido}.
+\end{block}
+\end{frame}
+
+% 5 ---------------------------------------------------------------------
+\begin{frame}{Nombrar atributos: el nombre dice qué guarda}
+\begin{itemize}\setlength\itemsep{5pt}\small
+  \item La clave primaria siempre se llama \texttt{id}.
+  \item La clave foránea es el nombre de la tabla a la que apunta más \texttt{\_id}: \texttt{cliente\_id} apunta a \tbl{cliente}.
+  \item No repitas el nombre de la tabla dentro de la columna: en \tbl{cliente} va \texttt{nombre}, no \texttt{nombre\_cliente}.
+  \item Las fechas empiezan con \texttt{fecha\_}: \texttt{fecha\_pedido}, \texttt{fecha\_nacimiento}.
+\end{itemize}
+\vspace{0.2cm}
+\begin{block}{Columnas que solo guardan sí o no}
+\small Cuando la columna únicamente puede valer \textbf{sí} o \textbf{no}, el nombre se escribe como una \textbf{afirmación que se pueda responder con sí o no}, empezando por \texttt{es\_} o \texttt{tiene\_}:
+\vspace{0.2cm}
+\centerline{\small
+\begin{tabular}{@{}l@{\hspace{1.4em}}l@{\hspace{1.4em}}l@{}}
+\texttt{es\_activo}       & \textit{¿el cliente está activo?}    & sí / no \\
+\texttt{es\_pagado}       & \textit{¿el pedido está pagado?}     & sí / no \\
+\texttt{tiene\_descuento} & \textit{¿el pedido tiene descuento?} & sí / no \\
+\end{tabular}}
+\end{block}
+\vspace{0.1cm}
+\begin{center}
+\small \tblb{pedido}\texttt{(\underline{id}, fecha\_pedido, total, es\_pagado, cliente\_id)}
+\end{center}
+\end{frame}
+
+% 6 ---------------------------------------------------------------------
+\begin{frame}{Completa: corrige el nombre}
+\begin{center}
+\small\setlength\tabcolsep{8pt}
+\begin{tabular}{>{\raggedright\arraybackslash}p{6.2cm}p{5.2cm}}
+\toprule
+\bfseries Como está escrito & \bfseries Cómo debería escribirse \\
+\midrule
+\texttt{Productos}                        & \bl[3.8cm] \\[5pt]
+\texttt{nombre\_del\_cliente} en \tbl{cliente} & \bl[3.8cm] \\[5pt]
+\texttt{id\_categoria} en \tbl{producto}  & \bl[3.8cm] \\[5pt]
+\texttt{FechaDeNacimiento}                & \bl[3.8cm] \\[5pt]
+\texttt{DetallePedidos}                   & \bl[3.8cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\small \textbf{Pista:} minúscula, singular, guion bajo, y la clave foránea termina en \texttt{\_id}.
+\end{frame}
+
+% =====================================================================
+% PARTE 2 · Modelo ER y notación pata de gallo
+% =====================================================================
+
+% 7 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{140mm}{!}{\bfseries\color{utpNegro}Modelo entidad-relación}};
+    \node[anchor=north,inner sep=0pt] at ([yshift=-15mm]current page.center)
+      {\color{utpRojo}\rule{140mm}{1.6pt}};
+  \end{tikzpicture}
+\end{frame}
+
+% 8 ---------------------------------------------------------------------
+\begin{frame}{Las tres piezas del modelo ER}
+\begin{center}
+\begin{tikzpicture}[font=\scriptsize]
+  \node[cajaverde,text width=2.5cm,align=left] (cli)
+    {\textbf{cliente}\\ \texttt{id}\\ \texttt{nombre}\\ \texttt{correo}};
+  \node[cajanaranja,text width=2.5cm,align=left,right=24mm of cli] (ped)
+    {\textbf{pedido}\\ \texttt{id}\\ \texttt{fecha\_pedido}\\ \texttt{cliente\_id}};
+  \draw[relacion] (cli)--(ped);
+  \pic[rotate=180] at (cli.east) {cfuno};
+  \pic at (ped.west) {cfomuchos};
+  \coordinate (m) at ($(cli.east)!0.5!(ped.west)$);
+  \node[anchor=south,font=\tiny,inner sep=2pt] at ([yshift=1mm]m) {hace};
+  \node[font=\scriptsize\bfseries,text=utpRojo,above=11mm of cli] (l1) {entidad};
+  \draw[-{Stealth[length=1.8mm]},semithick,utpRojo] (l1)--(cli.north);
+  \node[font=\scriptsize\bfseries,text=utpRojo,below=11mm of ped] (l2) {atributos};
+  \draw[-{Stealth[length=1.8mm]},semithick,utpRojo] (l2)--(ped.south);
+  \node[font=\scriptsize\bfseries,text=utpRojo,below=13mm of m] (l3) {relación};
+  \draw[-{Stealth[length=1.8mm]},semithick,utpRojo] (l3)--(m);
+\end{tikzpicture}
+\end{center}
+\vspace{0.15cm}
+\begin{center}
+\small
+\begin{tabular}{>{\bfseries}p{2.0cm}>{\raggedright\arraybackslash}p{10.0cm}}
+\toprule
+Entidad & Algo del que queremos guardar datos. Termina siendo una \textbf{tabla}. \\[3pt]
+Atributo & Un dato de esa entidad. Termina siendo una \textbf{columna}. \\[3pt]
+Relación & Cómo se conectan dos entidades. Termina siendo una \textbf{clave foránea}. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+% 9 ---------------------------------------------------------------------
+\begin{frame}{Notación pata de gallo: cuatro símbolos}
+\begin{center}
+\small\setlength\tabcolsep{10pt}
+\renewcommand{\arraystretch}{1.7}
+\begin{tabular}{cll}
+\toprule
+\bfseries Símbolo & \bfseries Se lee & \bfseries Ejemplo \\
+\midrule
+\pgsimb{cfuno}     & uno y solo uno & un pedido pertenece a \textbf{un} cliente \\
+\pgsimb{cfouno}    & cero o uno     & un cliente \textbf{puede} tener una credencial \\
+\pgsimb{cfmuchos}  & uno o muchos   & un pedido tiene \textbf{al menos} un detalle \\
+\pgsimb{cfomuchos} & cero o muchos  & un cliente \textbf{puede} no tener pedidos \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+% 10 ---------------------------------------------------------------------
+\begin{frame}{El símbolo se lee del lado contrario}
+\begin{center}
+\begin{tikzpicture}[font=\scriptsize]
+  \node[cajaverde,text width=2.2cm,align=left] (cli)
+    {\textbf{cliente}\\ \texttt{id}\\ \texttt{nombre}};
+  \node[cajanaranja,text width=2.4cm,align=left,right=26mm of cli] (ped)
+    {\textbf{pedido}\\ \texttt{id}\\ \texttt{cliente\_id}};
+  \draw[relacion] (cli)--(ped);
+  \pic[rotate=180] at (cli.east) {cfuno};
+  \pic at (ped.west) {cfomuchos};
+  \node[anchor=south,font=\tiny,inner sep=2pt]
+    at ($(cli.east)!0.5!(ped.west)+(0,1mm)$) {hace};
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\begin{exampleblock}{Mirando el símbolo de la derecha}
+\small Un cliente hace \textbf{cero o muchos} pedidos. La pata de gallo está pegada a \tbl{pedido}, así que el lado ``muchos'' es el de los pedidos.
+\end{exampleblock}
+\column{.48\textwidth}
+\begin{exampleblock}{Mirando el símbolo de la izquierda}
+\small Un pedido pertenece a \textbf{uno y solo un} cliente. Por eso \tbl{pedido} guarda \texttt{cliente\_id}: un solo valor le basta.
+\end{exampleblock}
+\end{columns}
+\end{frame}
+
+% =====================================================================
+% PARTE 3 · Conceptual y lógico
+% =====================================================================
+
+% 13 ---------------------------------------------------------------------
+\begin{frame}{Relaciones y llaves foráneas: dónde vive el \texttt{id}}
+\begin{center}
+\begin{tikzpicture}[font=\scriptsize]
+  \node[cajaverde,text width=2.6cm,align=left] (cli)
+    {\textbf{cliente}\\ \texttt{id} \pk\\ \texttt{nombre}};
+  \node[cajanaranja,text width=2.8cm,align=left,right=26mm of cli] (ped)
+    {\textbf{pedido}\\ \texttt{id} \pk\\ \texttt{fecha\_pedido}\\ \texttt{cliente\_id} \fk};
+  \draw[relacion] (cli)--(ped);
+  \pic[rotate=180] at (cli.east) {cfuno};
+  \pic at (ped.west) {cfomuchos};
+  \node[font=\scriptsize\bfseries,text=utpRojo,below=12mm of cli] (o1) {tabla referenciada};
+  \draw[-{Stealth[length=1.8mm]},semithick,utpRojo] (o1)--(cli.south);
+  \node[font=\scriptsize\bfseries,text=utpRojo,below=12mm of ped] (o2) {aquí vive la clave foránea};
+  \draw[-{Stealth[length=1.8mm]},semithick,utpRojo] (o2)--(ped.south);
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.50\textwidth}
+\begin{block}{La regla, en una línea}
+\small La clave foránea vive siempre en la tabla del lado de la \textbf{pata de gallo}, y apunta a la clave primaria del otro lado.
+\end{block}
+\column{.46\textwidth}
+\begin{exampleblock}{Qué garantiza}
+\small Que no exista un \tbl{pedido} con un \texttt{cliente\_id} que no corresponde a ningún cliente. La base de datos lo rechaza.
+\end{exampleblock}
+\end{columns}
+\vspace{0.2cm}
+\begin{center}
+\small\texttt{FOREIGN KEY (cliente\_id) REFERENCES cliente(id)}
+\end{center}
+\end{frame}
+
+% =====================================================================
+% PARTE 4 · Tipos de relación
+% =====================================================================
+
+% 14 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{140mm}{!}{\bfseries\color{utpNegro}Tipos de relación}};
+    \node[anchor=north,inner sep=0pt] at ([yshift=-15mm]current page.center)
+      {\color{utpRojo}\rule{140mm}{1.6pt}};
+  \end{tikzpicture}
+\end{frame}
+
+% 15 ---------------------------------------------------------------------
+\begin{frame}{La pregunta que separa los tres casos}
+\begin{block}{¿Dónde cae la clave foránea?}
+\large ¿La clave foránea forma parte de la \textbf{clave primaria} de la tabla hija, o es solo una columna más?
+\end{block}
+\vspace{0.35cm}
+\begin{center}
+\small
+\begin{tabular}{>{\bfseries}p{3.4cm}>{\raggedright\arraybackslash}p{8.6cm}}
+\toprule
+Identificadora & La \fk\ \textbf{es parte} de la clave primaria. La hija no existe sin la madre. Línea \textbf{continua}. \\[4pt]
+No identificadora & La \fk\ es una columna común. La hija tiene su propio \texttt{id} y vida propia. Línea \textbf{punteada}. \\[4pt]
+Generalización & Una entidad general y sus casos particulares. Los hijos comparten el \texttt{id} del padre. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+% 21 ---------------------------------------------------------------------
+\begin{frame}{Cierre: el camino completo}
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small]
+  \node[cajaverde,text width=3.0cm] (a) {Reglas del negocio};
+  \node[caja,text width=3.0cm,right=12mm of a] (b) {Diseño conceptual};
+  \node[caja,text width=3.0cm,right=12mm of b] (c) {Diseño lógico};
+  \node[cajanaranja,text width=3.0cm,right=12mm of c] (d) {\texttt{CREATE TABLE}};
+  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c); \draw[flecha] (c)--(d);
+  \node[font=\tiny,below=2mm of b,text=utpGris] {entidades y relaciones};
+  \node[font=\tiny,below=2mm of c,text=utpGris] {tablas, \pk\ y \fk};
+\end{tikzpicture}}
+\end{center}
+\end{frame}
+
+% 22 ---------------------------------------------------------------------
+\begin{frame}{Referencias}
+\footnotesize
+Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración} (9.ª ed.). Cengage Learning.
+
+\vspace{0.35cm}
+Elmasri, R., \& Navathe, S. (2007). \textit{Fundamentos de sistemas de bases de datos} (5.ª ed.). Addison Wesley.
+
+\vspace{0.35cm}
+Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2020). \textit{Database system concepts} (7th ed.). McGraw-Hill.
+\end{frame}
+
+% 23 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at ([yshift=-4mm]current page.center)
+      {\resizebox{120mm}{!}{%
+        \begin{tabular}{@{}c@{}}
+          \bfseries\color{utpNegro}Práctica\\[1pt]
+          \bfseries\color{utpRojo}Calificada 1
+        \end{tabular}}};
+    \node[anchor=north,inner sep=0pt] at ([yshift=-32mm]current page.center)
+      {\color{utpRojo}\rule{120mm}{1.6pt}};
+  \end{tikzpicture}
+\end{frame}
+
+\end{document}
