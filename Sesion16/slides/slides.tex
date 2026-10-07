@@ -1,0 +1,943 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+\usepackage[normalem]{ulem}
+
+\title{Vistas, DBML y DDL en SQLite}
+\subtitle{Consultas guardadas, diagramas como código,\\ el DDL en SQLite y los archivos \texttt{.sql}}
+\date{Semana 08 - Sesión 16}
+\author{Rel Guzman}
+
+% Espacio en blanco para completar
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL o de DBML dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Parte nueva de un bloque de codigo que crece paso a paso
+\newcommand{\nuevo}[1]{{%
+  \setlength{\fboxsep}{1.2pt}%
+  \begingroup
+  \renewcommand{\kw}[1]{\textcolor{utpNegro}{\textbf{##1}}}%
+  \colorbox{yellow!45}{\textcolor{utpNegro}{#1}}%
+  \endgroup}}
+% Comentario dentro de un bloque de código SQL
+\newcommand{\com}[1]{\textcolor{utpGris}{-- #1}}
+% Comentario dentro de un bloque de código DBML
+\newcommand{\comd}[1]{\textcolor{utpGris}{// #1}}
+% Marcas de clave primaria y clave foránea
+\newcommand{\pk}{{\scriptsize\color{utpRojo}\textbf{PK}}}
+\newcommand{\fk}{{\scriptsize\color{utpNaranja}\textbf{FK}}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre del gestor o de la forma de escribir algo
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Celda con un dato que rompe una regla
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% Valor desconocido
+\newcommand{\nulo}{\textcolor{utpGrisMedio}{\textit{NULL}}}
+% Se puede / no se puede
+\newcommand{\si}{\textbf{sí}}
+\newcommand{\no}{\textcolor{utpRojo}{\textbf{no}}}
+% Bloque de código sobre fondo gris
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.6em}}
+% Una forma de escribir algo: etiqueta a la izquierda, código a la derecha
+\newcommand{\forma}[3]{%
+  \begin{columns}[c,onlytextwidth]
+  \column{.30\textwidth}\etiqueta{#1}\\[3pt]{\scriptsize\color{utpGris} #2}
+  \column{.68\textwidth}\begin{sqlcode}[\textwidth]\scriptsize #3\end{sqlcode}
+  \end{columns}\vspace{-0.35cm}}
+% Anatomía de una instrucción: cada pieza del código con su pregunta al lado
+\tikzset{
+  pieza/.style={fill=utpGrisClaro,font=\ttfamily\footnotesize,anchor=west,inner sep=5pt,
+    minimum height=0.62cm},
+  para/.style={font=\small,anchor=west,text=utpNegro}
+}
+\newcommand{\piezax}{7.6}
+\newcommand{\pieza}[3]{%
+  \node[pieza] at (0,#1) {#2};
+  \node[para] at (\piezax,#1) {\textcolor{utpRojo}{$\blacktriangleleft$}\ #3};}
+% Diapositiva de sección: una palabra bien grande (\seccion[0]{...} la deja sin línea roja)
+\newcommand{\seccion}[2][1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#2}};
+    \ifnum#1=1
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+    \fi
+  \end{tikzpicture}
+\end{frame}}
+% Encabezado y filas de la tabla de ejemplo
+\newcommand{\cabproducto}{%
+  \normalfont\bfseries id & \normalfont\bfseries nombre & \normalfont\bfseries categoria
+  & \normalfont\bfseries precio & \normalfont\bfseries stock \\}
+\newcommand{\filasproducto}{%
+  1 & Arroz & abarrotes & 4.50 & 30 \\
+  2 & Gaseosa & bebidas & 3.00 & 12 \\
+  3 & Agua & bebidas & 1.50 & 0 \\
+  4 & Galletas & snacks & 1.20 & 50 \\
+  5 & Leche & bebidas & 3.80 & 20 \\
+  6 & Chifles & \nulo & 2.00 & 8 \\}
+% Tabla de ejemplo completa, lista para poner al costado
+\newcommand{\tablaproducto}{%
+  \centering\tbl{producto}\\[4pt]
+  \scriptsize\ttfamily
+  \begin{tabular}{lllrr}
+  \toprule
+  \cabproducto
+  \midrule
+  \filasproducto
+  \bottomrule
+  \end{tabular}}
+% Diagrama de la tienda: un cliente hace muchos pedidos (horizontal y vertical)
+\newcommand{\diagtienda}{%
+  \begin{tikzpicture}
+    \node[cajaverde,text width=1.9cm,font=\scriptsize,align=left] (cli)
+      {\textbf{cliente}\\ \texttt{id} \pk\\ \texttt{nombre}\\ \texttt{correo}};
+    \node[cajanaranja,text width=2.2cm,font=\scriptsize,align=left,right=13mm of cli] (ped)
+      {\textbf{pedido}\\ \texttt{id} \pk\\ \texttt{fecha}\\ \texttt{cliente\_id} \fk};
+    \draw[relacion] (cli)--(ped);
+    \pic at ($(cli.east)!2.6mm!(ped.west)$) {uno};
+    \pic at ($(ped.west)!2.6mm!(cli.east)$) {muchos};
+  \end{tikzpicture}}
+\newcommand{\diagtiendav}{%
+  \begin{tikzpicture}
+    \node[cajaverde,text width=2.2cm,font=\scriptsize,align=left] (cli)
+      {\textbf{cliente}\\ \texttt{id} \pk\\ \texttt{nombre}\\ \texttt{correo}};
+    \node[cajanaranja,text width=2.2cm,font=\scriptsize,align=left,below=11mm of cli] (ped)
+      {\textbf{pedido}\\ \texttt{id} \pk\\ \texttt{fecha}\\ \texttt{cliente\_id} \fk};
+    \draw[relacion] (cli)--(ped);
+    \pic[rotate=90] at ($(cli.south)!2.6mm!(ped.north)$) {uno};
+    \pic[rotate=-90] at ($(ped.north)!2.6mm!(cli.south)$) {muchos};
+  \end{tikzpicture}}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás \textbf{crear y borrar una vista}, \textbf{escribir el diseño} de una base de datos en \textbf{DBML} para ver su diagrama, reconocer \textbf{qué cambia en SQLite} al crear, modificar y borrar tablas, y explicar \textbf{qué es un archivo \texttt{.sql}}.
+\end{block}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Lo de hoy: cinco paradas}
+\begin{center}
+\begin{tikzpicture}
+  \tikzset{parada/.style={cajaverde,font=\footnotesize\bfseries,text width=1.95cm,minimum height=1.15cm}}
+  \node[parada] (a) {1. Vistas};
+  \node[parada,right=4.5mm of a] (b) {2. Diagramas\\como código};
+  \node[parada,right=4.5mm of b] (c) {3. DBML};
+  \node[parada,right=4.5mm of c] (d) {4. DDL\\en SQLite};
+  \node[parada,right=4.5mm of d] (e) {5. Archivos\\\texttt{.sql}};
+  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c); \draw[flecha] (c)--(d); \draw[flecha] (d)--(e);
+\end{tikzpicture}
+\end{center}
+\vspace{0.5cm}
+\begin{itemize}\setlength\itemsep{8pt}
+  \item Ya sabes \textbf{crear tablas} y \textbf{consultarlas}. Hoy no hay instrucciones difíciles.
+  \item Hoy vemos \textbf{ayudas}: guardar una consulta, dibujar el diseño escribiendo y guardar todo en un archivo.
+\end{itemize}
+\vspace{0.4cm}
+\ojo{Todo es \textbf{introductorio}. La meta es entender \textbf{la idea} de cada cosa.}
+\end{frame}
+% =======================================================================
+\seccion{Vistas}
+% ---------------------------------------------------------------------
+\begin{frame}{La misma consulta, una y otra vez}
+\begin{columns}[c,onlytextwidth]
+\column{.46\textwidth}
+\tablaproducto
+\column{.50\textwidth}
+\small El encargado de bebidas pide esto \textbf{todos los días}:
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre, precio\\
+\kw{FROM} producto\\
+\kw{WHERE} categoria = 'bebidas';
+\end{sqlcode}
+\vspace{-0.2cm}
+\small Escribirla cada vez \textbf{cansa}, y es fácil \textbf{equivocarse}.
+\end{columns}
+\vspace{0.3cm}
+\concepto{La idea}{\small Le ponemos \textbf{un nombre} a esa consulta y el gestor \textbf{la guarda}. Eso es una \textbf{vista}.}
+\vspace{0.1cm}
+\analogia{Es como \textbf{guardar un contacto}: en vez de marcar el número completo cada vez, buscas «Mamá».}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{CREATE VIEW}: una consulta con nombre}
+\begin{center}
+\begin{tikzpicture}[y=0.78cm]
+  \pieza{2}{\nuevo{\kw{CREATE VIEW}} bebidas \nuevo{\kw{AS}}}{el \textbf{nombre} que le pones}
+  \pieza{1}{\kw{SELECT} nombre, precio \kw{FROM} producto}{la \textbf{consulta} que se guarda}
+  \pieza{0}{\kw{WHERE} categoria = 'bebidas';}{con su condición y todo}
+\end{tikzpicture}
+\end{center}
+\vspace{0.25cm}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+Desde ahora se usa \textbf{como si fuera una tabla}:
+\begin{sqlcode}[\textwidth]
+\kw{SELECT} * \kw{FROM} \nuevo{bebidas};
+\end{sqlcode}
+\column{.38\textwidth}
+\centering\footnotesize\ttfamily
+\begin{tabular}{lr}
+\toprule
+\normalfont\bfseries nombre & \normalfont\bfseries precio \\
+\midrule
+Gaseosa & 3.00 \\
+Agua & 1.50 \\
+Leche & 3.80 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.35cm}
+\small El \texttt{CREATE VIEW} se escribe \textbf{una sola vez}. Es igual en MySQL, SQL Server y SQLite.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Una vista no guarda datos: es una ventana}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=3.5cm] (t) {\textbf{Tabla} \tbl{producto}\\[-1pt]{\scriptsize guarda las \textbf{filas}}};
+  \node[caja,dashed,text width=3.5cm,right=30mm of t] (v) {\textbf{Vista} \texttt{bebidas}\\[-1pt]{\scriptsize guarda solo la \textbf{consulta}}};
+  \draw[flecha] (v)--(t) node[midway,above,font=\scriptsize] {cada vez que la usas,} node[midway,below,font=\scriptsize] {va a leer la tabla};
+\end{tikzpicture}
+\end{center}
+\vspace{0.15cm}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+\small Llega un producto nuevo a la \textbf{tabla}:
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{INSERT INTO} producto\\
+\kw{VALUES} (7, 'Chicha', 'bebidas', 2.50, 15);
+\end{sqlcode}
+\vspace{-0.2cm}
+\small La Chicha aparece \textbf{sola} en la vista. Nadie tocó \texttt{bebidas}.
+\column{.38\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{lr}
+\toprule
+\normalfont\bfseries nombre & \normalfont\bfseries precio \\
+\midrule
+Gaseosa & 3.00 \\
+Agua & 1.50 \\
+Leche & 3.80 \\
+\nuevo{Chicha} & \nuevo{2.50} \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.3cm}
+\analogia{Una \textbf{ventana} no guarda el paisaje: te muestra lo que hay afuera \textbf{en este momento}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{DROP VIEW}: borrar la vista, no los datos}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\begin{sqlcode}[\textwidth]
+\nuevo{\kw{DROP VIEW}} bebidas;
+\end{sqlcode}
+\vspace{-0.2cm}
+Se borra \textbf{la consulta guardada}.\\[3pt]
+La tabla \tbl{producto} sigue con \textbf{todas sus filas}.
+\column{.48\textwidth}
+\begin{sqlcode}[\textwidth]
+\kw{DROP TABLE} producto;
+\end{sqlcode}
+\vspace{-0.2cm}
+Se borra \textbf{la tabla con sus datos}.\\[3pt]
+Esto sí es grave.
+\end{columns}
+\vspace{0.5cm}
+\analogia{Borrar un \textbf{contacto} del celular no desaparece a la persona. Borrar una vista no desaparece los datos.}
+\vspace{0.2cm}
+\small ¿Y si quiero \textbf{cambiar} una vista? Lo más simple: la \textbf{borras} y la \textbf{creas de nuevo}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Cuándo es útil una vista?}
+\begin{columns}[T,onlytextwidth]
+\column{.31\textwidth}
+\centering\etiqueta{Para no repetir}\\[6pt]
+\raggedright\small Una consulta que se usa seguido se escribe \textbf{una vez}.
+\column{.31\textwidth}
+\centering\etiqueta{Para simplificar}\\[6pt]
+\raggedright\small Detrás puede haber algo largo; quien la usa ve algo \textbf{sencillo}.
+\column{.31\textwidth}
+\centering\etiqueta{Para ocultar}\\[6pt]
+\raggedright\small Muestra solo \textbf{algunas columnas}: el precio sí, el costo no.
+\end{columns}
+\vspace{0.6cm}
+\begin{alertblock}{¿Y cuándo no?}
+\small Si la consulta la vas a usar \textbf{una sola vez}, no hace falta una vista.
+\end{alertblock}
+\vspace{0.2cm}
+\enlarealidad{En un colegio, la secretaría usa una vista con el \textbf{nombre y el teléfono} de cada alumno. Las notas y los pagos no aparecen ahí.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 1} Vistas sobre la bodega}
+\begin{columns}[c,onlytextwidth]
+\column{.44\textwidth}
+\tablaproducto
+\column{.52\textwidth}
+\small Se crea esta vista:
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE VIEW} baratos \kw{AS}\\
+\kw{SELECT} nombre, precio\\
+\kw{FROM} producto\\
+\kw{WHERE} precio < 3;
+\end{sqlcode}
+\end{columns}
+\vspace{0.2cm}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{8.6cm}>{\raggedright\arraybackslash}p{3.4cm}}
+\toprule
+\bfseries Pregunta & \bfseries Respuesta \\
+\midrule
+¿Qué nombres muestra \texttt{SELECT * FROM baratos;}? & \bl[3.2cm] \\[9pt]
+La Gaseosa baja a 2.50. ¿Aparece ahora en \texttt{baratos}? & \bl[3.2cm] \\[9pt]
+Se ejecuta \texttt{DROP VIEW baratos;}. ¿Cuántas filas tiene \tbl{producto}? & \bl[3.2cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\small \textbf{Para escribir:} crea la vista \texttt{agotados}, con los productos cuyo stock es 0.
+\end{frame}
+% =======================================================================
+\seccion{Diagramas como código}
+% ---------------------------------------------------------------------
+\begin{frame}{Dos maneras de hacer un diagrama}
+\begin{columns}[T,onlytextwidth]
+\column{.47\textwidth}
+\centering\etiqueta{Con el mouse}\\[8pt]
+\raggedright
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Arrastras cajas y las unes con líneas, \textbf{a mano}.
+  \item Si agregas una tabla, toca \textbf{reacomodar} todo.
+\end{itemize}
+\column{.49\textwidth}
+\centering\etiqueta{Con código}\\[8pt]
+\raggedright
+\begin{itemize}\setlength\itemsep{6pt}
+  \item \textbf{Escribes} qué tablas hay y cómo se conectan.
+  \item Un programa \textbf{dibuja el diagrama} por ti.
+\end{itemize}
+\end{columns}
+\vspace{0.35cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,font=\footnotesize\ttfamily,align=left,text width=3.4cm] (txt) {cliente\\pedido\\pedido > cliente};
+  \node[caja,font=\footnotesize,right=38mm of txt,text width=1.7cm] (c) {cliente};
+  \node[caja,font=\footnotesize,right=10mm of c,text width=1.7cm] (p) {pedido};
+  \draw[relacion] (c)--(p);
+  \draw[flecha] (txt)--(c) node[midway,above,font=\scriptsize] {un programa lo dibuja};
+  \node[font=\scriptsize,text=utpGris,below=1.5mm of txt] {tú escribes esto};
+  \node[font=\scriptsize,text=utpGris] at ($(c.south)!.5!(p.south)+(0,-3.2mm)$) {y obtienes esto};
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\analogia{Es la diferencia entre la \textbf{foto de un plato} y su \textbf{receta}. En la receta, cambiar un ingrediente es cambiar \textbf{una línea}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Por qué escribir los diagramas?}
+\begin{columns}[c,onlytextwidth]
+\column{.54\textwidth}
+\begin{itemize}\setlength\itemsep{9pt}
+  \item \textbf{Es rápido de cambiar:} corriges una línea y el dibujo se rehace solo.
+  \item \textbf{Es texto:} se copia, se pega en un chat y se guarda junto al proyecto.
+  \item \textbf{Lo puede escribir una IA:} le cuentas el caso, te da el texto y tú lo revisas.
+\end{itemize}
+\column{.42\textwidth}
+\centering\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{>{\bfseries}ll}
+\toprule
+Lenguaje & \bfseries Sirve para \\
+\midrule
+Mermaid & diagramas de flujo \\
+PlantUML & diagramas UML \\
+\nuevo{DBML} & \textbf{bases de datos} \\
+\bottomrule
+\end{tabular}\\[6pt]
+\scriptsize\color{utpGris}hay varios lenguajes para dibujar con texto
+\end{columns}
+\end{frame}
+% =======================================================================
+\seccion[0]{DBML}
+% ---------------------------------------------------------------------
+\begin{frame}{DBML: describir una base de datos con texto}
+\begin{columns}[c,onlytextwidth]
+\column{.50\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{Table} cliente \{\\
+\ind id int [pk]\\
+\ind nombre varchar(80)\\
+\ind correo varchar(120)\\
+\}\\[5pt]
+\kw{Table} pedido \{\\
+\ind id int [pk]\\
+\ind fecha date\\
+\ind cliente\_id int\\
+\}\\[5pt]
+\kw{Ref}: pedido.cliente\_id > cliente.id
+\end{sqlcode}
+\column{.46\textwidth}
+\centering\diagtiendav\\[4pt]
+{\scriptsize\color{utpGris}el diagrama que sale de ese texto}
+\end{columns}
+\vspace{0.15cm}
+\small \textbf{DBML} es un lenguaje pequeño y gratuito, hecho solo para \textbf{describir tablas y sus relaciones}. Se lee casi sin haberlo estudiado.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Por qué DBML, si ya sabemos SQL?}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{SQL}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} pedido (\\
+\ind id INT \kw{PRIMARY KEY},\\
+\ind fecha DATE \kw{NOT NULL},\\
+\ind cliente\_id INT,\\
+\ind \kw{FOREIGN KEY} (cliente\_id)\\
+\ind\ind \kw{REFERENCES} cliente(id)\\
+);
+\end{sqlcode}
+\column{.48\textwidth}
+\centering\etiqueta{DBML}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{Table} pedido \{\\
+\ind id int [pk]\\
+\ind fecha date [not null]\\
+\ind cliente\_id int\\
+\}\\[5pt]
+\kw{Ref}: pedido.cliente\_id > cliente.id
+\end{sqlcode}
+\end{columns}
+\vspace{0.1cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item \textbf{Es más corto:} menos palabras y sin comas que se olvidan.
+  \item \textbf{Es uno solo:} el SQL cambia de un gestor a otro; el DBML no.
+  \item \textbf{Se vuelve diagrama al instante:} sirve para conversar el diseño \textbf{antes} de crear nada.
+\end{itemize}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{DBML no reemplaza a SQL: lo ayuda}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=2.2cm] (d) {\textbf{DBML}\\[-1pt]{\scriptsize el diseño, en texto}};
+  \node[caja,text width=2.3cm,above right=-2mm and 16mm of d] (g) {\textbf{Diagrama}\\[-1pt]{\scriptsize para conversar}};
+  \node[caja,text width=2.3cm,below right=-2mm and 16mm of d] (s) {\textbf{SQL}\\[-1pt]{\scriptsize \texttt{CREATE TABLE}\ldots}};
+  \node[cajanaranja,text width=2.7cm,right=16mm of s] (b) {\textbf{Base de datos}\\[-1pt]{\scriptsize tablas y datos reales}};
+  \draw[flecha] (d.east)--(g.west);
+  \draw[flecha] (d.east)--(s.west);
+  \draw[flecha] (s)--(b) node[midway,above,font=\tiny] {se ejecuta};
+\end{tikzpicture}
+\end{center}
+\vspace{0.15cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\etiqueta{DBML sí}\\[5pt]
+\raggedright\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item Describe tablas y relaciones.
+  \item Genera el diagrama.
+  \item Genera el \texttt{CREATE TABLE}.
+\end{itemize}
+\column{.48\textwidth}
+\etiqueta{DBML no}\\[5pt]
+\raggedright\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item \textbf{No crea} la base de datos.
+  \item \textbf{No guarda} datos.
+  \item \textbf{No consulta}: no hay \texttt{SELECT}.
+\end{itemize}
+\end{columns}
+\vspace{0.3cm}
+\analogia{DBML es el \textbf{plano} de la casa; SQL es \textbf{la obra}. El plano ayuda a pensar, pero nadie vive en un plano.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Una tabla en DBML, pieza por pieza}
+\begin{center}
+\begin{tikzpicture}[y=0.82cm]
+  \renewcommand{\piezax}{5.7}
+  \pieza{4}{\nuevo{\kw{Table}} cliente \nuevo{\{}}{\texttt{Table}, el \textbf{nombre} y una llave que abre}
+  \pieza{3}{\ \ id int [pk]}{una columna por línea: \textbf{nombre} y \textbf{tipo}}
+  \pieza{2}{\ \ nombre varchar(80) \nuevo{[not null]}}{entre \textbf{corchetes}, las reglas}
+  \pieza{1}{\ \ correo varchar(120) [unique]}{\textbf{sin coma} al final de la línea}
+  \pieza{0}{\nuevo{\}}}{la llave que cierra}
+\end{tikzpicture}
+\end{center}
+\vspace{0.4cm}
+El orden es el mismo de \texttt{CREATE TABLE}: \textbf{nombre de la columna, tipo y reglas}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Las reglas entre corchetes}
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{>{\leavevmode\color{utpRojo}\ttfamily\bfseries}p{2.6cm}>{\ttfamily\small}p{3.6cm}>{\raggedright\arraybackslash}p{5.2cm}}
+\toprule
+\normalfont\color{utpNegro}\bfseries En DBML & \normalfont\bfseries En SQL & \bfseries Qué significa \\
+\midrule
+pk & PRIMARY KEY & identifica a cada fila \\
+increment & AUTO\_INCREMENT & el gestor numera solo \\
+not null & NOT NULL & no se puede dejar vacío \\
+unique & UNIQUE & no se puede repetir \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\begin{sqlcode}[.60\textwidth]
+id int [\nuevo{pk}, \nuevo{increment}]
+\end{sqlcode}
+\vspace{-0.1cm}
+Son las \textbf{mismas reglas} que ya conoces, más cortas. Si hay varias, se separan con \textbf{comas}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Las relaciones: \texttt{Ref}}
+\begin{sqlcode}[.70\textwidth]
+\nuevo{\kw{Ref}:} pedido.cliente\_id \nuevo{>} cliente.id
+\end{sqlcode}
+\vspace{-0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.50\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Se lee: «\texttt{cliente\_id} de \tbl{pedido} \textbf{apunta} al \texttt{id} de \tbl{cliente}».
+  \item Es la \textbf{clave foránea}, en una sola línea.
+\end{itemize}
+\column{.47\textwidth}
+\centering\diagtienda\\[5pt]
+{\scriptsize\color{utpGris}un cliente, muchos pedidos}
+\end{columns}
+\vspace{0.25cm}
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{>{\leavevmode\color{utpRojo}\ttfamily\bfseries}c>{\raggedright\arraybackslash}p{3.0cm}>{\ttfamily\small}p{6.6cm}}
+\toprule
+\normalfont\color{utpNegro}\bfseries Símbolo & \bfseries Relación & \normalfont\bfseries Ejemplo \\
+\midrule
+> & muchos a uno & pedido.cliente\_id > cliente.id \\
+- & uno a uno & usuario.id - perfil.usuario\_id \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\small \textbf{Truco:} el \texttt{>} se abre hacia el lado «\textbf{muchos}», igual que la pata de gallo.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 2} Lee este DBML}
+\begin{columns}[c,onlytextwidth]
+\column{.50\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{Table} categoria \{\\
+\ind id int [pk, increment]\\
+\ind nombre varchar(80) [unique]\\
+\}\\[5pt]
+\kw{Table} producto \{\\
+\ind id int [pk, increment]\\
+\ind nombre varchar(80) [not null]\\
+\ind precio decimal(10,2)\\
+\ind categoria\_id int\\
+\}\\[5pt]
+\kw{Ref}: producto.categoria\_id > categoria.id
+\end{sqlcode}
+\column{.46\textwidth}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{4.1cm}l}
+\toprule
+\bfseries Pregunta & \bfseries Resp. \\
+\midrule
+¿Cuántas tablas hay? & \bl[1.4cm] \\[10pt]
+¿Qué columna es clave foránea? & \bl[1.4cm] \\[10pt]
+¿Pueden repetirse los nombres de categoría? & \bl[1.4cm] \\[10pt]
+¿Cuál tabla está del lado «muchos»? & \bl[1.4cm] \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.3cm}
+\small \textbf{Dibuja} en tu cuaderno el diagrama: dos cajas y la línea que las une.
+\end{frame}
+% =======================================================================
+\seccion{Herramientas}
+% ---------------------------------------------------------------------
+\begin{frame}{Herramientas que usan DBML}
+\begin{center}
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{>{\raggedright\bfseries}p{3.6cm}>{\raggedright\arraybackslash}p{8.6cm}}
+\toprule
+Herramienta & \bfseries Para qué sirve \\
+\midrule
+\nuevo{dbdiagram.io} & Escribes DBML y \textbf{ves el diagrama} al lado. Es la que usaremos. \\
+dbdocs.io & Convierte el DBML en una \textbf{página web} que explica la base de datos. \\
+Extensiones de VS Code & Muestran el diagrama \textbf{dentro del editor}. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4cm}
+DBML es \textbf{abierto}: cualquier herramienta puede leerlo. Tu diseño no queda atrapado en un solo programa.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{dbdiagram.io en tres pasos}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=3.5cm,minimum height=1.5cm] (a) {\textbf{1. Escribe}\\[-1pt]{\scriptsize el DBML, a la izquierda}};
+  \node[cajaverde,text width=3.5cm,minimum height=1.5cm,right=9mm of a] (b) {\textbf{2. Mira}\\[-1pt]{\scriptsize el diagrama, a la derecha}};
+  \node[cajaverde,text width=3.5cm,minimum height=1.5cm,right=9mm of b] (c) {\textbf{3. Exporta}\\[-1pt]{\scriptsize a SQL, PDF o imagen}};
+  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c);
+\end{tikzpicture}
+\end{center}
+\vspace{0.4cm}
+\begin{itemize}\setlength\itemsep{7pt}
+  \item Se usa desde el navegador: \textbf{no se instala nada}.
+  \item Al exportar a SQL eliges el gestor, por ejemplo \textbf{MySQL}.
+\end{itemize}
+\vspace{0.4cm}
+\ojo{En la lista \textbf{no aparece SQLite}: el SQL que sale hay que \textbf{ajustarlo un poco}. Eso vemos en la siguiente parte.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 3} Del enunciado al diagrama}
+Un colegio registra a sus \textbf{alumnos} y las \textbf{matrículas} de cada uno.
+\vspace{0.3cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{alumno}\\[6pt]
+\raggedright\small
+\begin{itemize}\setlength\itemsep{3pt}
+  \item \texttt{id}: clave primaria
+  \item \texttt{nombre}: obligatorio
+  \item \texttt{correo}: no se repite
+\end{itemize}
+\column{.48\textwidth}
+\centering\etiqueta{matricula}\\[6pt]
+\raggedright\small
+\begin{itemize}\setlength\itemsep{3pt}
+  \item \texttt{id}: clave primaria
+  \item \texttt{fecha}: obligatoria
+  \item \texttt{alumno\_id}: apunta al alumno
+\end{itemize}
+\end{columns}
+\vspace{0.4cm}
+\begin{enumerate}\setlength\itemsep{6pt}
+  \item Escribe en DBML las \textbf{dos tablas} y la \textbf{relación}.
+  \item Pégalo en \texttt{dbdiagram.io} y mira el diagrama.
+  \item Exporta a \textbf{MySQL} y guarda ese SQL: lo usarás en la práctica 4.
+\end{enumerate}
+\end{frame}
+% =======================================================================
+\seccion{DDL en SQLite}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Por qué SQLite?}
+\begin{center}
+\begin{tikzpicture}
+  \node[caja,text width=2.3cm] (p1) {Tu programa};
+  \node[cajaverde,text width=2.7cm,right=9mm of p1] (s1) {\textbf{Servidor}\\[-1pt]{\scriptsize MySQL, SQL Server}};
+  \node[caja,text width=1.9cm,right=9mm of s1] (d1) {Datos};
+  \draw[flechavuelta] (p1)--(s1); \draw[flechavuelta] (s1)--(d1);
+  \node[caja,text width=2.3cm,below=6mm of p1] (p2) {Tu programa};
+  \node[cajanaranja,text width=2.7cm,right=9mm of p2] (d2) {\textbf{Un archivo}\\[-1pt]{\scriptsize \texttt{tienda.db}}};
+  \draw[flechavuelta] (p2)--(d2);
+  \node[font=\scriptsize,text=utpGris,anchor=west] at ([xshift=4mm]d1.east) {hay que instalar y encender};
+  \node[font=\scriptsize,text=utpGris,anchor=west] at ([xshift=4mm]d2.east) {\textbf{SQLite}: sin servidor};
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Toda la base de datos es \textbf{un solo archivo}: se copia y se envía como una foto.
+  \item \textbf{No se instala} nada ni se crean usuarios.
+  \item Está \textbf{en todas partes}: en tu celular, en tu navegador y dentro de Python.
+\end{itemize}
+\vspace{0.25cm}
+\ojo{Por ser tan pequeño, SQLite \textbf{simplifica}. Las instrucciones ya las conoces: solo veremos \textbf{qué cambia}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{CREATE TABLE} en SQLite}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} cliente (\\
+\ind id INT \kw{PRIMARY KEY} \kw{AUTO\_INCREMENT},\\
+\ind nombre VARCHAR(80) \kw{NOT NULL},\\
+\ind registro DATE\\
+);
+\end{sqlcode}
+\column{.48\textwidth}
+\centering\etiqueta{SQLite}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} cliente (\\
+\ind id \nuevo{INTEGER} \kw{PRIMARY KEY} \nuevo{\kw{AUTOINCREMENT}},\\
+\ind nombre \nuevo{TEXT} \kw{NOT NULL},\\
+\ind registro \nuevo{TEXT}\\
+);
+\end{sqlcode}
+\end{columns}
+\vspace{0.1cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item \textbf{Pocos tipos:} \texttt{INTEGER} para números enteros, \texttt{REAL} para decimales y \texttt{TEXT} para todo lo demás, incluso las fechas.
+  \item \textbf{No hay} \texttt{CREATE DATABASE}: la base de datos \textbf{es el archivo}.
+  \item Lo demás (\texttt{PRIMARY KEY}, \texttt{NOT NULL}, \texttt{UNIQUE}) se escribe \textbf{igual}.
+\end{itemize}
+\vspace{0.15cm}
+\small\color{utpGris} \textbf{¿Por qué?} SQLite quiere ser pequeño y simple: con tres tipos le alcanza.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{FOREIGN KEY} en SQLite: hay que encenderla}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\nuevo{\kw{PRAGMA} foreign\_keys = ON;}\\[5pt]
+\kw{CREATE TABLE} pedido (\\
+\ind id INTEGER \kw{PRIMARY KEY},\\
+\ind fecha TEXT,\\
+\ind cliente\_id INTEGER,\\
+\ind \kw{FOREIGN KEY} (cliente\_id)\\
+\ind\ind \kw{REFERENCES} cliente(id)\\
+);
+\end{sqlcode}
+\column{.44\textwidth}
+\begin{itemize}\setlength\itemsep{8pt}
+  \item Se escribe \textbf{igual} que en MySQL.
+  \item Pero viene \textbf{apagada}: hay que encenderla con el \texttt{PRAGMA}.
+\end{itemize}
+\end{columns}
+\vspace{0.15cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{>{\raggedright\arraybackslash}p{6.0cm}>{\raggedright\arraybackslash}p{6.0cm}}
+\toprule
+\bfseries Un pedido del cliente 99, que no existe & \bfseries Qué pasa \\
+\midrule
+Sin el \texttt{PRAGMA} & \mal{Se guarda}, y apunta a nadie \\
+Con el \texttt{PRAGMA} & SQLite lo \textbf{rechaza} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\analogia{Es como una \textbf{alarma} que viene instalada pero apagada: si no la enciendes, no avisa.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{ALTER TABLE} en SQLite: solo lo básico}
+\begin{columns}[T,onlytextwidth]
+\column{.52\textwidth}
+\centering\etiqueta{Sí se puede}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\com{agregar una columna}\\
+\kw{ALTER TABLE} cliente\\
+\ind \nuevo{\kw{ADD COLUMN}} telefono TEXT;\\[5pt]
+\com{cambiarle el nombre a una columna}\\
+\kw{ALTER TABLE} cliente\\
+\ind \nuevo{\kw{RENAME COLUMN}} correo \kw{TO} email;
+\end{sqlcode}
+\column{.44\textwidth}
+\centering\etiqueta{No se puede}\\[10pt]
+\raggedright
+\begin{itemize}\setlength\itemsep{8pt}
+  \item \textbf{Cambiar el tipo} de una columna.
+  \item \textbf{Agregar una clave foránea} a una tabla que ya existe.
+\end{itemize}
+\end{columns}
+\vspace{0.3cm}
+\ojo{En SQLite, las claves foráneas se escriben \textbf{al crear la tabla}. Después ya no se pueden agregar.}
+\vspace{0.1cm}
+\small\color{utpGris} \textbf{¿Por qué?} Para seguir siendo pequeño, SQLite solo trae los cambios más sencillos.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Y si necesito justo lo que no se puede?}
+Se \textbf{rehace la tabla}, como quien pasa un cuaderno en limpio:
+\vspace{0.4cm}
+\begin{center}
+\begin{tikzpicture}
+  \tikzset{paso/.style={cajaverde,font=\small,text width=2.45cm,minimum height=1.35cm}}
+  \node[paso] (a) {\textbf{1.} Crear una tabla nueva, corregida};
+  \node[paso,right=6mm of a] (b) {\textbf{2.} Copiar las filas};
+  \node[paso,right=6mm of b] (c) {\textbf{3.} Borrar la tabla vieja};
+  \node[paso,right=6mm of c] (d) {\textbf{4.} Ponerle el nombre de siempre};
+  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c); \draw[flecha] (c)--(d);
+\end{tikzpicture}
+\end{center}
+\vspace{0.5cm}
+\concepto{Lo más fácil mientras aprendes}{\small Corrige el \texttt{CREATE TABLE} en tu archivo \texttt{.sql} y \textbf{crea la base de nuevo}. Para eso sirve el archivo que veremos al final.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{DROP TABLE} en SQLite}
+\begin{sqlcode}[.60\textwidth]
+\kw{DROP TABLE} pedido;
+\end{sqlcode}
+\vspace{-0.1cm}
+Se escribe \textbf{igual} que en MySQL: borra la tabla \textbf{con todos sus datos}.
+\vspace{0.3cm}
+\begin{center}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.8cm}>{\ttfamily\small}p{4.1cm}>{\raggedright\arraybackslash}p{4.3cm}}
+\toprule
+\bfseries Quiero\ldots & \normalfont\etiqueta{MySQL} & \etiqueta{SQLite} \\
+\midrule
+Borrar una tabla & DROP TABLE pedido; & \texttt{\small DROP TABLE pedido;} \\
+Vaciar una tabla & TRUNCATE TABLE pedido; & \texttt{\small DELETE FROM pedido;} \\
+Borrar toda la base & DROP DATABASE tienda; & \textbf{borrar el archivo} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.25cm}
+\ojo{Borra primero la tabla que \textbf{apunta} (\tbl{pedido}) y después la \textbf{apuntada} (\tbl{cliente}).}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 4} De MySQL a SQLite}
+Este SQL salió de dbdiagram para MySQL. Escribe cómo queda \textbf{cada línea} en SQLite.
+\vspace{0.3cm}
+\begin{center}
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{>{\ttfamily\footnotesize}p{6.4cm}>{\raggedright\arraybackslash}p{5.8cm}}
+\toprule
+\normalfont\bfseries En MySQL & \bfseries En SQLite \\
+\midrule
+CREATE DATABASE colegio; & \bl[5.5cm] \\[10pt]
+id INT PRIMARY KEY AUTO\_INCREMENT, & \bl[5.5cm] \\[10pt]
+nombre VARCHAR(80) NOT NULL, & \bl[5.5cm] \\[10pt]
+fecha DATE NOT NULL, & \bl[5.5cm] \\[10pt]
+TRUNCATE TABLE matricula; & \bl[5.5cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\small \textbf{Pista:} una de las líneas \textbf{no existe} en SQLite. ¿Y qué línea falta al comienzo para encender las claves foráneas?
+\end{frame}
+% =======================================================================
+\seccion{Archivos .sql}
+% ---------------------------------------------------------------------
+\begin{frame}{Un archivo \texttt{.sql}: instrucciones guardadas}
+\begin{columns}[c,onlytextwidth]
+\column{.54\textwidth}
+\etiqueta{tienda.sql}
+\vspace{-0.15cm}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\com{Tienda: tablas y datos de prueba}\\[4pt]
+\kw{CREATE TABLE} cliente (\\
+\ind id INTEGER \kw{PRIMARY KEY},\\
+\ind nombre TEXT \kw{NOT NULL}\\
+);\\[4pt]
+\kw{INSERT INTO} cliente (nombre) \kw{VALUES} ('Ana');\\
+\kw{INSERT INTO} cliente (nombre) \kw{VALUES} ('Luis');
+\end{sqlcode}
+\column{.42\textwidth}
+\begin{itemize}\setlength\itemsep{8pt}
+  \item Es un archivo de \textbf{texto} con instrucciones SQL.
+  \item El gestor las ejecuta \textbf{de arriba hacia abajo}.
+  \item Se abre con \textbf{cualquier editor}.
+\end{itemize}
+\end{columns}
+\vspace{0.3cm}
+Es lo mismo que has escrito hasta hoy, pero \textbf{guardado} para no perderlo.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Para qué sirve un archivo \texttt{.sql}?}
+\begin{columns}[T,onlytextwidth]
+\column{.31\textwidth}
+\centering\etiqueta{Repetir}\\[6pt]
+\raggedright\small Crea la base completa \textbf{desde cero}, las veces que haga falta.
+\column{.31\textwidth}
+\centering\etiqueta{Compartir}\\[6pt]
+\raggedright\small Lo envías y la otra persona obtiene \textbf{la misma} base.
+\column{.31\textwidth}
+\centering\etiqueta{Respaldar}\\[6pt]
+\raggedright\small Queda una \textbf{copia} de las tablas y de los datos.
+\end{columns}
+\vspace{0.5cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=3.4cm] (s) {\texttt{tienda.sql}\\[-1pt]{\scriptsize las \textbf{instrucciones}}};
+  \node[cajanaranja,text width=3.4cm,right=26mm of s] (d) {\texttt{tienda.db}\\[-1pt]{\scriptsize la \textbf{base de datos}}};
+  \draw[flecha] (s)--(d) node[midway,above,font=\scriptsize] {se ejecuta};
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\analogia{El \texttt{.sql} es la \textbf{receta}; la base de datos es \textbf{el plato}. Con la receta lo vuelves a preparar cuando quieras.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Cierre: lo de hoy en una tabla}
+\begin{center}
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{>{\raggedright\bfseries}p{3.4cm}>{\raggedright\arraybackslash}p{9.0cm}}
+\toprule
+& \bfseries En una frase \\
+\midrule
+Vista & Una consulta guardada con nombre. No guarda datos. \\
+Diagrama como código & Un texto que un programa convierte en dibujo. \\
+DBML & El plano de la base de datos: ayuda a SQL, no lo reemplaza. \\
+DDL en SQLite & Lo mismo de siempre, más simple: pocos tipos y un archivo. \\
+Archivo \texttt{.sql} & La receta para crear la base de datos otra vez. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4cm}
+\small El camino completo: \textbf{piensas} en DBML, lo \textbf{ves} como diagrama, lo \textbf{exportas} a SQL, lo \textbf{guardas} en un \texttt{.sql} y lo \textbf{ejecutas}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Referencias}
+\footnotesize
+Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración} (9.ª ed.). Cengage Learning.
+
+\vspace{0.3cm}
+Elmasri, R., \& Navathe, S. (2007). \textit{Fundamentos de sistemas de bases de datos} (5.ª ed.). Addison Wesley.
+
+\vspace{0.3cm}
+Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2020). \textit{Database system concepts} (7th ed.). McGraw-Hill.
+
+\vspace{0.3cm}
+Holistics. (s.\,f.). \textit{DBML: Database Markup Language}. \texttt{https://dbml.dbdiagram.io}
+
+\vspace{0.3cm}
+SQLite. (s.\,f.). \textit{SQL as understood by SQLite}. \texttt{https://www.sqlite.org/lang.html}
+\end{frame}
+% ---------------------------------------------------------------------
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}

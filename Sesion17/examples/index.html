@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tipos de JOIN</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Tipos de <span>JOIN</span></h1>
+    <p>Elige un JOIN y mira qué filas se unen, cuáles se quedan sin pareja y cuáles quedan fuera.</p>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="Tipos de JOIN"></nav>
+
+  <main>
+    <section class="info">
+      <div class="venn" id="venn"></div>
+      <div>
+        <h2 id="titulo"></h2>
+        <p class="desc" id="desc"></p>
+        <p class="nota" id="nota"></p>
+      </div>
+    </section>
+
+    <pre class="sql"><code id="sql"></code></pre>
+
+    <section class="panel">
+      <h3>Tablas de origen <small>pasa el mouse sobre una fila</small></h3>
+      <div class="scroll">
+        <div class="stage" id="stage">
+          <div class="card left" id="tablaIzq"></div>
+          <div class="gap"></div>
+          <div class="card right" id="tablaDer"></div>
+          <svg class="lineas" id="lineas" aria-hidden="true"></svg>
+        </div>
+      </div>
+      <ul class="leyenda">
+        <li><i class="dot match"></i>Encontró pareja</li>
+        <li><i class="dot solo"></i>Sin pareja, pero se conserva (se rellena con <code>NULL</code>)</li>
+        <li><i class="dot out"></i>Queda fuera del resultado</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h3>Resultado <small id="conteo"></small></h3>
+      <div class="scroll">
+        <div class="card result" id="resultado"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>Usa las flechas ← → del teclado para cambiar de JOIN. · <a href="listas.html">Ver la versión con listas, sin SQL</a> · <a href="numeros.html">Versión con ids</a> · <a href="tablas.html">Versión con tablas e ids</a></footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

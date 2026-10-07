@@ -1,0 +1,594 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+
+\title{Claves y restricciones en SQL}
+\subtitle{Del modelo E-R al esquema relacional en DDL:\\ claves primarias, restricciones y claves foráneas}
+\date{Semana 06 - Sesión 12}
+\author{Rel Guzman}
+
+% Espacio en blanco para completar
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Parte nueva de un bloque de codigo que crece paso a paso
+\newcommand{\nuevo}[1]{{%
+  \setlength{\fboxsep}{1.2pt}%
+  \begingroup
+  \renewcommand{\kw}[1]{\textcolor{utpNegro}{\textbf{##1}}}%
+  \colorbox{yellow!45}{\textcolor{utpNegro}{#1}}%
+  \endgroup}}
+% Marcas de clave
+\newcommand{\pk}{{\scriptsize\color{utpRojo}\textbf{PK}}}
+\newcommand{\fk}{{\scriptsize\color{utpNaranja}\textbf{FK}}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Bloque de código SQL sobre fondo gris
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.6em}}
+% Tabla de tres columnas para alinear nombre / tipo / restricciones
+\newenvironment{sqltab}
+  {\begin{tabular}{@{}l@{\hspace{1.4em}}l@{\hspace{1.4em}}l@{}}}
+  {\end{tabular}}
+\newcommand{\sqlline}[1]{\multicolumn{3}{@{}l}{#1}}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás definir \textbf{claves primarias} y \textbf{restricciones}, crear una base de datos y conectar sus tablas mediante \textbf{claves foráneas}.
+\end{block}
+\end{frame}
+
+% 3 ---------------------------------------------------------------------
+\begin{frame}{Dónde estamos}
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small]
+  \node[cajaverde,text width=3.0cm] (a) {Caso de estudio};
+  \node[caja,text width=3.0cm,right=12mm of a] (b) {Diseño conceptual};
+  \node[caja,text width=3.0cm,right=12mm of b] (c) {Diseño lógico};
+  \node[cajanaranja,text width=3.0cm,right=12mm of c] (d)
+    {\textbf{Diseño físico}\\[2pt] \texttt{CREATE TABLE}};
+  \draw[flecha] (a)--(b);
+  \draw[flecha] (b)--(c);
+  \draw[flecha] (c)--(d);
+  \node[font=\tiny,below=2mm of b,text=utpGris] {entidades y relaciones};
+  \node[font=\tiny,below=2mm of c,text=utpGris] {tablas, \pk{} y \fk{}};
+\end{tikzpicture}}
+\end{center}
+\vspace{0.75cm}
+\begin{block}{DDL}
+\small DDL es el \textbf{lenguaje de definición de datos}: permite crear y modificar la estructura de la base de datos. \texttt{CREATE TABLE} crea sus tablas.
+\end{block}
+\end{frame}
+
+% 4 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}Claves y restricciones}};
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+  \end{tikzpicture}
+\end{frame}
+
+
+\begin{frame}{Paso 4: ¿quién es cada fila?}
+\begin{columns}[c,onlytextwidth]
+\column{.58\textwidth}
+\begin{sqlcode}[\textwidth]
+\kw{CREATE TABLE} cliente\\
+(\\
+\ind \nuevo{id \ \ \ \ \ INT \ \ \ \ \ \ \ \ \kw{PRIMARY KEY},}\\
+\ind nombre \ VARCHAR(80),\\
+\ind correo \ VARCHAR(120)\\
+);
+\end{sqlcode}
+\column{.38\textwidth}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=2.7cm,font=\scriptsize,align=left]
+    {\textbf{cliente}\\[3pt] \texttt{id} \ \pk\\ \texttt{nombre}\\ \texttt{correo}};
+\end{tikzpicture}
+\end{center}
+\vspace{5pt}
+\centering\scriptsize la \pk{} del dibujo\\ es esta línea
+\end{columns}
+\vspace{0.5cm}
+\small Sin el \texttt{id} hay un problema: si dos clientes se llaman igual, \textbf{no se pueden distinguir}. La \textbf{clave primaria} es la columna que identifica a una sola fila; no se repite y nunca queda vacía.
+\vspace{0.2cm}
+
+\small Y con eso la instrucción está completa: \textbf{eso es todo un \texttt{CREATE TABLE}}.
+\end{frame}
+
+% 13 ---------------------------------------------------------------------
+\begin{frame}{La instrucción completa, con sus nombres}
+\begin{sqlcode}[.60\textwidth]
+\begin{sqltab}
+\sqlline{\kw{CREATE TABLE} cliente (}\\
+\ind id     & INT           & \kw{PRIMARY KEY},\\
+\ind nombre & VARCHAR(80)   & \kw{NOT NULL},\\
+\ind correo & VARCHAR(120)  & \kw{UNIQUE}\\
+\sqlline{);}\\
+\end{sqltab}
+\end{sqlcode}
+\vspace{0.25cm}
+\begin{center}
+\small
+\begin{tabular}{>{\ttfamily}p{3.1cm}>{\raggedright\arraybackslash}p{8.0cm}}
+\toprule
+\normalfont\bfseries Parte & \bfseries Cómo se llama \\
+\midrule
+cliente & el \textbf{nombre de la tabla} \\
+nombre & el \textbf{nombre de la columna} \\
+VARCHAR(80) & el \textbf{tipo de dato} \\
+PRIMARY KEY & la \textbf{clave primaria} \\
+NOT NULL, UNIQUE & las \textbf{restricciones} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.25cm}
+\small Faltan las dos últimas, y son las que siguen.
+\end{frame}
+
+% 14 ---------------------------------------------------------------------
+\begin{frame}{El tipo dice qué clase de cosa se guarda}
+\begin{center}
+\begin{tikzpicture}
+  \node[caja,text width=2.4cm,font=\scriptsize,align=center] (a) {89.00};
+  \node[caja,text width=2.4cm,font=\scriptsize,align=center,right=10mm of a] (b) {Raúl};
+  \node[caja,text width=2.4cm,font=\scriptsize,align=center,right=10mm of b] (c) {2026-03-04};
+  \node[cajanaranja,text width=2.4cm,font=\scriptsize,align=center,below=9mm of a] (a2) {\texttt{DECIMAL(10,2)}};
+  \node[cajanaranja,text width=2.4cm,font=\scriptsize,align=center,below=9mm of b] (b2) {\texttt{VARCHAR(80)}};
+  \node[cajanaranja,text width=2.4cm,font=\scriptsize,align=center,below=9mm of c] (c2) {\texttt{DATE}};
+  \draw[flecha] (a)--(a2); \draw[flecha] (b)--(b2); \draw[flecha] (c)--(c2);
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\begin{center}
+\footnotesize
+\begin{tabular}{>{\ttfamily}p{2.7cm}>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{4.2cm}}
+\toprule
+\normalfont\bfseries Tipo & \bfseries Para qué & \bfseries Ejemplo \\
+\midrule
+INT & Números enteros & \texttt{id}, \texttt{cantidad} \\
+VARCHAR(n) & Texto, hasta \texttt{n} caracteres & \texttt{nombre VARCHAR(80)} \\
+DECIMAL(p,d) & Dinero & \texttt{precio DECIMAL(10,2)} \\
+DATE & Fecha & \texttt{fecha DATE} \\
+BOOLEAN & Verdadero o falso & \texttt{activo BOOLEAN} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+% 15 ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 2} Elige el tipo de cada columna}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{5.4cm}>{\raggedright\arraybackslash}p{3.0cm}>{\raggedright\arraybackslash}p{3.4cm}}
+\toprule
+\bfseries Dato que hay que guardar & \bfseries Tipo & \bfseries ¿Por qué? \\
+\midrule
+El precio de un producto & \bl[2.4cm] & \bl[2.8cm] \\[6pt]
+El DNI del cliente & \bl[2.4cm] & \bl[2.8cm] \\[6pt]
+La fecha del pedido & \bl[2.4cm] & \bl[2.8cm] \\[6pt]
+Cuántas unidades se pidieron & \bl[2.4cm] & \bl[2.8cm] \\[6pt]
+Si el producto sigue a la venta & \bl[2.4cm] & \bl[2.8cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.35cm}
+\small \textbf{Pista:} pregúntate dos cosas. ¿Se harán \textbf{cuentas} con ese dato? ¿Puede empezar con \textbf{cero}?
+\end{frame}
+
+% 16 ---------------------------------------------------------------------
+\begin{frame}{Las restricciones: reglas que toda fila cumple}
+\begin{center}
+\small
+\begin{tabular}{>{\ttfamily}p{2.9cm}>{\raggedright\arraybackslash}p{4.2cm}>{\raggedright\arraybackslash}p{4.6cm}}
+\toprule
+\normalfont\bfseries Restricción & \bfseries Qué obliga & \bfseries En la tienda \\
+\midrule
+NOT NULL & No puede quedar vacía & Un cliente sin nombre no sirve \\[5pt]
+UNIQUE & No se repite en dos filas & Dos clientes no comparten correo \\[5pt]
+AUTO\_INCREMENT & El gestor numera solo & \texttt{id} 1, 2, 3\ldots sin pensarlo \\[5pt]
+DEFAULT \textit{valor} & Si no se indica, usa ese & \texttt{activo BOOLEAN DEFAULT TRUE} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4cm}
+\small Se escriben \textbf{después del tipo}, en la misma línea. Son opcionales: una columna con nombre y tipo ya funciona.
+\vspace{0.3cm}
+
+\small \texttt{PRIMARY KEY} ya incluye \texttt{NOT NULL} y \texttt{UNIQUE}; por eso casi siempre se escribe junto con \texttt{AUTO\_INCREMENT} y nada más.
+\end{frame}
+
+% 17 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+
+% 18 ---------------------------------------------------------------------
+\begin{frame}{Antes de las tablas: crear la base y entrar en ella}
+\begin{center}
+\begin{tikzpicture}
+  \node[caja,text width=7.0cm,minimum height=1.9cm,font=\scriptsize,align=center,
+        label={[font=\scriptsize\bfseries,anchor=north west,xshift=3mm,yshift=-2mm]north west:tienda}] (bd) {};
+  \node[cajaverde,text width=1.3cm,font=\tiny,align=center,xshift=-22mm,yshift=-1mm] at (bd) {cliente};
+  \node[cajaverde,text width=1.3cm,font=\tiny,align=center,yshift=-1mm] at (bd) {pedido};
+  \node[cajaverde,text width=1.3cm,font=\tiny,align=center,xshift=22mm,yshift=-1mm] at (bd) {producto};
+  \node[font=\scriptsize,below=2mm of bd] {la base de datos es la \textbf{caja}; las tablas van dentro};
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\begin{sqlcode}[.72\textwidth]
+\kw{CREATE DATABASE} tienda;\\
+\kw{USE} tienda;\\[5pt]
+\kw{CREATE TABLE} cliente ( \ldots );
+\end{sqlcode}
+\vspace{0.05cm}
+\small \texttt{USE} dice en cuál se trabaja: desde esa línea, todo lo que se escriba se crea ahí dentro. Si se olvida, el gestor responde \texttt{No database selected}.
+\vspace{0.2cm}
+
+\analogia{Es el «abrir carpeta» antes de guardar. Si no abres ninguna, el archivo aparece en cualquier parte.}
+\end{frame}
+
+% 19 ---------------------------------------------------------------------
+\begin{frame}{\texttt{FOREIGN KEY}: la conexión, por fin escrita}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=1.9cm,font=\tiny,align=center] (cli) {\textbf{cliente}\\ \texttt{id} \pk};
+  \node[cajanaranja,text width=2.1cm,font=\tiny,align=center,right=22mm of cli] (ped) {\textbf{pedido}\\ \texttt{cliente\_id} \fk};
+  \draw[relacion] (cli)--(ped);
+  \pic at ($(cli.east)!2.6mm!(ped.west)$) {uno};
+  \pic at ($(ped.west)!2.6mm!(cli.east)$) {muchos};
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\begin{sqlcode}[.72\textwidth]
+\begin{sqltab}
+\sqlline{\kw{CREATE TABLE} pedido (}\\
+\ind id          & INT  & \kw{PRIMARY KEY} \kw{AUTO\_INCREMENT},\\
+\ind fecha       & DATE & \kw{NOT NULL},\\
+\ind cliente\_id  & INT  & \kw{NOT NULL},\\
+\sqlline{\ind \nuevo{\kw{FOREIGN KEY} (cliente\_id) \kw{REFERENCES} cliente(id)}}\\
+\sqlline{);}\\
+\end{sqltab}
+\end{sqlcode}
+\vspace{0.15cm}
+\small \textbf{Son dos líneas, no una:} arriba se declara \texttt{cliente\_id} como cualquier columna; abajo se dice \textbf{a dónde apunta}. Esa segunda línea conecta cada pedido con un cliente existente.
+\end{frame}
+
+% 20 ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 3} ¿En qué tabla va la clave foránea?}
+\begin{center}
+\begin{tikzpicture}
+  % caso a
+  \node[cajaverde,text width=1.7cm,font=\tiny,align=center] (a1) {\textbf{categoria}};
+  \node[cajanaranja,text width=1.7cm,font=\tiny,align=center,right=15mm of a1] (a2) {\textbf{producto}};
+  \draw[relacion] (a1)--(a2);
+  \pic at ($(a1.east)!2.6mm!(a2.west)$) {uno};
+  \pic at ($(a2.west)!2.6mm!(a1.east)$) {muchos};
+  % caso b
+  \node[cajaverde,text width=1.7cm,font=\tiny,align=center,below=13mm of a1] (b1) {\textbf{autor}};
+  \node[cajanaranja,text width=1.7cm,font=\tiny,align=center,right=15mm of b1] (b2) {\textbf{libro}};
+  \draw[relacion] (b1)--(b2);
+  \pic at ($(b1.east)!2.6mm!(b2.west)$) {uno};
+  \pic at ($(b2.west)!2.6mm!(b1.east)$) {muchos};
+  % caso c
+  \node[cajaverde,text width=1.7cm,font=\tiny,align=center,below=13mm of b1] (c1) {\textbf{area}};
+  \node[cajanaranja,text width=1.7cm,font=\tiny,align=center,right=15mm of c1] (c2) {\textbf{empleado}};
+  \draw[relacion] (c1)--(c2);
+  \pic at ($(c1.east)!2.6mm!(c2.west)$) {uno};
+  \pic at ($(c2.west)!2.6mm!(c1.east)$) {muchos};
+  % respuestas
+  \node[anchor=west,font=\scriptsize,right=14mm of a2] {la columna \bl[1.8cm] va en la tabla \bl[1.8cm]};
+  \node[anchor=west,font=\scriptsize,right=14mm of b2] {la columna \bl[1.8cm] va en la tabla \bl[1.8cm]};
+  \node[anchor=west,font=\scriptsize,right=14mm of c2] {la columna \bl[1.8cm] va en la tabla \bl[1.8cm]};
+\end{tikzpicture}
+\end{center}
+\vspace{0.4cm}
+\small \textbf{Pista:} la clave foránea siempre va del lado de la \textbf{pata de gallo}, y se llama como la otra tabla más \texttt{\_id}.
+\end{frame}
+
+% 21 ---------------------------------------------------------------------
+\begin{frame}{La tienda de hoy: cuatro tablas, dos conexiones}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=2.1cm,font=\scriptsize,align=left] (cli)
+    {\textbf{cliente}\\ \texttt{id} \pk\\ \texttt{nombre}};
+  \node[cajanaranja,text width=2.3cm,font=\scriptsize,align=left,right=24mm of cli] (ped)
+    {\textbf{pedido}\\ \texttt{id} \pk\\ \texttt{fecha}\\ \texttt{cliente\_id} \fk};
+  \node[cajaverde,text width=2.1cm,font=\scriptsize,align=left,below=12mm of cli] (cat)
+    {\textbf{categoria}\\ \texttt{id} \pk\\ \texttt{nombre}};
+  \node[cajanaranja,text width=2.3cm,font=\scriptsize,align=left,right=24mm of cat] (pro)
+    {\textbf{producto}\\ \texttt{id} \pk\\ \texttt{precio}\\ \texttt{categoria\_id} \fk};
+  \draw[relacion] (cli)--(ped); \draw[relacion] (cat)--(pro);
+  \pic at ($(cli.east)!2.6mm!(ped.west)$) {uno};
+  \pic at ($(ped.west)!2.6mm!(cli.east)$) {muchos};
+  \pic at ($(cat.east)!2.6mm!(pro.west)$) {uno};
+  \pic at ($(pro.west)!2.6mm!(cat.east)$) {muchos};
+  \node[anchor=south,font=\tiny] at ($(cli.east)!.5!(ped.west)$) {hace};
+  \node[anchor=south,font=\tiny] at ($(cat.east)!.5!(pro.west)$) {agrupa};
+\end{tikzpicture}
+\end{center}
+\vspace{0.35cm}
+\begin{alertblock}{Una tabla no puede apuntar a otra que todavía no existe}
+\small Por eso el orden importa: primero las que \textbf{no apuntan a nadie}. \textbf{Numera del 1 al 4}:\\[7pt]
+\hspace*{0.5cm}\tbl{producto} \bl[0.9cm] \hspace{0.9cm} \tbl{cliente} \bl[0.9cm] \hspace{0.9cm} \tbl{pedido} \bl[0.9cm] \hspace{0.9cm} \tbl{categoria} \bl[0.9cm]
+\end{alertblock}
+\end{frame}
+
+% 22 ---------------------------------------------------------------------
+\begin{frame}{La tienda completa, de principio a fin en MySQL}
+\begin{sqlcode}[.97\textwidth]
+\scriptsize
+\kw{CREATE DATABASE} tienda; \ \ \kw{USE} tienda;
+\end{sqlcode}
+\vspace{-0.25cm}
+\begin{columns}[T,onlytextwidth]
+\column{.49\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} cliente (\\
+\ind id INT \kw{PRIMARY KEY} \kw{AUTO\_INCREMENT},\\
+\ind nombre VARCHAR(80) \kw{NOT NULL},\\
+\ind correo VARCHAR(120) \kw{UNIQUE}\\
+);\\[7pt]
+\kw{CREATE TABLE} categoria (\\
+\ind id INT \kw{PRIMARY KEY} \kw{AUTO\_INCREMENT},\\
+\ind nombre VARCHAR(80) \kw{NOT NULL}\\
+);
+\end{sqlcode}
+\column{.49\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} pedido (\\
+\ind id INT \kw{PRIMARY KEY} \kw{AUTO\_INCREMENT},\\
+\ind fecha DATE \kw{NOT NULL},\\
+\ind cliente\_id INT \kw{NOT NULL},\\
+\ind \kw{FOREIGN KEY} (cliente\_id)\\
+\ind\ind \kw{REFERENCES} cliente(id)\\
+);\\[7pt]
+\kw{CREATE TABLE} producto (\\
+\ind id INT \kw{PRIMARY KEY} \kw{AUTO\_INCREMENT},\\
+\ind precio DECIMAL(10,2) \kw{NOT NULL},\\
+\ind categoria\_id INT \kw{NOT NULL},\\
+\ind \kw{FOREIGN KEY} (categoria\_id)\\
+\ind\ind \kw{REFERENCES} categoria(id)\\
+);
+\end{sqlcode}
+\end{columns}
+\vspace{0.15cm}
+\small \textbf{Todo lo de hoy cabe aquí:} una base, cuatro tablas, sus tipos, sus claves primarias y sus dos claves foráneas.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 4} Ejecución del script en MySQL}
+\small Copia el código completo de la diapositiva anterior en una nueva pestaña de MySQL Workbench y ejecútalo \textbf{de arriba abajo}.
+\vspace{0.45cm}
+
+\begin{sqlcode}[.66\textwidth]
+\nuevo{\kw{SHOW TABLES}};\\[7pt]
+\nuevo{\kw{DESCRIBE}} cliente;\\
+\nuevo{\kw{DESCRIBE}} pedido;
+\end{sqlcode}
+\vspace{0.35cm}
+
+\begin{block}{Comprueba el resultado}
+\small Deben aparecer las tablas \tbl{cliente}, \tbl{categoria}, \tbl{pedido} y \tbl{producto}. Revisa que \texttt{id} sea la clave primaria y que \texttt{cliente\_id} aparezca en \tbl{pedido}.
+\end{block}
+\vspace{0.3cm}
+
+\small Si aparece un error, identifica la instrucción que falló, corrígela y vuelve a ejecutar esa instrucción.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{La misma tienda, en \textnormal{SQL Server}}
+\begin{sqlcode}[.97\textwidth]
+\scriptsize
+\kw{CREATE DATABASE} tienda; \ \ \nuevo{GO} \ \ \kw{USE} tienda; \ \ \nuevo{GO}
+\end{sqlcode}
+\vspace{-0.25cm}
+\begin{columns}[T,onlytextwidth]
+\column{.49\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} cliente (\\
+\ind id INT \nuevo{\kw{IDENTITY}(1,1)} \kw{PRIMARY KEY},\\
+\ind nombre \nuevo{NVARCHAR(80)} \kw{NOT NULL},\\
+\ind correo \nuevo{NVARCHAR(120)} \kw{UNIQUE}\\
+);\\[7pt]
+\kw{CREATE TABLE} categoria (\\
+\ind id INT \nuevo{\kw{IDENTITY}(1,1)} \kw{PRIMARY KEY},\\
+\ind nombre \nuevo{NVARCHAR(80)} \kw{NOT NULL}\\
+);
+\end{sqlcode}
+\column{.49\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} pedido (\\
+\ind id INT \nuevo{\kw{IDENTITY}(1,1)} \kw{PRIMARY KEY},\\
+\ind fecha DATE \kw{NOT NULL},\\
+\ind cliente\_id INT \kw{NOT NULL},\\
+\ind \kw{FOREIGN KEY} (cliente\_id)\\
+\ind\ind \kw{REFERENCES} cliente(id)\\
+);\\[7pt]
+\kw{CREATE TABLE} producto (\\
+\ind id INT \nuevo{\kw{IDENTITY}(1,1)} \kw{PRIMARY KEY},\\
+\ind precio DECIMAL(10,2) \kw{NOT NULL},\\
+\ind categoria\_id INT \kw{NOT NULL},\\
+\ind \kw{FOREIGN KEY} (categoria\_id)\\
+\ind\ind \kw{REFERENCES} categoria(id)\\
+);
+\end{sqlcode}
+\end{columns}
+\vspace{0.15cm}
+\small \textbf{Lo marcado es lo único que cambia:} \texttt{IDENTITY(1,1)} en lugar de \texttt{AUTO\_INCREMENT}, \texttt{NVARCHAR} en lugar de \texttt{VARCHAR}, y \texttt{GO} para separar instrucciones. \textbf{Todo lo demás es idéntico.}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{La misma tienda, en \textnormal{SQLite}}
+\begin{sqlcode}[.97\textwidth]
+\scriptsize
+\nuevo{-- no hay CREATE DATABASE ni USE: la base de datos \textbf{es un archivo}} \ \ \nuevo{\kw{PRAGMA} foreign\_keys = ON;}
+\end{sqlcode}
+\vspace{-0.25cm}
+\begin{columns}[T,onlytextwidth]
+\column{.49\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} cliente (\\
+\ind id \nuevo{INTEGER} \kw{PRIMARY KEY} \nuevo{\kw{AUTOINCREMENT},}\\
+\ind nombre \nuevo{TEXT} \kw{NOT NULL},\\
+\ind correo \nuevo{TEXT} \kw{UNIQUE}\\
+);\\[7pt]
+\kw{CREATE TABLE} categoria (\\
+\ind id \nuevo{INTEGER} \kw{PRIMARY KEY} \nuevo{\kw{AUTOINCREMENT},}\\
+\ind nombre \nuevo{TEXT} \kw{NOT NULL}\\
+);
+\end{sqlcode}
+\column{.49\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} pedido (\\
+\ind id \nuevo{INTEGER} \kw{PRIMARY KEY} \nuevo{\kw{AUTOINCREMENT},}\\
+\ind fecha \nuevo{TEXT} \kw{NOT NULL},\\
+\ind cliente\_id INTEGER \kw{NOT NULL},\\
+\ind \kw{FOREIGN KEY} (cliente\_id)\\
+\ind\ind \kw{REFERENCES} cliente(id)\\
+);\\[7pt]
+\kw{CREATE TABLE} producto (\\
+\ind id \nuevo{INTEGER} \kw{PRIMARY KEY} \nuevo{\kw{AUTOINCREMENT},}\\
+\ind precio \nuevo{REAL} \kw{NOT NULL},\\
+\ind categoria\_id INTEGER \kw{NOT NULL},\\
+\ind \kw{FOREIGN KEY} (categoria\_id)\\
+\ind\ind \kw{REFERENCES} categoria(id)\\
+);
+\end{sqlcode}
+\end{columns}
+\vspace{0.15cm}
+\small SQLite tiene \textbf{muy pocos tipos}: \texttt{INTEGER}, \texttt{TEXT} y \texttt{REAL} cubren todo, y las fechas se guardan como texto. \textbf{Y las claves foráneas vienen apagadas}: sin el \texttt{PRAGMA} se aceptan y no se vigilan.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Cada gestor tiene su propia notación}
+\begin{block}{Lo que hay que llevarse}
+El \textbf{SQL que aprendimos hoy es el mismo en todos}. Lo que cambia son \textbf{detalles}: cómo se numera solo el \texttt{id}, cómo se llama el tipo de texto, si existe o no \texttt{CREATE DATABASE}.
+\end{block}
+\vspace{0.4cm}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.1cm}>{\ttfamily}p{3.0cm}>{\ttfamily}p{2.9cm}>{\ttfamily}p{2.4cm}}
+\toprule
+& \normalfont\bfseries MySQL & \normalfont\bfseries SQL Server & \normalfont\bfseries SQLite \\
+\midrule
+Numerar solo el \texttt{id} & AUTO\_INCREMENT & IDENTITY(1,1) & AUTOINCREMENT \\[4pt]
+Texto & VARCHAR(80) & NVARCHAR(80) & TEXT \\[4pt]
+Decimales & DECIMAL(10,2) & DECIMAL(10,2) & REAL \\[4pt]
+Crear la base & CREATE DATABASE & CREATE DATABASE & \normalfont es un archivo \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4cm}
+\small Por eso no hay que aprender tres idiomas: se aprende \textbf{uno}, y al cambiar de gestor se consulta la tabla de equivalencias. \texttt{CREATE TABLE}, \texttt{PRIMARY KEY}, \texttt{FOREIGN KEY}, \texttt{NOT NULL} y \texttt{UNIQUE} son iguales en los tres.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 5} Ahora prueba guardar y consultar}
+\small Las tablas ya existen, pero están \textbf{vacías}. Escribe estas dos instrucciones y mira qué responde el gestor:
+\vspace{0.3cm}
+\begin{sqlcode}[.80\textwidth]
+\textcolor{utpGris}{-- 1. guardar una fila}\\
+\kw{INSERT INTO} cliente (nombre, correo)\\
+\kw{VALUES} ('Raúl', 'raul@mail.com');\\[9pt]
+\textcolor{utpGris}{-- 2. verla}\\
+\kw{SELECT} * \kw{FROM} cliente;
+\end{sqlcode}
+\vspace{0.15cm}
+\small \texttt{INSERT INTO} dice \textbf{en qué tabla y en qué columnas}; \texttt{VALUES} trae los datos, en el mismo orden. \texttt{SELECT * FROM} es «muéstrame todo de esta tabla».
+\vspace{0.3cm}
+\begin{block}{Dos cosas para comprobar}
+\small ¿Qué valor le tocó al \texttt{id}, si no lo escribimos? \ Y prueba un pedido con \texttt{cliente\_id = 97}: \textbf{¿qué contesta?}
+\end{block}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Lo de hoy fue DDL: ¿y el resto?}
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}
+  \node[cajanaranja,text width=3.1cm,font=\scriptsize,align=center] (ddl)
+    {\textbf{DDL}\\[2pt] \textit{definición}\\[2pt] define la estructura\\[3pt] \texttt{CREATE ALTER DROP}};
+  \node[caja,text width=3.1cm,font=\scriptsize,align=center,right=9mm of ddl] (dml)
+    {\textbf{DML}\\[2pt] \textit{manipulación}\\[2pt] cambia los datos\\[3pt] \texttt{INSERT UPDATE DELETE}};
+  \node[caja,text width=3.1cm,font=\scriptsize,align=center,right=9mm of dml] (dql)
+    {\textbf{DQL}\\[2pt] \textit{consulta}\\[2pt] lee los datos\\[3pt] \texttt{SELECT}};
+  \node[caja,text width=3.1cm,font=\scriptsize,align=center,right=9mm of dql] (dcl)
+    {\textbf{DCL}\\[2pt] \textit{control}\\[2pt] quién puede qué\\[3pt] \texttt{GRANT REVOKE}};
+  \node[font=\scriptsize,below=3mm of ddl,text=utpRojo] {\textbf{todo lo de hoy}};
+  \node[font=\scriptsize,below=3mm of dml] {la práctica 4};
+  \node[font=\scriptsize,below=3mm of dql] {próximas sesiones};
+  \node[font=\scriptsize,below=3mm of dcl] {más adelante};
+\end{tikzpicture}}
+\end{center}
+\vspace{0.5cm}
+\small Las cuatro son SQL; se agrupan por \textbf{para qué sirven}. Hoy solo construimos el \textbf{envase}: qué tablas hay y qué columnas tienen. Con el envase hecho, lo que sigue es \textbf{llenarlo y consultarlo}.
+\end{frame}
+
+% 23 ---------------------------------------------------------------------
+\begin{frame}{Cierre: completa en voz alta}
+\begin{itemize}\setlength\itemsep{16pt}
+  \item Una columna se escribe siempre con dos cosas: \bl[5cm]
+\end{itemize}
+\end{frame}
+
+% 24 ---------------------------------------------------------------------
+\begin{frame}{Referencias}
+\footnotesize
+Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración} (9.ª ed.). Cengage Learning.
+
+\vspace{0.35cm}
+Elmasri, R., \& Navathe, S. (2007). \textit{Fundamentos de sistemas de bases de datos} (5.ª ed.). Addison Wesley.
+
+\vspace{0.35cm}
+Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2020). \textit{Database system concepts} (7th ed.). McGraw-Hill.
+\end{frame}
+
+% ---------------------------------------------------------------------
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}

@@ -1,0 +1,1060 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+\usepackage[normalem]{ulem}
+
+\title{Consultas con condiciones}
+\subtitle{Filtrar con \texttt{AND}, \texttt{OR}, \texttt{NOT}, \texttt{IN}, \texttt{LIKE} y compañía,\\ y presentar el resultado con \texttt{TOP}, \texttt{DISTINCT}, \texttt{ORDER BY} y \texttt{CASE}}
+\date{Semana 08 - Sesión 15}
+\author{Rel Guzman}
+
+% Espacio en blanco para completar
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Parte nueva de un bloque de codigo que crece paso a paso
+\newcommand{\nuevo}[1]{{%
+  \setlength{\fboxsep}{1.2pt}%
+  \begingroup
+  \renewcommand{\kw}[1]{\textcolor{utpNegro}{\textbf{##1}}}%
+  \colorbox{yellow!45}{\textcolor{utpNegro}{#1}}%
+  \endgroup}}
+% Comentario dentro de un bloque de código
+\newcommand{\com}[1]{\textcolor{utpGris}{-- #1}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre del gestor o de la forma de escribir algo
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Celda con un dato que rompe una regla
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% Valor desconocido
+\newcommand{\nulo}{\textcolor{utpGrisMedio}{\textit{NULL}}}
+% Resultado de evaluar una condición en una fila
+\newcommand{\si}{\textbf{sí}}
+\newcommand{\no}{\textcolor{utpGrisMedio}{no}}
+\newcommand{\nose}{\textcolor{utpNaranja}{\textbf{¿?}}}
+% Bloque de código SQL sobre fondo gris
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.6em}}
+% Una forma de escribir algo: etiqueta a la izquierda, código a la derecha
+\newcommand{\forma}[3]{%
+  \begin{columns}[c,onlytextwidth]
+  \column{.30\textwidth}\etiqueta{#1}\\[3pt]{\scriptsize\color{utpGris} #2}
+  \column{.68\textwidth}\begin{sqlcode}[\textwidth]\scriptsize #3\end{sqlcode}
+  \end{columns}\vspace{-0.35cm}}
+% Anatomía de una instrucción: cada pieza del código con su pregunta al lado
+\tikzset{
+  pieza/.style={fill=utpGrisClaro,font=\ttfamily\footnotesize,anchor=west,inner sep=5pt,
+    minimum height=0.62cm},
+  para/.style={font=\small,anchor=west,text=utpNegro}
+}
+\newcommand{\pieza}[3]{%
+  \node[pieza] at (0,#1) {#2};
+  \node[para] at (8.6,#1) {\textcolor{utpRojo}{$\blacktriangleleft$}\ #3};}
+% Qué tan seguido se usa un operador: de 1 a 5 puntos
+\newcommand{\uso}[1]{\tikz[baseline=-0.6ex]{\foreach \i in {1,...,5}{
+  \ifnum\i>#1 \fill[utpGrisMedio!45] (\i*0.19,0) circle (0.055);
+  \else \fill[utpRojo] (\i*0.19,0) circle (0.055); \fi}}}
+% Diapositiva de sección: una palabra bien grande (\seccion[0]{...} la deja sin línea roja)
+\newcommand{\seccion}[2][1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#2}};
+    \ifnum#1=1
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+    \fi
+  \end{tikzpicture}
+\end{frame}}
+% Encabezado y filas de la tabla de ejemplo
+\newcommand{\cabproducto}{%
+  \normalfont\bfseries id & \normalfont\bfseries nombre & \normalfont\bfseries categoria
+  & \normalfont\bfseries precio & \normalfont\bfseries stock \\}
+\newcommand{\filasproducto}{%
+  1 & Arroz & abarrotes & 4.50 & 30 \\
+  2 & Gaseosa & bebidas & 3.00 & 12 \\
+  3 & Agua & bebidas & 1.50 & 0 \\
+  4 & Galletas & snacks & 1.20 & 50 \\
+  5 & Leche & bebidas & 3.80 & 20 \\
+  6 & Chifles & \nulo & 2.00 & 8 \\}
+% Tabla de ejemplo completa, lista para poner al costado
+\newcommand{\tablaproducto}{%
+  \centering\tbl{producto}\\[4pt]
+  \scriptsize\ttfamily
+  \begin{tabular}{lllrr}
+  \toprule
+  \cabproducto
+  \midrule
+  \filasproducto
+  \bottomrule
+  \end{tabular}}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás \textbf{combinar condiciones} con \texttt{AND}, \texttt{OR}, \texttt{NOT} y paréntesis, \textbf{filtrar} con \texttt{IN}, \texttt{BETWEEN}, \texttt{LIKE}, \texttt{EXISTS}, \texttt{ANY} y \texttt{ALL}, \textbf{tratar} los valores \texttt{NULL}, y \textbf{presentar} el resultado con \texttt{TOP}, \texttt{DISTINCT}, \texttt{ORDER BY} y \texttt{CASE}.
+\end{block}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{La tabla de ejemplo: la bodega creció}
+\begin{columns}[c,onlytextwidth]
+\column{.42\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Es la misma tabla \tbl{producto} de la sesión 14, con \textbf{dos filas más}.
+  \item El \textbf{Chifles} no tiene categoría: su celda es \nulo, es decir, \textbf{no se sabe}. Le daremos atención especial.
+  \item Cada consulta parte de \textbf{estas seis filas}. Lo que la condición deja pasar se marca en \nuevo{amarillo}.
+\end{itemize}
+\column{.54\textwidth}
+\tablaproducto
+\end{columns}
+\vspace{0.5cm}
+\ojo{Los ejemplos están en MySQL. Casi todo se escribe \textbf{igual} en SQL Server y SQLite; las diferencias (\texttt{TOP}, algunos comodines, \texttt{ANY} y \texttt{ALL}) se señalan en su diapositiva.}
+\end{frame}
+% =======================================================================
+\seccion{AND · OR · NOT}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{AND}: se tienen que cumplir \textbf{las dos}}
+\begin{sqlcode}[.84\textwidth]
+\kw{SELECT} nombre, precio \kw{FROM} producto\\
+\kw{WHERE} categoria = 'bebidas' \nuevo{\kw{AND}} precio < 3.50;
+\end{sqlcode}
+\vspace{-0.15cm}
+\begin{columns}[c,onlytextwidth]
+\column{.58\textwidth}
+\centering\scriptsize
+\begin{tabular}{>{\ttfamily}lccc}
+\toprule
+\normalfont\bfseries nombre & \bfseries ¿bebidas? & \bfseries ¿precio < 3.50? & \bfseries ¿sale? \\
+\midrule
+Arroz & \no & \no & \no \\
+\nuevo{Gaseosa} & \si & \si & \si \\
+\nuevo{Agua} & \si & \si & \si \\
+Galletas & \no & \si & \no \\
+Leche & \si & \no & \no \\
+Chifles & \nose & \si & \no \\
+\bottomrule
+\end{tabular}
+\column{.38\textwidth}
+\small
+Una fila sale solo si \textbf{ambas} respuestas son \textbf{sí}. Basta \textbf{un no} para dejarla fuera.
+\vspace{0.2cm}
+
+\scriptsize\color{utpGris}\nose\ = la categoría del Chifles es \texttt{NULL}: no se sabe si es bebida.
+\end{columns}
+\vspace{0.25cm}
+\begin{block}{¿Y el \nose\ cuenta como resultado?}
+\small \textbf{No.} El \texttt{WHERE} solo deja pasar las filas cuya condición da \textbf{sí}. Un \nose\ (desconocido) se trata igual que un \textbf{no}: el Chifles \textbf{no aparece} en el resultado del \texttt{SELECT}, y tampoco sale un error.
+\end{block}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{El resultado del \texttt{AND}}
+\begin{columns}[T,onlytextwidth]
+\column{.50\textwidth}
+\centering\etiqueta{Tabla original}\\[6pt]
+\tbl{producto}\\[4pt]
+\footnotesize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+\filasproducto
+\bottomrule
+\end{tabular}
+\column{.46\textwidth}
+\centering\etiqueta{Resultado del SELECT}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre, precio \kw{FROM} producto\\
+\kw{WHERE} categoria = 'bebidas' \kw{AND} precio < 3.50;
+\end{sqlcode}
+\vspace{-0.1cm}
+\footnotesize\ttfamily
+\begin{tabular}{lr}
+\toprule
+\normalfont\bfseries nombre & \normalfont\bfseries precio \\
+\midrule
+Gaseosa & 3.00 \\
+Agua & 1.50 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{OR}: basta con que se cumpla \textbf{una}}
+\begin{sqlcode}[.84\textwidth]
+\kw{SELECT} nombre, categoria, stock \kw{FROM} producto\\
+\kw{WHERE} categoria = 'snacks' \nuevo{\kw{OR}} stock = 0;
+\end{sqlcode}
+\vspace{-0.15cm}
+\begin{columns}[c,onlytextwidth]
+\column{.58\textwidth}
+\centering\scriptsize
+\begin{tabular}{>{\ttfamily}lccc}
+\toprule
+\normalfont\bfseries nombre & \bfseries ¿snacks? & \bfseries ¿stock = 0? & \bfseries ¿sale? \\
+\midrule
+Arroz & \no & \no & \no \\
+Gaseosa & \no & \no & \no \\
+\nuevo{Agua} & \no & \si & \si \\
+\nuevo{Galletas} & \si & \no & \si \\
+Leche & \no & \no & \no \\
+Chifles & \nose & \no & \no \\
+\bottomrule
+\end{tabular}
+\column{.38\textwidth}
+\small
+Una fila sale si \textbf{al menos una} respuesta es \textbf{sí}. Solo queda fuera cuando \textbf{todas} son no.
+\vspace{0.2cm}
+
+\small Si las dos se cumplen, la fila sale \textbf{una sola vez}.
+\end{columns}
+\vspace{0.25cm}
+\analogia{En la caja te dicen: «puedes pagar con \textbf{efectivo} \textbf{o} con \textbf{tarjeta}». Con cualquiera de los dos te atienden.}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{El resultado del \texttt{OR}}
+\begin{columns}[T,onlytextwidth]
+\column{.50\textwidth}
+\centering\etiqueta{Tabla original}\\[6pt]
+\tbl{producto}\\[4pt]
+\footnotesize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+\filasproducto
+\bottomrule
+\end{tabular}
+\column{.46\textwidth}
+\centering\etiqueta{Resultado del SELECT}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre, categoria, stock \kw{FROM} producto\\
+\kw{WHERE} categoria = 'snacks' \kw{OR} stock = 0;
+\end{sqlcode}
+\vspace{-0.1cm}
+\footnotesize\ttfamily
+\begin{tabular}{llr}
+\toprule
+\normalfont\bfseries nombre & \normalfont\bfseries categoria & \normalfont\bfseries stock \\
+\midrule
+Agua & bebidas & 0 \\
+Galletas & snacks & 50 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{NOT}: da vuelta la respuesta}
+\begin{sqlcode}[.84\textwidth]
+\kw{SELECT} nombre, categoria \kw{FROM} producto\\
+\kw{WHERE} \nuevo{\kw{NOT}} categoria = 'bebidas';
+\end{sqlcode}
+\vspace{-0.15cm}
+\begin{columns}[c,onlytextwidth]
+\column{.50\textwidth}
+\centering\scriptsize
+\begin{tabular}{>{\ttfamily}lcc}
+\toprule
+\normalfont\bfseries nombre & \bfseries ¿bebidas? & \bfseries NOT: ¿sale? \\
+\midrule
+\nuevo{Arroz} & \no & \si \\
+Gaseosa & \si & \no \\
+Agua & \si & \no \\
+\nuevo{Galletas} & \no & \si \\
+Leche & \si & \no \\
+Chifles & \nose & \nose\ \ \no \\
+\bottomrule
+\end{tabular}
+\column{.46\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item Lo que era \textbf{sí} pasa a \textbf{no}, y al revés.
+  \item Lo que \textbf{no se sabe} sigue sin saberse: el Chifles \textbf{no sale}.
+  \item Se combina con otros operadores: \texttt{NOT IN}, \texttt{NOT LIKE}, \texttt{NOT BETWEEN}, \texttt{NOT EXISTS}, \texttt{IS NOT NULL}.
+\end{itemize}
+\end{columns}
+\vspace{0.25cm}
+\small Aquí \texttt{NOT categoria = 'bebidas'} equivale a \texttt{categoria <> 'bebidas'}. \texttt{NOT} brilla cuando niega una condición \textbf{compuesta}: \texttt{NOT (a \kw{OR} b)}.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{El resultado del \texttt{NOT}}
+\begin{columns}[T,onlytextwidth]
+\column{.50\textwidth}
+\centering\etiqueta{Tabla original}\\[6pt]
+\tbl{producto}\\[4pt]
+\footnotesize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+\filasproducto
+\bottomrule
+\end{tabular}
+\column{.46\textwidth}
+\centering\etiqueta{Resultado del SELECT}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre, categoria \kw{FROM} producto\\
+\kw{WHERE} \kw{NOT} categoria = 'bebidas';
+\end{sqlcode}
+\vspace{-0.1cm}
+\footnotesize\ttfamily
+\begin{tabular}{ll}
+\toprule
+\normalfont\bfseries nombre & \normalfont\bfseries categoria \\
+\midrule
+Arroz & abarrotes \\
+Galletas & snacks \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Paréntesis: primero \texttt{AND}, después \texttt{OR}}
+\begin{columns}[T,onlytextwidth]
+\column{.49\textwidth}
+\centering\etiqueta{Sin paréntesis}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{WHERE} categoria = 'bebidas'\\
+\ind\kw{OR} categoria = 'snacks'\\
+\ind\kw{AND} precio > 2;
+\end{sqlcode}
+\vspace{-0.2cm}
+\scriptsize El gestor lee: bebidas \textbf{o} (snacks \textbf{y} más de 2).\\[4pt]
+\ttfamily Gaseosa, Agua, Leche\\[2pt]
+\normalfont\color{utpGris}sale el Agua, ¡que cuesta 1.50!
+\column{.49\textwidth}
+\centering\etiqueta{Con paréntesis}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{WHERE} \nuevo{(}categoria = 'bebidas'\\
+\ind\kw{OR} categoria = 'snacks'\nuevo{)}\\
+\ind\kw{AND} precio > 2;
+\end{sqlcode}
+\vspace{-0.2cm}
+\scriptsize Ahora: (bebidas \textbf{o} snacks) \textbf{y} más de 2.\\[4pt]
+\ttfamily Gaseosa, Leche\\[2pt]
+\normalfont\color{utpGris}justo lo que se quería
+\end{columns}
+\vspace{0.15cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,font=\small,text width=2.6cm,align=center] (n) {\textbf{1.\ \texttt{NOT}}};
+  \node[cajaverde,font=\small,text width=2.6cm,align=center,right=8mm of n] (a) {\textbf{2.\ \texttt{AND}}};
+  \node[cajaverde,font=\small,text width=2.6cm,align=center,right=8mm of a] (o) {\textbf{3.\ \texttt{OR}}};
+  \draw[flecha] (n)--(a);
+  \draw[flecha] (a)--(o);
+  \node[font=\tiny,text=utpGris,below=1.5mm of a] {orden en que el gestor los evalúa};
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\analogia{Es como en matemática: $2 + 3 \times 4 = 14$, pero $(2 + 3) \times 4 = 20$. \texttt{AND} es la multiplicación: va primero. \textbf{Si mezclas \texttt{AND} con \texttt{OR}, pon paréntesis siempre}, aunque no hagan falta.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 1} ¿Qué filas salen?}
+\begin{columns}[c,onlytextwidth]
+\column{.46\textwidth}
+\tablaproducto
+\column{.50\textwidth}
+\small Escribe los \textbf{nombres} que devuelve \texttt{SELECT nombre FROM producto} con cada condición.
+\vspace{0.2cm}
+
+\small \textbf{Pista:} las dos últimas solo se diferencian en los paréntesis. ¿Dan lo mismo?
+\end{columns}
+\vspace{0.2cm}
+\begin{center}
+\small
+\begin{tabular}{>{\ttfamily\scriptsize}p{8.6cm}>{\raggedright\arraybackslash}p{3.4cm}}
+\toprule
+\normalfont\bfseries Condición del \texttt{WHERE} & \bfseries Resultado \\
+\midrule
+categoria = 'bebidas' \kw{AND} stock > 10 & \bl[3.1cm] \\[6pt]
+precio > 4 \kw{OR} stock > 40 & \bl[3.1cm] \\[6pt]
+\kw{NOT} stock > 10 & \bl[3.1cm] \\[6pt]
+(categoria = 'bebidas' \kw{OR} categoria = 'snacks') \kw{AND} stock < 15 & \bl[3.1cm] \\[6pt]
+categoria = 'bebidas' \kw{OR} categoria = 'snacks' \kw{AND} stock < 15 & \bl[3.1cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+% =======================================================================
+\seccion{Operadores}
+% ---------------------------------------------------------------------
+\begin{frame}{Los operadores lógicos, de más a menos usados}
+\begin{center}
+\scriptsize
+\renewcommand{\arraystretch}{1.18}
+\begin{tabular}{>{\leavevmode\color{utpRojo}\ttfamily\bfseries}p{1.7cm}>{\raggedright\arraybackslash}p{3.6cm}>{\ttfamily}p{5.4cm}c}
+\toprule
+\normalfont\color{utpNegro}\bfseries Operador & \bfseries Pregunta que hace & \normalfont\bfseries Ejemplo & \bfseries Uso \\
+\midrule
+AND & ¿se cumplen \textbf{las dos}? & stock > 0 AND precio < 3 & \uso{5} \\
+OR & ¿se cumple \textbf{alguna}? & categoria = 'snacks' OR stock = 0 & \uso{5} \\
+NOT & ¿\textbf{no} se cumple? & NOT categoria = 'bebidas' & \uso{4} \\
+IN & ¿está en \textbf{esta lista}? & categoria IN ('snacks', 'bebidas') & \uso{4} \\
+LIKE & ¿se \textbf{parece} a este patrón? & nombre LIKE 'Ga\%' & \uso{4} \\
+BETWEEN & ¿está en \textbf{este rango}? & precio BETWEEN 1 AND 3 & \uso{3} \\
+EXISTS & ¿hay \textbf{al menos una} fila? & EXISTS (SELECT \ldots) & \uso{2} \\
+ANY / SOME & ¿cumple con \textbf{alguno} de la lista? & precio > ANY (SELECT \ldots) & \uso{1} \\
+ALL & ¿cumple con \textbf{todos} los de la lista? & precio > ALL (SELECT \ldots) & \uso{1} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\small Todos responden \textbf{sí} o \textbf{no} para cada fila, así que se pueden mezclar con \texttt{AND}, \texttt{OR} y \texttt{NOT}. Los tres primeros ya los viste; \texttt{LIKE} tiene su propia sección.
+\vspace{0.1cm}
+
+\footnotesize\color{utpGris} \texttt{SOME} es \textbf{otro nombre} de \texttt{ANY}: hacen exactamente lo mismo.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{IN} y \texttt{BETWEEN}: listas y rangos}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{IN: ¿está en esta lista?}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{WHERE} categoria \nuevo{\kw{IN} ('snacks', 'abarrotes')}
+\end{sqlcode}
+\vspace{-0.25cm}
+\scriptsize\ttfamily Arroz, Galletas\\[4pt]
+\raggedright\normalfont\small
+\begin{itemize}\setlength\itemsep{3pt}
+  \item Es una cadena de \texttt{OR} con \texttt{=}, pero \textbf{más corta}.
+  \item Sirve con texto, números o fechas: \texttt{id IN (1, 3, 5)}.
+  \item \texttt{NOT IN} pide lo contrario.
+\end{itemize}
+\column{.48\textwidth}
+\centering\etiqueta{BETWEEN: ¿está en este rango?}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{WHERE} precio \nuevo{\kw{BETWEEN} 1.50 \kw{AND} 3.00}
+\end{sqlcode}
+\vspace{-0.25cm}
+\scriptsize\ttfamily Gaseosa, Agua, Chifles\\[4pt]
+\raggedright\normalfont\small
+\begin{itemize}\setlength\itemsep{3pt}
+  \item Es \texttt{precio >= 1.50 \kw{AND} precio <= 3.00}: \textbf{incluye los extremos}.
+  \item Primero el \textbf{menor}: \texttt{BETWEEN 3.00 AND 1.50} no trae nada.
+\end{itemize}
+\end{columns}
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}[x=2.3cm]
+  \draw[thick,utpGrisMedio,-{Stealth[length=2mm]}] (0.9,0) -- (4.8,0);
+  \fill[utpRojo!15] (1.5,-0.16) rectangle (3.0,0.16);
+  \draw[very thick,utpRojo] (1.5,0) -- (3.0,0);
+  \fill[utpRojo] (1.5,0) circle (0.07) (3.0,0) circle (0.07);
+  \foreach \v/\n in {1.2/Galletas,1.5/Agua,2.0/Chifles,3.0/Gaseosa,3.8/Leche,4.5/Arroz}{
+    \draw[utpNegro] (\v,-0.1) -- (\v,0.1);
+    \node[font=\tiny\ttfamily,above=1mm] at (\v,0.1) {\n};
+    \node[font=\tiny,text=utpGris,below=1mm] at (\v,-0.1) {\v};
+  }
+\end{tikzpicture}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Ejemplo con \texttt{IN} y \texttt{BETWEEN}}
+\begin{columns}[T,onlytextwidth]
+\column{.50\textwidth}
+\centering\etiqueta{Tabla original}\\[6pt]
+\tbl{producto}\\[4pt]
+\footnotesize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+\filasproducto
+\bottomrule
+\end{tabular}
+\column{.46\textwidth}
+\centering\etiqueta{Resultado del SELECT}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre, categoria, precio \kw{FROM} producto\\
+\kw{WHERE} categoria \kw{IN} ('bebidas', 'snacks')\\
+\ind\kw{AND} precio \kw{BETWEEN} 1.50 \kw{AND} 3.00;
+\end{sqlcode}
+\vspace{-0.1cm}
+\footnotesize\ttfamily
+\begin{tabular}{llr}
+\toprule
+\normalfont\bfseries nombre & \normalfont\bfseries categoria & \normalfont\bfseries precio \\
+\midrule
+Gaseosa & bebidas & 3.00 \\
+Agua & bebidas & 1.50 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.4cm}
+\small Las Galletas son \texttt{snacks}, pero cuestan 1.20: quedan \textbf{fuera del rango}. La Leche es bebida, pero cuesta 3.80.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Alias: apodos para columnas y tablas}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{Alias de columna}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre \nuevo{\kw{AS} articulo},\\
+\ind\ind precio \nuevo{\kw{AS} costo}\\
+\kw{FROM} producto;
+\end{sqlcode}
+\vspace{-0.2cm}
+\scriptsize\ttfamily
+\begin{tabular}{lr}
+\toprule
+\normalfont\bfseries\nuevo{articulo} & \normalfont\bfseries\nuevo{costo} \\
+\midrule
+Arroz & 4.50 \\
+Gaseosa & 3.00 \\
+\ldots & \ldots \\
+\bottomrule
+\end{tabular}\\[6pt]
+\raggedright\normalfont\small Cambia el \textbf{nombre que se muestra} en el resultado. La tabla no cambia.
+\column{.48\textwidth}
+\centering\etiqueta{Alias de tabla}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} \nuevo{p.}nombre, \nuevo{p.}precio\\
+\kw{FROM} producto \nuevo{p};
+\end{sqlcode}
+\vspace{-0.2cm}
+\raggedright\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item \texttt{p} es un \textbf{apodo} de \tbl{producto}, válido solo en esta consulta.
+  \item \texttt{p.nombre} se lee «la columna \texttt{nombre} de la tabla \texttt{p}».
+  \item Sirve cuando una consulta usa \textbf{dos tablas}, como en \texttt{EXISTS}.
+\end{itemize}
+\end{columns}
+\vspace{0.3cm}
+\footnotesize\color{utpGris} El \texttt{AS} es opcional: \texttt{producto AS p} y \texttt{producto p} son lo mismo.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{EXISTS}: ¿hay al menos una fila?}
+\begin{columns}[c,onlytextwidth]
+\column{.34\textwidth}
+\centering\tbl{venta}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{lcr}
+\toprule
+\normalfont\bfseries id & \normalfont\bfseries producto\_id & \normalfont\bfseries cantidad \\
+\midrule
+1 & 1 & 5 \\
+2 & 2 & 3 \\
+3 & 4 & 10 \\
+4 & 2 & 1 \\
+\bottomrule
+\end{tabular}\\[5pt]
+\normalfont\tiny\color{utpGris}cada fila es una venta de un producto
+\column{.62\textwidth}
+\small Pregunta: «¿qué productos \textbf{se vendieron} alguna vez?»
+\vspace{0.3cm}
+
+\small Para cada producto, \texttt{EXISTS} mira si en \tbl{venta} hay \textbf{al menos una fila} con su \texttt{id}:
+\vspace{0.2cm}
+\begin{itemize}\setlength\itemsep{4pt}
+  \item Si hay una o más: el producto \textbf{sale}.
+  \item Si no hay ninguna: \textbf{no sale}.
+  \item \texttt{NOT EXISTS} hace lo contrario.
+\end{itemize}
+\end{columns}
+\vspace{0.4cm}
+\analogia{El bodeguero revisa sus boletas: «¿hay \textbf{al menos una} boleta de este producto?». No importa cuántas: con una basta.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Ejemplo con \texttt{EXISTS}}
+\begin{columns}[T,onlytextwidth]
+\column{.50\textwidth}
+\centering\etiqueta{Tablas originales}\\[6pt]
+\tbl{producto}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+\filasproducto
+\bottomrule
+\end{tabular}\\[6pt]
+\normalfont\tbl{venta}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{lcr}
+\toprule
+\normalfont\bfseries id & \normalfont\bfseries producto\_id & \normalfont\bfseries cantidad \\
+\midrule
+1 & 1 & 5 \\
+2 & 2 & 3 \\
+3 & 4 & 10 \\
+4 & 2 & 1 \\
+\bottomrule
+\end{tabular}
+\column{.46\textwidth}
+\centering\etiqueta{Resultado del SELECT}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} p.nombre \kw{FROM} producto p\\
+\kw{WHERE} \kw{EXISTS} (\kw{SELECT} * \kw{FROM} venta v\\
+\ind\ind\ind\ind\kw{WHERE} v.producto\_id = p.id);
+\end{sqlcode}
+\vspace{-0.1cm}
+\footnotesize\ttfamily
+\begin{tabular}{l}
+\toprule
+\normalfont\bfseries nombre \\
+\midrule
+Arroz \\
+Gaseosa \\
+Galletas \\
+\bottomrule
+\end{tabular}\\[6pt]
+\raggedright\normalfont\small Son los \texttt{id} 1, 2 y 4: los que aparecen en \tbl{venta}.
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{ANY}, \texttt{SOME} y \texttt{ALL}: comparar con una lista}
+\begin{sqlcode}[.92\textwidth]
+\scriptsize
+\kw{WHERE} precio > \nuevo{\kw{ANY}} (\kw{SELECT} precio \kw{FROM} producto \kw{WHERE} categoria = 'bebidas')
+\end{sqlcode}
+\vspace{-0.1cm}
+\small El \texttt{SELECT} de adentro da una \textbf{lista}: los precios de las bebidas, \textbf{3.00, 1.50 y 3.80}.
+\vspace{0.4cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{> ANY \ (o \ > SOME)}\\[6pt]
+\raggedright\small Mayor que \textbf{alguno} de la lista.\\
+Basta con superar al \textbf{más bajo}: 1.50.\\[6pt]
+\centering\scriptsize\ttfamily Arroz, Gaseosa, Leche, Chifles
+\column{.48\textwidth}
+\centering\etiqueta{> ALL}\\[6pt]
+\raggedright\small Mayor que \textbf{todos} los de la lista.\\
+Hay que superar al \textbf{más alto}: 3.80.\\[6pt]
+\centering\scriptsize\ttfamily Arroz
+\end{columns}
+\vspace{0.5cm}
+\analogia{«¿Corres más rápido que \textbf{alguno} del equipo?» Basta ganarle al más lento. «¿Más rápido que \textbf{todos}?» Hay que ganarle al más rápido.}
+\vspace{0.05cm}
+\footnotesize\color{utpGris} \texttt{SOME} es otro nombre de \texttt{ANY}. Funcionan en MySQL y SQL Server; SQLite no los tiene.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 2} Elige el operador}
+\small Completa el espacio con \texttt{IN}, \texttt{BETWEEN}, \texttt{EXISTS} o \texttt{ALL}:
+\vspace{0.4cm}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{4.4cm}>{\ttfamily\footnotesize}l}
+\toprule
+\bfseries Pedido & \normalfont\bfseries Condición \\
+\midrule
+Productos de snacks o de bebidas & categoria \bl[1.8cm] ('snacks', 'bebidas') \\[12pt]
+Precio de 1 a 3 soles & precio \bl[1.8cm] 1 \kw{AND} 3 \\[12pt]
+Productos que se vendieron & \bl[1.8cm] (\kw{SELECT} * \kw{FROM} venta \ldots) \\[12pt]
+Más caros que todas las bebidas & precio > \bl[1.8cm] (\kw{SELECT} precio \ldots) \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4cm}
+\small \textbf{Pista:} ¿es una \textbf{lista}, un \textbf{rango}, «\textbf{¿hay alguna?}» o «\textbf{contra todos}»?
+\end{frame}
+% =======================================================================
+\seccion{LIKE y comodines}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{LIKE}: buscar por parecido}
+\begin{sqlcode}[.70\textwidth]
+\kw{SELECT} nombre \kw{FROM} producto\\
+\kw{WHERE} nombre \nuevo{\kw{LIKE} 'Ga\%'}; \ \ \com{columna, LIKE, patrón}
+\end{sqlcode}
+\begin{columns}[c,onlytextwidth]
+\column{.62\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item \texttt{=} pide el texto \textbf{exacto}; \texttt{LIKE} pide que \textbf{se parezca} a un patrón.
+  \item \texttt{'Ga\%'} se lee «empieza con \textbf{Ga} y sigue lo que sea».
+  \item \texttt{NOT LIKE} se queda con los que \textbf{no} se parecen. En MySQL y SQL Server, normalmente \textbf{no distingue} mayúsculas: \texttt{'ga\%'} da lo mismo.
+\end{itemize}
+\column{.34\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{l}
+\toprule
+\normalfont\bfseries nombre \\
+\midrule
+\nuevo{Ga}seosa \\
+\nuevo{Ga}lletas \\
+\bottomrule
+\end{tabular}\\[6pt]
+\normalfont\tiny\color{utpGris}con \texttt{nombre = 'Ga'} no sale ninguno
+\end{columns}
+\vspace{0.3cm}
+\enlarealidad{Cuando escribes \textit{«gall»} en el buscador de una tienda en línea, detrás hay algo como \texttt{WHERE nombre LIKE '\%gall\%'}: trae todo lo que \textbf{contenga} esas letras.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Caracteres comodín: \texttt{\%} y \texttt{\_}}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{\%}\\[4pt]
+\raggedright\small Reemplaza \textbf{cualquier cantidad} de caracteres: cero, uno o muchos.
+\column{.48\textwidth}
+\centering\etiqueta{\_}\\[4pt]
+\raggedright\small Reemplaza \textbf{exactamente un} carácter, ni más ni menos.
+\end{columns}
+\vspace{0.15cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{>{\ttfamily}l>{\raggedright\arraybackslash}p{4.2cm}>{\ttfamily}l}
+\toprule
+\normalfont\bfseries Patrón & \bfseries Se lee & \normalfont\bfseries Resultado \\
+\midrule
+'A\%' & empieza con A & Arroz, Agua \\
+'\%s' & termina en s & Galletas, Chifles \\
+'\%ll\%' & contiene «ll» en cualquier parte & Galletas \\
+'\_g\%' & la segunda letra es g & Agua \\
+'\_\_\_\_' & tiene exactamente 4 letras & Agua \\
+'L\_che' & L, una letra cualquiera, «che» & Leche \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\analogia{Son como el \textbf{comodín} de las cartas: ocupan el lugar de lo que falta. El \texttt{\%} es un comodín elástico, que se estira; el \texttt{\_} ocupa \textbf{una sola casilla}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 3} Patrones}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{A. ¿Qué nombres salen?}\\[6pt]
+\small
+\begin{tabular}{>{\ttfamily\scriptsize}l>{\raggedright\arraybackslash}p{2.6cm}}
+\toprule
+\normalfont\bfseries Condición & \bfseries Resultado \\
+\midrule
+nombre \kw{LIKE} 'G\%' & \bl[2.4cm] \\[8pt]
+nombre \kw{LIKE} '\%a' & \bl[2.4cm] \\[8pt]
+nombre \kw{LIKE} '\%i\%' & \bl[2.4cm] \\[8pt]
+nombre \kw{NOT LIKE} '\%a\%' & \bl[2.4cm] \\
+\bottomrule
+\end{tabular}
+\column{.48\textwidth}
+\centering\etiqueta{B. Escribe el patrón}\\[6pt]
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.1cm}>{\raggedright\arraybackslash}p{2.2cm}}
+\toprule
+\bfseries Pedido & \bfseries Patrón \\
+\midrule
+Termina en «oz» & \bl[2.0cm] \\[8pt]
+Tiene exactamente 5 letras & \bl[2.0cm] \\[8pt]
+Contiene «che» & \bl[2.0cm] \\[8pt]
+La tercera letra es u & \bl[2.0cm] \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.4cm}
+\small Los nombres son: \texttt{Arroz, Gaseosa, Agua, Galletas, Leche, Chifles}.
+\vspace{0.1cm}
+
+\small \textbf{Pista:} ¿el patrón habla del \textbf{comienzo}, del \textbf{final}, de \textbf{cualquier parte} o de una \textbf{posición exacta}?
+\end{frame}
+% =======================================================================
+\seccion{Presentar el resultado}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{TOP}: quedarse con las primeras filas}
+\small Pedido: «los \textbf{3 productos más caros}». Cada gestor lo escribe a su manera:
+\vspace{0.2cm}
+
+\forma{SQL Server}{\texttt{TOP} va pegado al \texttt{SELECT}}{%
+\kw{SELECT} \nuevo{\kw{TOP} 3} nombre, precio \kw{FROM} producto\\
+\kw{ORDER BY} precio \kw{DESC};}
+\forma{MySQL · SQLite}{\texttt{LIMIT} va al final de todo}{%
+\kw{SELECT} nombre, precio \kw{FROM} producto\\
+\kw{ORDER BY} precio \kw{DESC} \nuevo{\kw{LIMIT} 3};}
+\vspace{0.3cm}
+\begin{columns}[c,onlytextwidth]
+\column{.30\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{lr}
+\toprule
+\normalfont\bfseries nombre & \normalfont\bfseries precio \\
+\midrule
+Arroz & 4.50 \\
+Leche & 3.80 \\
+Gaseosa & 3.00 \\
+\bottomrule
+\end{tabular}
+\column{.66\textwidth}
+\ojo{\textbf{Primero se ordena, después se cortan} las 3 primeras. Sin \texttt{ORDER BY}, \texttt{TOP 3} trae «tres cualquiera»: no necesariamente las más caras.}
+\end{columns}
+\vspace{0.15cm}
+\footnotesize\color{utpGris} SQL Server también acepta porcentajes: \texttt{SELECT TOP 50 PERCENT \ldots} trae la mitad de las filas.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{DISTINCT}: sin repetidos}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\begin{sqlcode}[\textwidth]
+\kw{SELECT} categoria \kw{FROM} producto;
+\end{sqlcode}
+\vspace{-0.2cm}
+\centering\scriptsize\ttfamily
+\begin{tabular}{l}
+\toprule
+\normalfont\bfseries categoria \\
+\midrule
+abarrotes \\
+\mal{bebidas} \\
+\mal{bebidas} \\
+snacks \\
+\mal{bebidas} \\
+\nulo \\
+\bottomrule
+\end{tabular}\\[4pt]
+\normalfont\small 6 filas, una por producto.
+\column{.48\textwidth}
+\begin{sqlcode}[\textwidth]
+\kw{SELECT} \nuevo{\kw{DISTINCT}} categoria \kw{FROM} producto;
+\end{sqlcode}
+\vspace{-0.2cm}
+\centering\scriptsize\ttfamily
+\begin{tabular}{l}
+\toprule
+\normalfont\bfseries categoria \\
+\midrule
+abarrotes \\
+bebidas \\
+snacks \\
+\nulo \\
+\bottomrule
+\end{tabular}\\[4pt]
+\normalfont\small 4 filas: cada valor \textbf{una sola vez}.
+\end{columns}
+\vspace{0.3cm}
+\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item \texttt{DISTINCT} va \textbf{justo después} de \texttt{SELECT} y mira la \textbf{fila completa}: \texttt{SELECT DISTINCT categoria, precio} no quita nada, porque no hay dos filas con la misma pareja.
+  \item \texttt{NULL} también cuenta como un valor: aparece una vez.
+\end{itemize}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{ORDER BY} con varias columnas}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} categoria, nombre, precio\\
+\kw{FROM} producto\\
+\kw{ORDER BY} \nuevo{categoria}, \nuevo{precio \kw{DESC}};
+\end{sqlcode}
+\vspace{-0.1cm}
+\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item Ordena por la \textbf{primera} columna.
+  \item La \textbf{segunda} solo decide cuando hay \textbf{empate} en la primera: las tres bebidas.
+  \item Cada columna lleva su propio \texttt{ASC} o \texttt{DESC}.
+\end{itemize}
+\column{.44\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{llr}
+\toprule
+\normalfont\bfseries categoria & \normalfont\bfseries nombre & \normalfont\bfseries precio \\
+\midrule
+\nulo & Chifles & 2.00 \\
+abarrotes & Arroz & 4.50 \\
+bebidas & Leche & \nuevo{3.80} \\
+bebidas & Gaseosa & \nuevo{3.00} \\
+bebidas & Agua & \nuevo{1.50} \\
+snacks & Galletas & 1.20 \\
+\bottomrule
+\end{tabular}\\[4pt]
+\normalfont\tiny\color{utpGris}en MySQL, SQL Server y SQLite, \texttt{NULL} va primero en orden \texttt{ASC}
+\end{columns}
+\vspace{0.3cm}
+\analogia{Es como la lista de alumnos: primero por \textbf{apellido}; si dos se apellidan igual, recién ahí se mira el \textbf{nombre}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{IS NULL}: la casilla que nadie llenó}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{Así no}
+\begin{sqlcode}[\textwidth]
+\kw{SELECT} nombre \kw{FROM} producto\\
+\kw{WHERE} categoria \mal{= NULL};
+\end{sqlcode}
+\vspace{-0.2cm}
+\small \textbf{Ninguna fila}, y sin error.
+\column{.48\textwidth}
+\centering\etiqueta{Así sí}
+\begin{sqlcode}[\textwidth]
+\kw{SELECT} nombre \kw{FROM} producto\\
+\kw{WHERE} categoria \nuevo{\kw{IS NULL}};
+\end{sqlcode}
+\vspace{-0.2cm}
+\small Sale el \textbf{Chifles}. Con \texttt{IS NOT NULL}, los otros cinco.
+\end{columns}
+\vspace{0.3cm}
+\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item \texttt{NULL} significa \textbf{«no se sabe»}. No es cero, ni un texto vacío \texttt{''}.
+  \item Toda comparación con \texttt{NULL} da \textbf{desconocido}, y el \texttt{WHERE} solo deja pasar lo \textbf{verdadero}. Por eso el Chifles \textbf{no salió} con \texttt{NOT}: hay que pedirlo aparte.
+\end{itemize}
+\vspace{-0.15cm}
+\begin{sqlcode}[.84\textwidth]
+\scriptsize
+\kw{WHERE} categoria <> 'bebidas' \nuevo{\kw{OR} categoria \kw{IS NULL}}; \ \ \ \com{Arroz, Galletas, Chifles}
+\end{sqlcode}
+\vspace{-0.2cm}
+\analogia{En una ficha de inscripción, la casilla \textit{teléfono} en blanco no quiere decir que tu número sea 0: quiere decir que \textbf{no lo sabemos}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Ejemplo con \texttt{IS NULL}}
+\begin{columns}[T,onlytextwidth]
+\column{.50\textwidth}
+\centering\etiqueta{Tabla original}\\[6pt]
+\tbl{producto}\\[4pt]
+\footnotesize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+\filasproducto
+\bottomrule
+\end{tabular}
+\column{.46\textwidth}
+\centering\etiqueta{Resultado del SELECT}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre, categoria \kw{FROM} producto\\
+\kw{WHERE} categoria \kw{IS NULL};
+\end{sqlcode}
+\vspace{-0.1cm}
+\footnotesize\ttfamily
+\begin{tabular}{ll}
+\toprule
+\normalfont\bfseries nombre & \normalfont\bfseries categoria \\
+\midrule
+Chifles & \nulo \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{CASE}: una columna que decide}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre, precio,\\
+\ind\nuevo{\kw{CASE}}\\
+\ind\ind\nuevo{\kw{WHEN} precio < 2 \kw{THEN} 'barato'}\\
+\ind\ind\nuevo{\kw{WHEN} precio < 4 \kw{THEN} 'regular'}\\
+\ind\ind\nuevo{\kw{ELSE} 'caro'}\\
+\ind\nuevo{\kw{END AS} rango}\\
+\kw{FROM} producto;
+\end{sqlcode}
+\column{.44\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{lrl}
+\toprule
+\normalfont\bfseries nombre & \normalfont\bfseries precio & \normalfont\bfseries rango \\
+\midrule
+Arroz & 4.50 & \nuevo{caro} \\
+Gaseosa & 3.00 & \nuevo{regular} \\
+Agua & 1.50 & \nuevo{barato} \\
+Galletas & 1.20 & \nuevo{barato} \\
+Leche & 3.80 & \nuevo{regular} \\
+Chifles & 2.00 & \nuevo{regular} \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.3cm}
+\small \texttt{CASE} va \textbf{dentro del \texttt{SELECT}}: crea una columna \textbf{solo en el resultado}, sin cambiar la tabla.
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.31\textwidth}
+\etiqueta{Gana el primero}\\[4pt]
+\raggedright\small El primer \texttt{WHEN} que se cumple decide. El Agua cumple los dos, pero queda «barato».
+\column{.31\textwidth}
+\etiqueta{Ojo con el borde}\\[4pt]
+\raggedright\small El Chifles cuesta 2.00, que \textbf{no} es menor que 2: queda «regular».
+\column{.31\textwidth}
+\etiqueta{Sin ELSE}\\[4pt]
+\raggedright\small Si nada se cumple y no hay \texttt{ELSE}, sale \texttt{NULL}: el Arroz quedaría sin rango.
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Cierre: el DML en MySQL, SQL Server y SQLite}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.6cm}>{\ttfamily\footnotesize}p{2.7cm}>{\ttfamily\footnotesize}p{2.7cm}>{\ttfamily\footnotesize}p{2.7cm}}
+\toprule
+& \normalfont\etiqueta{MySQL} & \normalfont\etiqueta{SQL Server} & \normalfont\etiqueta{SQLite} \\
+\midrule
+\texttt{INSERT}, \texttt{SELECT}, \texttt{UPDATE}, \texttt{DELETE} & \normalfont igual & \normalfont igual & \normalfont igual \\
+Quedarse con 3 filas & LIMIT 3 & TOP 3 & LIMIT 3 \\
+Vaciar una tabla & TRUNCATE TABLE & TRUNCATE TABLE & DELETE FROM \\
+Reemplazar un \texttt{NULL} & IFNULL & ISNULL & IFNULL \\
+\texttt{ANY}, \texttt{SOME}, \texttt{ALL} & \normalfont sí & \normalfont sí & \normalfont no \\
+Comodín \texttt{[AG]} en \texttt{LIKE} & \normalfont no & \normalfont sí & \normalfont no \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\small Lo básico se escribe \textbf{igual} en los tres. Las diferencias están en los detalles; \texttt{COALESCE} funciona en todos.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Referencias}
+\footnotesize
+Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración} (9.ª ed.). Cengage Learning.
+
+\vspace{0.35cm}
+Elmasri, R., \& Navathe, S. (2007). \textit{Fundamentos de sistemas de bases de datos} (5.ª ed.). Addison Wesley.
+
+\vspace{0.35cm}
+Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2020). \textit{Database system concepts} (7th ed.). McGraw-Hill.
+\end{frame}
+% ---------------------------------------------------------------------
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}

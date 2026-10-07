@@ -1,0 +1,1099 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+\usepackage[normalem]{ulem}
+
+\title{Integridad de datos y DML}
+\subtitle{Restricciones, claves foráneas, variables\\ e \texttt{INSERT}, \texttt{UPDATE}, \texttt{DELETE} y \texttt{SELECT}}
+\date{Semana 07 - Sesión 13}
+\author{Rel Guzman}
+
+% Espacio en blanco para completar
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Parte nueva de un bloque de codigo que crece paso a paso
+\newcommand{\nuevo}[1]{{%
+  \setlength{\fboxsep}{1.2pt}%
+  \begingroup
+  \renewcommand{\kw}[1]{\textcolor{utpNegro}{\textbf{##1}}}%
+  \colorbox{yellow!45}{\textcolor{utpNegro}{#1}}%
+  \endgroup}}
+% Comentario dentro de un bloque de código
+\newcommand{\com}[1]{\textcolor{utpGris}{-- #1}}
+% Marcas de clave
+\newcommand{\pk}{{\scriptsize\color{utpRojo}\textbf{PK}}}
+\newcommand{\fk}{{\scriptsize\color{utpNaranja}\textbf{FK}}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre del gestor o de la forma de escribir algo
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Celda con un dato que rompe una regla
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% Bloque de código SQL sobre fondo gris
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.6em}}
+% Una forma de escribir algo: etiqueta a la izquierda, código a la derecha
+\newcommand{\forma}[3]{%
+  \begin{columns}[c,onlytextwidth]
+  \column{.30\textwidth}\etiqueta{#1}\\[3pt]{\scriptsize\color{utpGris} #2}
+  \column{.68\textwidth}\begin{sqlcode}[\textwidth]\scriptsize #3\end{sqlcode}
+  \end{columns}\vspace{-0.35cm}}
+% Diapositiva de sección: una palabra bien grande
+\newcommand{\seccion}[1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#1}};
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+  \end{tikzpicture}
+\end{frame}}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás reconocer los tres tipos de \textbf{integridad}, declarar \textbf{restricciones} y \textbf{claves foráneas} en MySQL, SQL Server y SQLite, usar \textbf{variables} y escribir tus primeros \texttt{INSERT}, \texttt{UPDATE}, \texttt{DELETE} y \texttt{SELECT}.
+\end{block}
+\end{frame}
+
+% 3 ---------------------------------------------------------------------
+\begin{frame}{Dónde estamos}
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small]
+  \node[cajaverde,text width=3.2cm] (a) {\textbf{Sesión 12}\\[2pt] \texttt{CREATE TABLE}};
+  \node[cajanaranja,text width=3.2cm,right=12mm of a] (b) {\textbf{Hoy, parte 1}\\[2pt] reglas que cuidan los datos};
+  \node[cajanaranja,text width=3.2cm,right=12mm of b] (c) {\textbf{Hoy, parte 2}\\[2pt] llenar y leer las tablas};
+  \draw[flecha] (a)--(b);
+  \draw[flecha] (b)--(c);
+  \node[font=\tiny,below=2mm of a,text=utpGris] {construimos el envase};
+  \node[font=\tiny,below=2mm of b,text=utpGris] {integridad y restricciones};
+  \node[font=\tiny,below=2mm of c,text=utpGris] {\texttt{INSERT UPDATE DELETE SELECT}};
+\end{tikzpicture}}
+\end{center}
+\vspace{0.75cm}
+\analogia{La sesión pasada construimos los estantes. Hoy ponemos los \textbf{letreros de reglas} («aquí solo libros», «uno por casillero») y empezamos a \textbf{guardar cosas} en ellos.}
+\end{frame}
+
+% =======================================================================
+\seccion{Restricciones de integridad}
+
+% ---------------------------------------------------------------------
+\begin{frame}{¿Qué es la integridad de datos?}
+\concepto{Integridad}{Que los datos guardados sean \textbf{correctos y coherentes}: que no haya filas repetidas, valores imposibles ni referencias a cosas que no existen.}
+\vspace{0.4cm}
+\begin{columns}[T,onlytextwidth]
+\column{.31\textwidth}
+\centering\etiqueta{Fila repetida}\\[6pt]
+\small Dos alumnos con el mismo código. ¿A cuál le pongo la nota?
+\column{.31\textwidth}
+\centering\etiqueta{Valor imposible}\\[6pt]
+\small Un alumno con edad \texttt{-4}, o una nota de \texttt{25} sobre 20.
+\column{.31\textwidth}
+\centering\etiqueta{Referencia rota}\\[6pt]
+\small Un pedido de un cliente que \textbf{no existe}.
+\end{columns}
+\vspace{0.5cm}
+\small La buena noticia: no hay que vigilarlo a mano. Se escriben \textbf{restricciones} y el gestor \textbf{rechaza} cualquier dato que las rompa.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Tres tipos de integridad, cinco restricciones}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.6cm}>{\leavevmode\color{utpRojo}\ttfamily\bfseries}p{3.1cm}>{\raggedright\arraybackslash}p{6.4cm}}
+\toprule
+\bfseries Tipo de integridad & \normalfont\color{utpNegro}\bfseries Restricción & \bfseries Para qué sirve \\
+\midrule
+\raisebox{-1.15\normalbaselineskip}[0pt][0pt]{\textbf{Entidad}} & PRIMARY KEY & Identificar cada fila: clave primaria \\
+\cmidrule(l){2-3}
+ & UNIQUE & Que un valor no se repita: clave única \\
+\midrule
+\textbf{Referencial} & FOREIGN KEY & Apuntar a una fila de otra tabla: clave foránea \\
+\midrule
+\raisebox{-1.15\normalbaselineskip}[0pt][0pt]{\textbf{Dominio}} & DEFAULT & Poner un valor por defecto si no se indica \\
+\cmidrule(l){2-3}
+ & CHECK & Validar un rango, formato o lista de valores \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.32\textwidth}\small \textbf{Entidad:} cada fila es \textbf{una sola cosa}, distinguible de las demás.
+\column{.32\textwidth}\small \textbf{Referencial:} las conexiones entre tablas \textbf{no se rompen}.
+\column{.32\textwidth}\small \textbf{Dominio:} cada valor está \textbf{dentro de lo permitido}.
+\end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 1} ¿Qué integridad se rompe?}
+\begin{columns}[c,onlytextwidth]
+\column{.30\textwidth}
+\centering
+\tbl{carrera}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{ll}
+\toprule
+\normalfont\bfseries id & \normalfont\bfseries nombre \\
+\midrule
+1 & Sistemas \\
+2 & Industrial \\
+\bottomrule
+\end{tabular}
+\column{.66\textwidth}
+\centering
+\tbl{alumno}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{llll}
+\toprule
+\normalfont\bfseries id & \normalfont\bfseries nombre & \normalfont\bfseries edad & \normalfont\bfseries carrera\_id \\
+\midrule
+1 & Ana & 19 & 1 \\
+\mal{1} & Luis & 20 & 2 \\
+3 & Sofía & \mal{-4} & 1 \\
+4 & Pedro & 21 & \mal{9} \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.55cm}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{5.2cm}>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{3.4cm}}
+\toprule
+\bfseries Dato marcado & \bfseries Integridad rota & \bfseries Restricción que lo evita \\
+\midrule
+El \texttt{id} 1 de Luis & \bl[2.6cm] & \bl[2.8cm] \\[6pt]
+La edad \texttt{-4} de Sofía & \bl[2.6cm] & \bl[2.8cm] \\[6pt]
+La \texttt{carrera\_id} 9 de Pedro & \bl[2.6cm] & \bl[2.8cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Tres formas de escribir una restricción}
+\forma{1. En la misma columna}{al lado del tipo, como en la sesión pasada}{%
+\kw{CREATE TABLE} cliente (\\
+\ind codigo CHAR(10) \kw{NOT NULL} \nuevo{\kw{PRIMARY KEY}},\\
+\ind \ldots\\
+);}
+\forma{2. En una línea aparte}{al final, dentro del \texttt{CREATE TABLE}}{%
+\kw{CREATE TABLE} cliente (\\
+\ind codigo CHAR(10) \kw{NOT NULL},\\
+\ind \ldots,\\
+\ind \nuevo{\kw{PRIMARY KEY} (codigo)}\\
+);}
+\forma{3. En una tabla que ya existe}{se le «agrega» después, con \texttt{ALTER TABLE}}{%
+\kw{ALTER TABLE} cliente\\
+\nuevo{\kw{ADD PRIMARY KEY} (codigo)};}
+\vspace{0.35cm}
+\small Las tres dan \textbf{el mismo resultado}. La 2 es obligatoria cuando la regla abarca \textbf{varias columnas}, por ejemplo \texttt{PRIMARY KEY (alumno\_id, curso\_id)}.
+\end{frame}
+
+% =======================================================================
+\seccion{Integridad referencial}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Integridad referencial: no apuntar al vacío}
+\begin{center}
+\begin{tikzpicture}
+  \node (cli) {\scriptsize\ttfamily
+    \begin{tabular}{ll}
+    \multicolumn{2}{c}{\normalfont\tbl{cliente}}\\
+    \toprule
+    \normalfont\bfseries id \pk & \normalfont\bfseries nombre \\
+    \midrule
+    1 & Ana \\
+    2 & Luis \\
+    \bottomrule
+    \end{tabular}};
+  \node[right=28mm of cli] (ped) {\scriptsize\ttfamily
+    \begin{tabular}{lll}
+    \multicolumn{3}{c}{\normalfont\tbl{pedido}}\\
+    \toprule
+    \normalfont\bfseries id \pk & \normalfont\bfseries fecha & \normalfont\bfseries cliente\_id \fk \\
+    \midrule
+    10 & 2026-09-01 & 1 \\
+    11 & 2026-09-02 & 2 \\
+    12 & 2026-09-02 & 1 \\
+    13 & 2026-09-03 & \mal{97} \\
+    \bottomrule
+    \end{tabular}};
+  \draw[flecha,utpGris] ([xshift=-2mm]ped.west) -- node[above,font=\tiny,text=utpGris]{apunta a} ([xshift=2mm]cli.east);
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\concepto{La regla}{Todo valor de una \textbf{clave foránea} debe existir como \textbf{clave primaria} en la otra tabla. El pedido 13 dice que es del cliente 97\ldots\ pero ese cliente \textbf{no existe}.}
+\vspace{0.2cm}
+\small Con la \texttt{FOREIGN KEY} declarada, el gestor \textbf{rechaza} el pedido 13 antes de guardarlo. Sin ella, lo acepta en silencio.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Formas de crear la relación dentro de \texttt{CREATE TABLE}}
+\begin{columns}[T,onlytextwidth]
+\column{.32\textwidth}
+\centering\etiqueta{1. En la misma columna}\\[3pt]
+{\scriptsize\color{utpGris} solo \texttt{REFERENCES}, al lado del tipo}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} pedido (\\
+\ind id INT \kw{PRIMARY KEY},\\
+\ind cliente\_id INT\\
+\ind\ind \nuevo{\kw{REFERENCES}}\\
+\ind\ind \nuevo{cliente(id)}\\
+);
+\end{sqlcode}
+\column{.32\textwidth}
+\centering\etiqueta{2. En una línea aparte}\\[3pt]
+{\scriptsize\color{utpGris} la que usamos la sesión pasada}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} pedido (\\
+\ind id INT \kw{PRIMARY KEY},\\
+\ind cliente\_id INT,\\
+\ind \nuevo{\kw{FOREIGN KEY} (cliente\_id)}\\
+\ind\ind \nuevo{\kw{REFERENCES} cliente(id)}\\
+);
+\end{sqlcode}
+\column{.32\textwidth}
+\centering\etiqueta{3. Aparte y con nombre}\\[3pt]
+{\scriptsize\color{utpGris} \texttt{CONSTRAINT} le pone nombre}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} pedido (\\
+\ind id INT \kw{PRIMARY KEY},\\
+\ind cliente\_id INT,\\
+\ind \nuevo{\kw{CONSTRAINT} fk\_pedido\_cliente}\\
+\ind \kw{FOREIGN KEY} (cliente\_id)\\
+\ind\ind \kw{REFERENCES} cliente(id)\\
+);
+\end{sqlcode}
+\end{columns}
+\vspace{0.1cm}
+\small Las tres dicen lo mismo: \textbf{«\texttt{cliente\_id} apunta al \texttt{id} de \tbl{cliente}»}. La 3 además le da un nombre a la regla, útil para leer errores o para quitarla después.
+\vspace{0.15cm}
+
+\ojo{En MySQL la forma 1 se acepta pero \textbf{no se aplica} en versiones anteriores a la 9.0: no aparece ningún error y la relación simplemente no existe. Usa la 2 o la 3 y funcionará igual en los tres gestores.}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Y si la tabla ya existe: \texttt{ALTER TABLE}}
+\begin{sqlcode}[.80\textwidth]
+\kw{ALTER TABLE} pedido\\
+\kw{ADD} \nuevo{\kw{CONSTRAINT} fk\_pedido\_cliente}\\
+\ind \kw{FOREIGN KEY} (cliente\_id) \kw{REFERENCES} cliente(id);
+\end{sqlcode}
+\vspace{0.2cm}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}p{9.2cm}}
+\toprule
+\bfseries Gestor & \bfseries ¿Funciona? \\
+\midrule
+\etiqueta{MySQL} & Sí, tal cual. \\[3pt]
+\etiqueta{SQL Server} & Sí, tal cual. \\[3pt]
+\etiqueta{SQLite} & \textbf{No.} SQLite no deja agregar claves foráneas después: hay que declararlas al crear la tabla. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\analogia{Ponerle nombre (\texttt{fk\_pedido\_cliente}) es como etiquetar un cable: cuando el gestor se queje, el mensaje de error dirá \textbf{cuál} regla se rompió, y si algún día hay que quitarla, se la llama por su nombre.}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{¿Y si borro un cliente que tiene pedidos?}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=2.1cm,font=\scriptsize,align=center] (cli) {\textbf{cliente 1}\\ Ana};
+  \node[cajanaranja,text width=1.8cm,font=\tiny,align=center,right=22mm of cli,yshift=6mm] (p1) {pedido 10};
+  \node[cajanaranja,text width=1.8cm,font=\tiny,align=center,right=22mm of cli,yshift=-6mm] (p2) {pedido 12};
+  \draw[flecha,utpGris] (p1.west) -- (cli.east);
+  \draw[flecha,utpGris] (p2.west) -- (cli.east);
+  \node[font=\scriptsize\bfseries,text=utpRojo,left=6mm of cli] {¿borrar?};
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\begin{center}
+\small
+\begin{tabular}{>{\ttfamily}p{4.1cm}>{\raggedright\arraybackslash}p{7.6cm}}
+\toprule
+\normalfont\bfseries Se agrega a la \texttt{FOREIGN KEY} & \bfseries Qué pasa con los pedidos 10 y 12 \\
+\midrule
+\normalfont\textit{(nada)} & El gestor \textbf{no deja borrar} a Ana. Es lo más seguro. \\[3pt]
+ON DELETE CASCADE & Se borran \textbf{también} sus pedidos, en cadena. \\[3pt]
+ON DELETE SET NULL & Los pedidos quedan, pero con \texttt{cliente\_id} vacío. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\begin{sqlcode}[.80\textwidth]
+\kw{FOREIGN KEY} (cliente\_id) \kw{REFERENCES} cliente(id) \nuevo{\kw{ON DELETE CASCADE}}
+\end{sqlcode}
+\vspace{-0.1cm}
+\small Se escribe igual en MySQL, SQL Server y SQLite.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 2} ¿Se guarda o no?}
+\begin{columns}[c,onlytextwidth]
+\column{.34\textwidth}
+\centering\tbl{cliente}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{ll}
+\toprule
+\normalfont\bfseries id & \normalfont\bfseries nombre \\
+\midrule
+1 & Ana \\
+2 & Luis \\
+\bottomrule
+\end{tabular}
+\column{.62\textwidth}
+\small Cada pedido debe ser de un cliente que \textbf{exista}. ¿El gestor guarda estos pedidos?
+\end{columns}
+\vspace{0.4cm}
+\begin{center}
+\small
+\begin{tabular}{>{\ttfamily}l>{\centering\arraybackslash}p{2.6cm}}
+\toprule
+\normalfont\bfseries Pedido nuevo & \bfseries ¿Se guarda? \\
+\midrule
+pedido 20, del cliente 2 & \bl[1.6cm] \\[6pt]
+pedido 21, del cliente 5 & \bl[1.6cm] \\[6pt]
+pedido 22, del cliente 1 & \bl[1.6cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4cm}
+\small \textbf{Pista:} busca el número del cliente en la tabla de la izquierda. Si no está, el pedido \textbf{se rechaza}.
+\end{frame}
+
+% =======================================================================
+\seccion{Otras restricciones}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Tres restricciones: NN, UQ y AI}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{>{\raggedright\arraybackslash}p{1.1cm}>{\ttfamily}p{3.2cm}>{\raggedright\arraybackslash}p{7.2cm}}
+\toprule
+\bfseries Sigla & \normalfont\bfseries Restricción & \bfseries En una frase \\
+\midrule
+\etiqueta{NN} & NOT NULL & La columna \textbf{no puede quedar vacía}. \\
+\etiqueta{UQ} & UNIQUE & El valor \textbf{no se repite} en dos filas. \\
+\etiqueta{AI} & AUTO\_INCREMENT & El gestor \textbf{numera solo}: 1, 2, 3\ldots \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4cm}
+\enlarealidad{Estas siglas son las casillas que aparecen en MySQL Workbench al diseñar una tabla: \marca{PK} \marca{NN} \marca{UQ} \marca{AI}. Marcar la casilla es lo mismo que escribir la palabra en el \texttt{CREATE TABLE}.}
+\vspace{0.2cm}
+\small Para cada una veremos: la idea, cómo se escribe en \textbf{MySQL}, en \textbf{SQL Server} y en \textbf{SQLite}, y una práctica.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\etiqueta{NN} \texttt{NOT NULL}: no se puede dejar vacío}
+\small Un alumno sin nombre no sirve para nada. \texttt{NULL} significa «\textbf{no hay dato}», y \texttt{NOT NULL} lo prohíbe.
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.32\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} alumno (\\
+\ind id INT \kw{PRIMARY KEY},\\
+\ind nombre VARCHAR(80)\\
+\ind\ind \nuevo{\kw{NOT NULL}}\\
+);
+\end{sqlcode}
+\column{.32\textwidth}
+\centering\etiqueta{SQL Server}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} alumno (\\
+\ind id INT \kw{PRIMARY KEY},\\
+\ind nombre NVARCHAR(80)\\
+\ind\ind \nuevo{\kw{NOT NULL}}\\
+);
+\end{sqlcode}
+\column{.32\textwidth}
+\centering\etiqueta{SQLite}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} alumno (\\
+\ind id INTEGER \kw{PRIMARY KEY},\\
+\ind nombre TEXT\\
+\ind\ind \nuevo{\kw{NOT NULL}}\\
+);
+\end{sqlcode}
+\end{columns}
+\vspace{0.1cm}
+\begin{sqlcode}[.70\textwidth]
+\kw{INSERT INTO} alumno (id) \kw{VALUES} (1); \ \ \com{sin nombre}
+\end{sqlcode}
+\vspace{-0.1cm}
+\begin{center}
+\scriptsize
+\begin{tabular}{@{}l@{\hspace{0.8em}}l@{}}
+\etiqueta{MySQL} & \texttt{Field 'nombre' doesn't have a default value} \\[3pt]
+\etiqueta{SQL Server} & \texttt{Cannot insert the value NULL into column 'nombre'} \\[3pt]
+\etiqueta{SQLite} & \texttt{NOT NULL constraint failed: alumno.nombre} \\
+\end{tabular}
+\end{center}
+\vspace{0.05cm}
+\small \textbf{Se escribe igual en los tres.} Lo que cambia es cómo cada uno redacta el error.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 3} Del formulario a la tabla: ¿cuáles son \texttt{NOT NULL}?}
+\begin{columns}[c,onlytextwidth]
+\column{.44\textwidth}
+\centering
+\begin{tikzpicture}[
+  campo/.style={draw=utpGrisMedio,rounded corners=1.5pt,fill=white,minimum width=4.4cm,
+    minimum height=0.42cm,anchor=north west},
+  rotulo/.style={font=\tiny,anchor=south west,inner sep=0pt}]
+  % ventana
+  \draw[utpGrisMedio,rounded corners=3pt,fill=utpGrisClaro] (0,0) rectangle (5.2,-5.55);
+  \fill[utpGrisMedio!60,rounded corners=3pt] (0,0) rectangle (5.2,-0.35);
+  \fill[utpGrisMedio!60] (0,-0.2) rectangle (5.2,-0.35);
+  \foreach \x/\c in {0.2/utpRojo,0.38/utpNaranja,0.56/utpGris} \fill[\c] (\x,-0.175) circle (0.055);
+  \node[font=\tiny,text=utpGris] at (2.6,-0.175) {tienda.pe/registro};
+  \node[font=\small\bfseries,anchor=west] at (0.4,-0.72) {Crear cuenta};
+  % campos
+  \foreach \y/\t in {-1.35/{Nombre {\color{utpRojo}*}},
+                     -2.05/{Correo {\color{utpRojo}*}},
+                     -2.75/{Contraseña {\color{utpRojo}*}},
+                     -3.45/{Celular \textcolor{utpGrisMedio}{(opcional)}},
+                     -4.15/{¿Cómo nos conociste? \textcolor{utpGrisMedio}{(opcional)}}} {
+    \node[rotulo] at (0.4,\y+0.04) {\t};
+    \node[campo] at (0.4,\y) {};
+  }
+  \node[fill=utpRojo,text=white,font=\scriptsize\bfseries,rounded corners=2pt,
+        minimum width=4.4cm,minimum height=0.45cm,anchor=north west] at (0.4,-4.8) {Registrarme};
+\end{tikzpicture}\\[3pt]
+{\scriptsize\color{utpRojo}*} {\scriptsize obligatorio}
+\column{.52\textwidth}
+\small Cuando el usuario pulsa \textbf{Registrarme}, se guarda una fila en la tabla \tbl{usuario}. Decide qué columnas llevan \texttt{NOT NULL}:
+\vspace{0.3cm}
+\begin{center}
+\small
+\begin{tabular}{>{\ttfamily}l>{\centering\arraybackslash}p{2.4cm}}
+\toprule
+\normalfont\bfseries Columna & \bfseries ¿\texttt{NOT NULL}? \\
+\midrule
+nombre & \bl[1.3cm] \\[5pt]
+correo & \bl[1.3cm] \\[5pt]
+contrasena & \bl[1.3cm] \\[5pt]
+celular & \bl[1.3cm] \\[5pt]
+como\_nos\_conociste & \bl[1.3cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\small \textbf{Pista:} el \textcolor{utpRojo}{\textbf{*}} del formulario y el \texttt{NOT NULL} de la tabla dicen \textbf{lo mismo}: sin ese dato, no se guarda.
+\end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\etiqueta{UQ} \texttt{UNIQUE}: no se puede repetir}
+\small Dos alumnos pueden llamarse igual, pero \textbf{no pueden tener el mismo correo}.
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.32\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} alumno (\\
+\ind id INT \kw{PRIMARY KEY},\\
+\ind correo VARCHAR(120)\\
+\ind\ind \nuevo{\kw{UNIQUE}}\\
+);
+\end{sqlcode}
+\column{.32\textwidth}
+\centering\etiqueta{SQL Server}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} alumno (\\
+\ind id INT \kw{PRIMARY KEY},\\
+\ind correo NVARCHAR(120)\\
+\ind\ind \nuevo{\kw{UNIQUE}}\\
+);
+\end{sqlcode}
+\column{.32\textwidth}
+\centering\etiqueta{SQLite}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} alumno (\\
+\ind id INTEGER \kw{PRIMARY KEY},\\
+\ind correo TEXT\\
+\ind\ind \nuevo{\kw{UNIQUE}}\\
+);
+\end{sqlcode}
+\end{columns}
+\vspace{0.1cm}
+\begin{sqlcode}[.92\textwidth]
+\scriptsize
+\kw{INSERT INTO} alumno \kw{VALUES} (1, 'ana@utp.edu.pe'); \ \ \com{bien}\\
+\kw{INSERT INTO} alumno \kw{VALUES} (2, 'ana@utp.edu.pe'); \ \ \com{\textbf{rechazada}: correo repetido}
+\end{sqlcode}
+\vspace{0.05cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}\small \textbf{\texttt{UNIQUE} no es \texttt{PRIMARY KEY}:} una tabla tiene \textbf{una sola} clave primaria, pero puede tener \textbf{varias} columnas \texttt{UNIQUE} (correo, DNI, teléfono\ldots).
+\column{.48\textwidth}\small \textbf{Diferencia curiosa:} una columna \texttt{UNIQUE} sin \texttt{NOT NULL} admite vacíos. MySQL y SQLite aceptan \textbf{muchos} \texttt{NULL}; SQL Server, \textbf{solo uno}.
+\end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 4} ¿\texttt{UNIQUE} o no?}
+\small ¿En cuáles columnas tiene sentido prohibir que el valor se repita?
+\vspace{0.35cm}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.0cm}>{\ttfamily}p{3.2cm}>{\centering\arraybackslash}p{1.8cm}>{\raggedright\arraybackslash}p{3.4cm}}
+\toprule
+\bfseries Tabla & \normalfont\bfseries Columna & \bfseries ¿\texttt{UQ}? & \bfseries ¿Por qué? \\
+\midrule
+\tbl{alumno} & dni & \bl[1.1cm] & \bl[3.0cm] \\[6pt]
+\tbl{alumno} & apellido & \bl[1.1cm] & \bl[3.0cm] \\[6pt]
+\tbl{producto} & codigo\_barras & \bl[1.1cm] & \bl[3.0cm] \\[6pt]
+\tbl{producto} & precio & \bl[1.1cm] & \bl[3.0cm] \\[6pt]
+\tbl{auto} & placa & \bl[1.1cm] & \bl[3.0cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.35cm}
+\small \textbf{Pista:} imagina que llegan \textbf{dos filas} con el mismo valor. ¿Es un error o es normal?
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\etiqueta{AI} Autoincremento: el gestor numera solo}
+\small Nadie quiere recordar cuál fue el último \texttt{id}. Con autoincremento, \textbf{no se escribe}: el gestor pone el siguiente.
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.32\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+id INT \kw{PRIMARY KEY}\\
+\ind \nuevo{\kw{AUTO\_INCREMENT}}
+\end{sqlcode}
+\column{.32\textwidth}
+\centering\etiqueta{SQL Server}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+id INT \nuevo{\kw{IDENTITY}(1,1)}\\
+\ind \kw{PRIMARY KEY}
+\end{sqlcode}
+\column{.32\textwidth}
+\centering\etiqueta{SQLite}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+id \nuevo{INTEGER} \kw{PRIMARY KEY}\\
+\ind \nuevo{\kw{AUTOINCREMENT}}
+\end{sqlcode}
+\end{columns}
+\vspace{0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.58\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{INSERT INTO} alumno (nombre) \kw{VALUES} ('Ana');\\
+\kw{INSERT INTO} alumno (nombre) \kw{VALUES} ('Luis');\\
+\kw{INSERT INTO} alumno (nombre) \kw{VALUES} ('Sofía');
+\end{sqlcode}
+\column{.38\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{ll}
+\toprule
+\normalfont\bfseries id & \normalfont\bfseries nombre \\
+\midrule
+\nuevo{1} & Ana \\
+\nuevo{2} & Luis \\
+\nuevo{3} & Sofía \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.15cm}
+\small \texttt{IDENTITY(1,1)} se lee «\textbf{empieza en 1, suma de 1 en 1}». En SQLite la columna tiene que ser \texttt{INTEGER}, no \texttt{INT}. Y en SQL Server \textbf{no puedes} escribir el \texttt{id} tú mismo: da error.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 5} ¿Qué número le toca?}
+\small La tabla \tbl{alumno} tiene autoincremento y ya guardó a Ana (1), Luis (2) y Sofía (3). Ahora:
+\vspace{0.3cm}
+\begin{sqlcode}[.72\textwidth]
+\kw{DELETE FROM} alumno \kw{WHERE} id = 3; \ \ \ \ \ \ \ \ \ \ \ \ \ \com{se va Sofía}\\
+\kw{INSERT INTO} alumno (nombre) \kw{VALUES} ('Pedro');
+\end{sqlcode}
+\vspace{0.3cm}
+\begin{center}
+\large ¿Qué \texttt{id} recibe Pedro? \ \ \bl[2cm]
+\end{center}
+\vspace{0.4cm}
+\pregunta{\small ¿Por qué crees que el gestor \textbf{no reutiliza} el número de una fila borrada? Piensa en una boleta impresa que decía «alumno 3».}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Dos más de dominio: \texttt{DEFAULT} y \texttt{CHECK}}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{DEFAULT}\\[4pt]
+\raggedright\small Si no se indica el dato, \textbf{se usa este}.
+\begin{sqlcode}[\textwidth]
+\scriptsize
+estado VARCHAR(20) \nuevo{\kw{DEFAULT} 'activo'}
+\end{sqlcode}
+\column{.48\textwidth}
+\centering\etiqueta{CHECK}\\[4pt]
+\raggedright\small El dato tiene que \textbf{cumplir una condición}.
+\begin{sqlcode}[\textwidth]
+\scriptsize
+nota INT \nuevo{\kw{CHECK} (nota \kw{BETWEEN} 0 \kw{AND} 20)}
+\end{sqlcode}
+\end{columns}
+\vspace{0.2cm}
+\begin{sqlcode}[.90\textwidth]
+\scriptsize
+\kw{CREATE TABLE} matricula (\\
+\ind id \ \ \ \ \ INT \kw{PRIMARY KEY} \kw{AUTO\_INCREMENT},\\
+\ind nota \ \ \ INT \nuevo{\kw{CHECK} (nota \kw{BETWEEN} 0 \kw{AND} 20)},\\
+\ind estado \ VARCHAR(20) \nuevo{\kw{DEFAULT} 'activo'} \nuevo{\kw{CHECK} (estado \kw{IN} ('activo', 'retirado'))}\\
+);
+\end{sqlcode}
+\vspace{0.05cm}
+\small Una nota de \texttt{25} se rechaza. Si no se dice el estado, queda \texttt{'activo'}. Y el estado solo puede ser uno de esos dos.
+\vspace{0.2cm}
+
+\small \textbf{En los tres gestores} se escriben igual (solo cambia el tipo y el autoincremento). \textbf{Ojo:} MySQL recién respeta \texttt{CHECK} desde la versión 8.0.16; antes lo ignoraba.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Resumen: la misma regla, en cada gestor}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.2cm}>{\ttfamily}p{2.9cm}>{\ttfamily}p{3.0cm}>{\ttfamily}p{3.0cm}}
+\toprule
+& \normalfont\etiqueta{MySQL} & \normalfont\etiqueta{SQL Server} & \normalfont\etiqueta{SQLite} \\
+\midrule
+\etiqueta{NN} No vacío & NOT NULL & NOT NULL & NOT NULL \\
+\etiqueta{UQ} No repetido & UNIQUE & UNIQUE & UNIQUE \\
+\etiqueta{AI} Numerar solo & AUTO\_INCREMENT & IDENTITY(1,1) & AUTOINCREMENT \\
+Por defecto & DEFAULT & DEFAULT & DEFAULT \\
+Validar & CHECK & CHECK & CHECK \\
+Clave foránea & FOREIGN KEY & FOREIGN KEY & FOREIGN KEY\normalfont\textsuperscript{*} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\small \textbf{Casi todo es idéntico.} La única que cambia de nombre es el autoincremento.
+\vspace{0.15cm}
+
+\footnotesize \textsuperscript{*} En SQLite hay que encenderlas con \texttt{PRAGMA foreign\_keys = ON;} o no se vigilan.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 6} Escribe la tabla completa}
+\small Escribe en \textbf{MySQL} el \texttt{CREATE TABLE} de \tbl{libro} con estas reglas, y luego marca qué cambiarías para \textbf{SQL Server}:
+\vspace{0.3cm}
+\begin{itemize}\setlength\itemsep{5pt}
+  \item \texttt{id}: entero, se numera solo, es la clave primaria.
+  \item \texttt{titulo}: texto de hasta 150 caracteres, obligatorio.
+  \item \texttt{isbn}: texto de 13 caracteres, no se puede repetir.
+  \item \texttt{paginas}: entero, tiene que ser mayor que 0.
+  \item \texttt{disponible}: texto, por defecto \texttt{'si'}.
+  \item \texttt{autor\_id}: entero, obligatorio, apunta a \tbl{autor}(\texttt{id}).
+\end{itemize}
+\vspace{0.3cm}
+\begin{sqlcode}[.60\textwidth]
+\kw{CREATE TABLE} libro (\\
+\ind \ldots\\
+);
+\end{sqlcode}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+
+% =======================================================================
+\seccion{Variables}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Una variable es una caja con nombre}
+\begin{columns}[c,onlytextwidth]
+\column{.30\textwidth}
+\centering
+\begin{tikzpicture}
+  \node[cajanaranja,minimum width=2.4cm,minimum height=1.0cm,font=\large\ttfamily] (v) {100};
+  \node[font=\small\ttfamily\bfseries,above=1.5mm of v] {@precio};
+  \node[font=\scriptsize,below=1.5mm of v,text=utpGris] {nombre arriba, valor adentro};
+\end{tikzpicture}
+\column{.66\textwidth}
+\small Guarda un valor \textbf{por un rato}, para usarlo después sin volver a escribirlo. No es una tabla: \textbf{se pierde} al cerrar la conexión.
+\end{columns}
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\nuevo{\kw{SET} @precio = 100;}\\
+\kw{SET} @igv = @precio * 0.18;\\[4pt]
+\kw{SELECT} @precio, @igv,\\
+\ind @precio + @igv \kw{AS} total;
+\end{sqlcode}
+\vspace{-0.2cm}
+\raggedright\footnotesize Basta con \texttt{SET}: la variable \textbf{nace} al darle valor, sin decir su tipo.
+\column{.48\textwidth}
+\centering\etiqueta{SQL Server}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\nuevo{\kw{DECLARE} @precio DECIMAL(10,2) = 100;}\\
+\kw{DECLARE} @igv DECIMAL(10,2) = @precio * 0.18;\\[4pt]
+\kw{SELECT} @precio, @igv,\\
+\ind @precio + @igv \kw{AS} total;
+\end{sqlcode}
+\vspace{-0.2cm}
+\raggedright\footnotesize Primero se \textbf{declara} con \texttt{DECLARE} y su tipo. Vive hasta el siguiente \texttt{GO}.
+\end{columns}
+\vspace{0.3cm}
+\small \etiqueta{SQLite} \ no tiene variables en SQL: el valor se escribe directo o lo pasa el programa (por ejemplo, Python).
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 7} Calcula con variables}
+\small Una matrícula cuesta \textbf{S/ 850} y hay un descuento de \textbf{15 \%}. Completa en \textbf{MySQL} y luego pásalo a \textbf{SQL Server}:
+\vspace{0.3cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlcode}[\textwidth]
+\kw{SET} @costo = \bl[1.4cm];\\
+\kw{SET} @descuento = @costo * \bl[1.2cm];\\[4pt]
+\kw{SELECT} @costo - @descuento\\
+\ind \kw{AS} a\_pagar;
+\end{sqlcode}
+\column{.48\textwidth}
+\centering\etiqueta{SQL Server}
+\begin{sqlcode}[\textwidth]
+\bl[1.6cm] @costo DECIMAL(10,2) = 850;\\
+\bl[1.6cm] @descuento \bl[1.8cm]\\
+\ind = @costo * 0.15;\\[4pt]
+\kw{SELECT} @costo - @descuento \kw{AS} a\_pagar;
+\end{sqlcode}
+\end{columns}
+\vspace{0.4cm}
+\begin{center}
+\small ¿Cuánto debe salir en \texttt{a\_pagar}? \ \bl[2cm]
+\end{center}
+\end{frame}
+
+% =======================================================================
+\seccion{Primeros pasos en DML}
+
+% ---------------------------------------------------------------------
+\begin{frame}{DML: trabajar con los datos}
+\small Hasta ahora usamos \textbf{DDL} para construir el envase. El \textbf{DML} (lenguaje de manipulación de datos) sirve para \textbf{llenarlo, cambiarlo y leerlo}.
+\vspace{0.4cm}
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}
+  \node[cajanaranja,text width=3.0cm,font=\scriptsize,align=center] (i)
+    {\textbf{\texttt{INSERT}}\\[3pt] \textbf{agrega} una fila nueva\\[3pt] \color{utpGris}alguien se matricula};
+  \node[cajanaranja,text width=3.0cm,font=\scriptsize,align=center,right=7mm of i] (u)
+    {\textbf{\texttt{UPDATE}}\\[3pt] \textbf{cambia} datos que ya están\\[3pt] \color{utpGris}alguien cambia de correo};
+  \node[cajanaranja,text width=3.0cm,font=\scriptsize,align=center,right=7mm of u] (d)
+    {\textbf{\texttt{DELETE}}\\[3pt] \textbf{borra} filas\\[3pt] \color{utpGris}alguien se retira};
+  \node[cajaverde,text width=3.0cm,font=\scriptsize,align=center,right=7mm of d] (s)
+    {\textbf{\texttt{SELECT}}\\[3pt] \textbf{lee}, sin cambiar nada\\[3pt] \color{utpGris}ver la lista del salón};
+\end{tikzpicture}}
+\end{center}
+\vspace{0.4cm}
+\analogia{Es como la agenda del celular: \textbf{agregas} un contacto, \textbf{editas} su número, lo \textbf{eliminas} o simplemente lo \textbf{buscas}. Cuatro acciones, cuatro palabras.}
+\vspace{0.15cm}
+\footnotesize\color{utpGris} \texttt{SELECT} a veces se separa como DQL (consulta). Aquí lo vemos junto, porque sin él no podríamos ver lo que guardamos.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{La tabla de ejemplo}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} alumno (\\
+\ind id \ \ \ \ \ INT \kw{PRIMARY KEY} \kw{AUTO\_INCREMENT},\\
+\ind nombre \ VARCHAR(80) \kw{NOT NULL},\\
+\ind correo \ VARCHAR(120) \kw{UNIQUE},\\
+\ind ciclo \ \ INT \kw{DEFAULT} 1\\
+);
+\end{sqlcode}
+\column{.44\textwidth}
+\centering\tbl{alumno}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{llll}
+\toprule
+\normalfont\bfseries id & \normalfont\bfseries nombre & \normalfont\bfseries correo & \normalfont\bfseries ciclo \\
+\midrule
+1 & Ana & ana@utp.pe & 3 \\
+2 & Luis & luis@utp.pe & 1 \\
+3 & Sofía & sofia@utp.pe & 5 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.5cm}
+\small En los ejemplos que siguen partimos siempre de estas tres filas y vemos \textbf{cómo queda la tabla} después de cada instrucción.
+\vspace{0.3cm}
+
+\ojo{Los ejemplos están en MySQL, pero \texttt{INSERT}, \texttt{UPDATE}, \texttt{DELETE} y \texttt{SELECT} \textbf{se escriben igual} en SQL Server y en SQLite.}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{INSERT}: agregar una fila}
+\begin{sqlcode}[.78\textwidth]
+\kw{INSERT INTO} alumno (nombre, correo, ciclo)\\
+\kw{VALUES} ('Pedro', 'pedro@utp.pe', 2);
+\end{sqlcode}
+\vspace{0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item \texttt{INSERT INTO} + \textbf{tabla} + \textbf{columnas} que vas a llenar.
+  \item \texttt{VALUES} trae los datos, \textbf{en el mismo orden}.
+  \item El texto va entre \textbf{comillas simples}; los números, sin comillas.
+  \item El \texttt{id} no se escribe: lo pone el autoincremento.
+\end{itemize}
+\column{.44\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{llll}
+\toprule
+\normalfont\bfseries id & \normalfont\bfseries nombre & \normalfont\bfseries correo & \normalfont\bfseries ciclo \\
+\midrule
+1 & Ana & ana@utp.pe & 3 \\
+2 & Luis & luis@utp.pe & 1 \\
+3 & Sofía & sofia@utp.pe & 5 \\
+\nuevo{4} & \nuevo{Pedro} & \nuevo{pedro@utp.pe} & \nuevo{2} \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.3cm}
+\begin{sqlcode}[.78\textwidth]
+\com{varias filas de una vez}\\
+\kw{INSERT INTO} alumno (nombre) \kw{VALUES} ('Rosa'), ('Juan');
+\end{sqlcode}
+\vspace{-0.1cm}
+\small ¿Y el \texttt{ciclo} de Rosa y Juan? Quedó en \texttt{1}, por el \texttt{DEFAULT}. ¿Y su correo? \texttt{NULL}.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{UPDATE}: cambiar lo que ya está}
+\begin{sqlcode}[.78\textwidth]
+\kw{UPDATE} alumno\\
+\kw{SET} \ \ ciclo = 2\\
+\nuevo{\kw{WHERE} id = 2};
+\end{sqlcode}
+\vspace{0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item \texttt{UPDATE} + \textbf{tabla}.
+  \item \texttt{SET}: \textbf{qué columna} y \textbf{su nuevo valor}.
+  \item \texttt{WHERE}: \textbf{a qué filas}. Aquí, solo a Luis.
+\end{itemize}
+\column{.44\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{llll}
+\toprule
+\normalfont\bfseries id & \normalfont\bfseries nombre & \normalfont\bfseries correo & \normalfont\bfseries ciclo \\
+\midrule
+1 & Ana & ana@utp.pe & 3 \\
+2 & Luis & luis@utp.pe & \nuevo{2} \\
+3 & Sofía & sofia@utp.pe & 5 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.35cm}
+\ojo{\textbf{Sin \texttt{WHERE}, cambian todas las filas.} \texttt{UPDATE alumno SET ciclo = 2;} pasa a \textbf{todo el salón} al ciclo 2. Por eso MySQL Workbench, en su «modo seguro», rechaza un \texttt{UPDATE} que no filtre por la clave primaria.}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{DELETE}: borrar filas}
+\begin{sqlcode}[.78\textwidth]
+\kw{DELETE FROM} alumno\\
+\nuevo{\kw{WHERE} id = 3};
+\end{sqlcode}
+\vspace{0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item \texttt{DELETE FROM} + \textbf{tabla}.
+  \item \texttt{WHERE}: \textbf{cuáles} filas se van.
+  \item Se borra la \textbf{fila entera}, no una columna.
+\end{itemize}
+\column{.44\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{llll}
+\toprule
+\normalfont\bfseries id & \normalfont\bfseries nombre & \normalfont\bfseries correo & \normalfont\bfseries ciclo \\
+\midrule
+1 & Ana & ana@utp.pe & 3 \\
+2 & Luis & luis@utp.pe & 1 \\
+\color{utpGrisMedio}\sout{3} & \color{utpGrisMedio}\sout{Sofía} & \color{utpGrisMedio}\sout{sofia@utp.pe} & \color{utpGrisMedio}\sout{5} \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.35cm}
+\ojo{\textbf{Sin \texttt{WHERE}, se borran todas las filas.} \texttt{DELETE FROM alumno;} deja la tabla vacía y \textbf{no hay papelera}. Antes de borrar, prueba con un \texttt{SELECT} con el mismo \texttt{WHERE}.}
+\vspace{0.1cm}
+\small Y recuerda la integridad referencial: si otra tabla apunta a esta fila, el gestor \textbf{no deja borrarla}.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{SELECT}: leer sin cambiar nada}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\begin{sqlcode}[\textwidth]
+\com{todo}\\
+\kw{SELECT} * \kw{FROM} alumno;
+\end{sqlcode}
+\vspace{-0.2cm}
+\centering\scriptsize\ttfamily
+\begin{tabular}{llll}
+\toprule
+\normalfont\bfseries id & \normalfont\bfseries nombre & \normalfont\bfseries correo & \normalfont\bfseries ciclo \\
+\midrule
+1 & Ana & ana@utp.pe & 3 \\
+2 & Luis & luis@utp.pe & 1 \\
+3 & Sofía & sofia@utp.pe & 5 \\
+\bottomrule
+\end{tabular}
+\column{.48\textwidth}
+\begin{sqlcode}[\textwidth]
+\com{solo algunas columnas y filas}\\
+\kw{SELECT} \nuevo{nombre, ciclo} \kw{FROM} alumno\\
+\nuevo{\kw{WHERE} ciclo >= 3};
+\end{sqlcode}
+\vspace{-0.2cm}
+\centering\scriptsize\ttfamily
+\begin{tabular}{ll}
+\toprule
+\normalfont\bfseries nombre & \normalfont\bfseries ciclo \\
+\midrule
+Ana & 3 \\
+Sofía & 5 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.45cm}
+\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item \texttt{*} significa «\textbf{todas las columnas}». Si escribes nombres, salen solo esas.
+  \item \texttt{WHERE} filtra \textbf{filas}, igual que en \texttt{UPDATE} y \texttt{DELETE}.
+  \item \texttt{SELECT} \textbf{nunca} cambia la tabla: puedes ejecutarlo mil veces sin miedo.
+\end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 8} ¿Cómo queda la tabla?}
+\small Parte de la tabla \tbl{alumno} con Ana (1), Luis (2) y Sofía (3). Ejecuta en orden y dibuja \textbf{cómo queda} al final:
+\vspace{0.25cm}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\com{1}\\
+\kw{INSERT INTO} alumno (nombre, ciclo)\\
+\kw{VALUES} ('Marco', 4);\\[4pt]
+\com{2}\\
+\kw{UPDATE} alumno \kw{SET} ciclo = 6 \kw{WHERE} id = 3;\\[4pt]
+\com{3}\\
+\kw{DELETE FROM} alumno \kw{WHERE} id = 1;\\[4pt]
+\com{4}\\
+\kw{SELECT} nombre \kw{FROM} alumno \kw{WHERE} ciclo > 3;
+\end{sqlcode}
+\column{.40\textwidth}
+\centering\scriptsize
+\begin{tabular}{p{0.5cm}p{1.2cm}p{0.9cm}}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries ciclo \\
+\midrule
+\bl[0.4cm] & \bl[1.1cm] & \bl[0.7cm] \\[6pt]
+\bl[0.4cm] & \bl[1.1cm] & \bl[0.7cm] \\[6pt]
+\bl[0.4cm] & \bl[1.1cm] & \bl[0.7cm] \\[6pt]
+\bl[0.4cm] & \bl[1.1cm] & \bl[0.7cm] \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.35cm}
+\small ¿Qué nombres muestra el \texttt{SELECT} del paso 4? \ \bl[4cm]
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Cierre: completa en voz alta}
+\begin{itemize}\setlength\itemsep{14pt}
+  \item Los tres tipos de integridad son: \bl[5cm]
+  \item Una clave foránea no puede apuntar a \bl[5cm]
+  \item \texttt{NN}, \texttt{UQ} y \texttt{AI} significan: \bl[5cm]
+  \item En SQL Server, \texttt{AUTO\_INCREMENT} se escribe \bl[3cm]
+  \item Las cuatro instrucciones del DML son: \bl[5cm]
+  \item Si olvido el \texttt{WHERE} en un \texttt{UPDATE} o \texttt{DELETE}\ldots \bl[4cm]
+\end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Referencias}
+\footnotesize
+Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración} (9.ª ed.). Cengage Learning.
+
+\vspace{0.35cm}
+Elmasri, R., \& Navathe, S. (2007). \textit{Fundamentos de sistemas de bases de datos} (5.ª ed.). Addison Wesley.
+
+\vspace{0.35cm}
+Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2020). \textit{Database system concepts} (7th ed.). McGraw-Hill.
+\end{frame}
+
+% ---------------------------------------------------------------------
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}

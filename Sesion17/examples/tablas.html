@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JOIN con tablas</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --panel: #ffffff;
+      --text: #1c2333;
+      --muted: #6b7388;
+      --border: #e2e5ee;
+      --left: #2563eb;
+      --left-bg: #eaf1ff;
+      --right: #9333ea;
+      --right-bg: #f5ebff;
+      --match: #16a34a;
+      --match-bg: #e9f8ee;
+      --solo: #d97706;
+      --solo-bg: #fff4dc;
+      --out: #a3a9b8;
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.5;
+    }
+
+    .top, main, .tabs, footer {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+
+    .top { padding-top: 32px; }
+    .top h1 { margin: 0; font-size: 2rem; letter-spacing: -0.02em; }
+    .top h1 span { color: var(--left); }
+    .top p { margin: 4px 0 20px; color: var(--muted); }
+
+    /* Pestañas */
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .tabs button {
+      font: 600 0.85rem var(--mono);
+      padding: 9px 14px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .tabs button:hover { border-color: var(--left); }
+    .tabs button.activo { background: var(--text); border-color: var(--text); color: #fff; }
+
+    /* Explicación */
+    .info {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+    .venn { flex: 0 0 150px; }
+    .venn svg { display: block; width: 100%; height: auto; }
+    .info h2 { margin: 0 0 2px; font-size: 1.3rem; }
+    .info h2 code { margin-left: 8px; font: 600 0.8rem var(--mono); color: var(--muted); }
+    .desc { margin: 0; font-size: 1.05rem; }
+    .regla {
+      margin: 10px 0 0;
+      padding: 8px 12px;
+      border-left: 4px solid var(--match);
+      background: var(--match-bg);
+      border-radius: 0 8px 8px 0;
+      font-size: 0.95rem;
+    }
+    .nota { margin: 8px 0 0; color: var(--muted); font-size: 0.92rem; }
+
+    /* Paneles */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 20px 18px;
+      margin-bottom: 14px;
+    }
+    .panel h3 { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; font-size: 1rem; }
+    .panel h3 small { font-weight: 400; color: var(--muted); }
+    .reiniciar {
+      margin-left: auto;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 400;
+      padding: 3px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .reiniciar:hover { border-color: var(--left); color: var(--left); }
+    .scroll { overflow-x: auto; }
+
+    .stage {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr 110px 1fr;
+      align-items: start;
+      min-width: 520px;
+    }
+    .lineas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    .lineas path {
+      fill: none;
+      stroke: var(--match);
+      stroke-width: 2.5;
+      stroke-linecap: round;
+      opacity: 0.55;
+      transition: opacity 0.15s, stroke-width 0.15s;
+    }
+    .lineas.muchas path { stroke-width: 1.5; opacity: 0.35; }
+
+    /* Tablas */
+    .card { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .card .nombre { padding: 6px 12px; font-weight: 700; font-size: 0.88rem; color: #fff; }
+    .card.l .nombre { background: var(--left); }
+    .card.r .nombre { background: var(--right); }
+    .card.resultado { min-width: 420px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.98rem; }
+    th, td { padding: 7px 12px; text-align: left; white-space: nowrap; }
+    th {
+      font: 600 0.78rem var(--mono);
+      color: var(--muted);
+      background: #fafbfe;
+      border-bottom: 1px solid var(--border);
+    }
+    th.l { color: var(--left); background: var(--left-bg); }
+    th.r { color: var(--right); background: var(--right-bg); }
+    th.grupo { text-align: center; font-family: inherit; font-size: 0.8rem; }
+    td.borde, th.borde { border-left: 2px solid var(--border); }
+    tbody tr { transition: opacity 0.15s; cursor: default; }
+    tbody tr + tr td { border-top: 1px solid var(--border); }
+
+    .id {
+      display: inline-grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      font: 700 0.95rem var(--mono);
+      color: #fff;
+      vertical-align: middle;
+    }
+    .id.l { background: var(--left); }
+    .id.r { background: var(--right); }
+
+    tr.match td { background: var(--match-bg); }
+    tr.match td:first-child { box-shadow: inset 4px 0 0 var(--match); }
+    tr.solo td { background: var(--solo-bg); }
+    tr.solo td:first-child { box-shadow: inset 4px 0 0 var(--solo); }
+    tr.out td { color: var(--out); }
+    tr.out td:first-child { box-shadow: inset 4px 0 0 var(--border); }
+    tr.out .txt { text-decoration: line-through; }
+    tr.out .id { background: var(--out); }
+
+    .vacio { font-style: italic; font-size: 0.85rem; color: var(--solo); }
+    tr.out .vacio { color: var(--out); }
+
+    .pasos { display: inline-flex; gap: 3px; margin-left: 8px; vertical-align: middle; }
+    .pasos button {
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      font: 700 0.95rem/1 var(--mono);
+      cursor: pointer;
+    }
+    .pasos button:hover:not(:disabled) { border-color: var(--left); color: var(--left); }
+    .pasos button:disabled { opacity: 0.3; cursor: default; }
+
+    .nada { margin: 0; padding: 12px; color: var(--muted); font-style: italic; }
+
+    /* Resaltado al pasar el mouse */
+    .enfocando tbody tr:not(.hl) { opacity: 0.25; }
+    .enfocando .lineas path:not(.hl) { opacity: 0.06; }
+    .enfocando .lineas path.hl { opacity: 1; stroke-width: 4; }
+
+    /* Leyenda */
+    .leyenda {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 20px;
+      list-style: none;
+      margin: 14px 0 0;
+      padding: 0;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .leyenda li { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+    .dot.match { background: var(--match); }
+    .dot.solo { background: var(--solo); }
+    .dot.out { background: var(--border); }
+
+    footer { padding: 6px 16px 32px; color: var(--muted); font-size: 0.85rem; }
+    footer a { color: var(--left); }
+
+    @media (max-width: 600px) {
+      .top h1 { font-size: 1.6rem; }
+      .info { flex-direction: column; align-items: flex-start; }
+      .venn { flex-basis: auto; width: 130px; }
+      .panel, .info { padding: 14px; }
+      .stage { grid-template-columns: 1fr 40px 1fr; min-width: 500px; }
+      th, td { padding: 6px 8px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <h1>JOIN con <span>tablas</span> e ids</h1>
+    <p>Dos tablas, cada fila con un número (su id). Se juntan las filas que tienen el mismo id.</p>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="Tipos de JOIN"></nav>
+
+  <main>
+    <section class="info">
+      <div class="venn" id="venn"></div>
+      <div>
+        <h2 id="titulo"></h2>
+        <p class="desc" id="desc"></p>
+        <p class="regla" id="regla"></p>
+        <p class="nota" id="nota"></p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3>
+        Las dos tablas
+        <small id="ayuda"></small>
+        <button class="reiniciar" id="reiniciar">Reiniciar ids</button>
+      </h3>
+      <div class="scroll">
+        <div class="stage" id="stage">
+          <div class="card l" id="tablaIzq"></div>
+          <div></div>
+          <div class="card r" id="tablaDer"></div>
+          <svg class="lineas" id="lineas" aria-hidden="true"></svg>
+        </div>
+      </div>
+      <ul class="leyenda">
+        <li><i class="dot match"></i>Encontró pareja</li>
+        <li><i class="dot solo"></i>Sin pareja, pero igual entra a la tabla final</li>
+        <li><i class="dot out"></i>Se queda fuera</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h3>Tabla final <small id="conteo"></small></h3>
+      <div class="scroll">
+        <div class="card resultado" id="resultado"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Usa las flechas ← → del teclado para cambiar de JOIN. ·
+    <a href="numeros.html">Versión con listas e ids</a> ·
+    <a href="listas.html">Versión con listas de todos los días</a> ·
+    <a href="index.html">Versión con SQL</a>
+  </footer>
+
+  <script>
+    // ---------- Tablas ----------
+
+    const ID_MIN = 1, ID_MAX = 9;
+
+    const inicial = {
+      l: [
+        { id: 1, nombre: 'Ana' },
+        { id: 2, nombre: 'Luis' },
+        { id: 3, nombre: 'María' },
+      ],
+      r: [
+        { id: 2, puntos: 50 },
+        { id: 3, puntos: 80 },
+        { id: 4, puntos: 30 },
+      ],
+    };
+
+    // Copia editable: los botones − y + cambian estos ids.
+    let tablas = structuredClone(inicial);
+
+    // En cada columna, esId indica que el valor se dibuja como un círculo con el número.
+    const nombresPuntos = () => ({
+      izq: {
+        titulo: 'Tabla A · nombres',
+        cols: [{ campo: 'id', esId: true, editable: true }, { campo: 'nombre' }],
+        filas: tablas.l,
+      },
+      der: {
+        titulo: 'Tabla B · puntos',
+        cols: [{ campo: 'id', esId: true, editable: true }, { campo: 'puntos' }],
+        filas: tablas.r,
+      },
+      grupos: { l: 'de la tabla A', r: 'de la tabla B' },
+      coincide: (a, b) => a.id === b.id,
+    });
+
+    const equipo = [
+      { id: 1, nombre: 'Ana', id_lider: null },
+      { id: 2, nombre: 'Luis', id_lider: 1 },
+      { id: 3, nombre: 'María', id_lider: 1 },
+      { id: 4, nombre: 'Pedro', id_lider: 2 },
+    ];
+
+    const lideres = () => ({
+      izq: {
+        titulo: 'Tabla personas',
+        cols: [{ campo: 'id', esId: true }, { campo: 'nombre' }, { campo: 'id_lider', esId: true, lado: 'r' }],
+        filas: equipo,
+      },
+      der: {
+        titulo: 'Tabla personas (la misma)',
+        cols: [{ campo: 'id', esId: true }, { campo: 'nombre' }],
+        filas: equipo,
+      },
+      grupos: { l: 'la persona', r: 'su líder' },
+      coincide: (persona, lider) => persona.id_lider === lider.id,
+    });
+
+    const joins = [
+      {
+        id: 'inner',
+        nombre: 'INNER JOIN',
+        apodo: 'Solo los ids que están en las dos',
+        desc: 'Entra una fila solo si su id aparece en la tabla A y también en la tabla B.',
+        regla: 'Busca cada id de A en B. Si lo encuentras, junta las dos filas en una. Si no, descártala.',
+        datos: nombresPuntos,
+        editable: true,
+        venn: () => venn(false, true, false),
+      },
+      {
+        id: 'left',
+        nombre: 'LEFT JOIN',
+        apodo: 'Todas las filas de A',
+        desc: 'Entran todas las filas de la tabla A. Si su id también está en B, se le pega esa fila al costado.',
+        regla: 'Recorre A completa. Si el id no está en B, la fila igual entra, con las columnas de B vacías.',
+        datos: nombresPuntos,
+        editable: true,
+        venn: () => venn(true, true, false),
+      },
+      {
+        id: 'right',
+        nombre: 'RIGHT JOIN',
+        apodo: 'Todas las filas de B',
+        desc: 'Entran todas las filas de la tabla B. Si su id también está en A, se le pega esa fila al costado.',
+        regla: 'Recorre B completa. Si el id no está en A, la fila igual entra, con las columnas de A vacías.',
+        datos: nombresPuntos,
+        editable: true,
+        venn: () => venn(false, true, true),
+      },
+      {
+        id: 'full',
+        nombre: 'FULL OUTER JOIN',
+        apodo: 'Todas las filas de A y de B',
+        desc: 'Entran todas las filas de ambas tablas. Los ids iguales se juntan; las demás van con un lado vacío.',
+        regla: 'Ninguna fila se descarta: junta los ids iguales y deja vacías las columnas del lado que falte.',
+        datos: nombresPuntos,
+        editable: true,
+        venn: () => venn(true, true, true),
+      },
+      {
+        id: 'cross',
+        nombre: 'CROSS JOIN',
+        apodo: 'Todas con todas',
+        desc: 'Cada fila de A se junta con cada fila de B, sin mirar los ids.',
+        regla: 'Aquí el id no importa: no hay condición, toda fila va con toda fila.',
+        nota: () => `${tablas.l.length} filas de A × ${tablas.r.length} filas de B = ${tablas.l.length * tablas.r.length} filas.`,
+        datos: nombresPuntos,
+        venn: vennCross,
+      },
+      {
+        id: 'self',
+        nombre: 'SELF JOIN',
+        apodo: 'La tabla consigo misma',
+        desc: 'Una sola tabla usada dos veces: cada persona guarda el id de su líder, que es otra fila de la misma tabla.',
+        regla: 'Para cada persona, busca en la misma tabla la fila cuyo id es igual a su id_lider.',
+        nota: () => 'Ana no tiene líder (id_lider vacío), así que no aparece como persona. María y Pedro no son líderes de nadie.',
+        datos: lideres,
+        venn: vennSelf,
+      },
+    ];
+
+    // ---------- Lógica de los joins ----------
+
+    // Devuelve pares { l, r } con posiciones de fila; null significa "sin pareja".
+    function calcularPares(tipo, L, R, coincide) {
+      const pares = [];
+      const ok = (i, j) => tipo === 'cross' || coincide(L[i], R[j]);
+      const idxL = L.map((_, i) => i);
+      const idxR = R.map((_, j) => j);
+
+      if (tipo === 'right') {
+        idxR.forEach(r => {
+          const ls = idxL.filter(l => ok(l, r));
+          if (ls.length) ls.forEach(l => pares.push({ l, r }));
+          else pares.push({ l: null, r });
+        });
+        return pares;
+      }
+
+      const conservarIzq = tipo === 'left' || tipo === 'full';
+      idxL.forEach(l => {
+        const rs = idxR.filter(r => ok(l, r));
+        if (rs.length) rs.forEach(r => pares.push({ l, r }));
+        else if (conservarIzq) pares.push({ l, r: null });
+      });
+      if (tipo === 'full') {
+        idxR.filter(r => !idxL.some(l => ok(l, r)))
+          .forEach(r => pares.push({ l: null, r }));
+      }
+      return pares;
+    }
+
+    // Resumen de qué ids están en cada tabla, para la nota bajo la regla.
+    function resumenIds() {
+      const unicos = arr => [...new Set(arr)].sort((a, b) => a - b);
+      const a = unicos(tablas.l.map(x => x.id));
+      const b = unicos(tablas.r.map(x => x.id));
+      const texto = ids => (ids.length ? ids.join(', ') : 'ninguno');
+      return `Ids en las dos tablas: ${texto(a.filter(x => b.includes(x)))} · ` +
+        `solo en A: ${texto(a.filter(x => !b.includes(x)))} · ` +
+        `solo en B: ${texto(b.filter(x => !a.includes(x)))}`;
+    }
+
+    // ---------- Diagramas ----------
+
+    function venn(izq, centro, der) {
+      const on = 'var(--match)';
+      const off = '#fff';
+      return `<svg viewBox="0 0 150 90" role="img" aria-label="Diagrama de Venn">
+        <defs><clipPath id="clipA"><circle cx="55" cy="45" r="34"/></clipPath></defs>
+        <circle cx="55" cy="45" r="34" fill="${izq ? on : off}"/>
+        <circle cx="95" cy="45" r="34" fill="${der ? on : off}"/>
+        <circle cx="95" cy="45" r="34" fill="${centro ? on : off}" clip-path="url(#clipA)"/>
+        <circle cx="55" cy="45" r="34" fill="none" stroke="var(--left)" stroke-width="2.5"/>
+        <circle cx="95" cy="45" r="34" fill="none" stroke="var(--right)" stroke-width="2.5"/>
+        <text x="33" y="50" font-size="15" font-weight="700" fill="${izq ? '#fff' : 'var(--left)'}">A</text>
+        <text x="107" y="50" font-size="15" font-weight="700" fill="${der ? '#fff' : 'var(--right)'}">B</text>
+      </svg>`;
+    }
+
+    function vennCross() {
+      const ys = [22, 45, 68];
+      const lineas = ys.map(y1 => ys.map(y2 =>
+        `<line x1="40" y1="${y1}" x2="110" y2="${y2}" stroke="var(--match)" stroke-width="1.5"/>`).join('')).join('');
+      const puntos = (x, color) => ys.map(y => `<circle cx="${x}" cy="${y}" r="6" fill="${color}"/>`).join('');
+      return `<svg viewBox="0 0 150 90" role="img" aria-label="Todas las combinaciones">
+        ${lineas}${puntos(40, 'var(--left)')}${puntos(110, 'var(--right)')}
+      </svg>`;
+    }
+
+    function vennSelf() {
+      return `<svg viewBox="0 0 150 90" role="img" aria-label="Tabla unida consigo misma">
+        <defs><marker id="flecha" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0 0 L10 5 L0 10 z" fill="var(--match)"/></marker></defs>
+        <circle cx="62" cy="48" r="30" fill="#fff" stroke="var(--left)" stroke-width="2.5"/>
+        <path d="M84 28 C 128 2, 138 78, 92 62" fill="none" stroke="var(--match)" stroke-width="3" marker-end="url(#flecha)"/>
+      </svg>`;
+    }
+
+    // ---------- Render ----------
+
+    const $ = id => document.getElementById(id);
+    let actual = 0;
+    let pares = [];
+
+    function estadoFilas(n, lado) {
+      return Array.from({ length: n }, (_, i) => {
+        const mias = pares.filter(p => p[lado] === i);
+        if (!mias.length) return 'out';
+        const otro = lado === 'l' ? 'r' : 'l';
+        return mias.some(p => p[otro] !== null) ? 'match' : 'solo';
+      });
+    }
+
+    // fila === null dibuja la celda vacía de un lado sin pareja.
+    function celda(fila, col, lado, editable) {
+      const valor = fila ? fila[col.campo] : null;
+      if (valor === null) return '<span class="vacio">vacío</span>';
+      if (!col.esId) return `<span class="txt">${valor}</span>`;
+      const pasos = editable && col.editable ? `<span class="pasos">
+          <button data-paso="-1" ${valor <= ID_MIN ? 'disabled' : ''} aria-label="Bajar id">−</button>
+          <button data-paso="1" ${valor >= ID_MAX ? 'disabled' : ''} aria-label="Subir id">+</button>
+        </span>` : '';
+      return `<span class="id ${col.lado || lado}">${valor}</span>${pasos}`;
+    }
+
+    function tablaOrigen(tabla, lado, editable) {
+      const estados = estadoFilas(tabla.filas.length, lado);
+      const filas = tabla.filas.map((fila, i) =>
+        `<tr class="${estados[i]}" data-lado="${lado}" data-i="${i}">` +
+        tabla.cols.map(c => `<td>${celda(fila, c, lado, editable)}</td>`).join('') + '</tr>').join('');
+      return `<div class="nombre">${tabla.titulo}</div>
+        <table><thead><tr>${tabla.cols.map(c => `<th>${c.campo}</th>`).join('')}</tr></thead>
+        <tbody>${filas}</tbody></table>`;
+    }
+
+    function tablaFinal(izq, der, grupos) {
+      if (!pares.length) return '<p class="nada">Ningún id coincide: la tabla final queda vacía.</p>';
+      const lados = [['l', izq], ['r', der]];
+      const borde = (lado, j) => (lado === 'r' && j === 0 ? ' borde' : '');
+      const grupo = lados.map(([lado, t]) =>
+        `<th class="grupo ${lado}${borde(lado, 0)}" colspan="${t.cols.length}">${grupos[lado]}</th>`).join('');
+      const cabecera = lados.map(([lado, t]) =>
+        t.cols.map((c, j) => `<th class="${lado}${borde(lado, j)}">${c.campo}</th>`).join('')).join('');
+      const filas = pares.map((p, k) => {
+        const clase = p.l === null || p.r === null ? 'solo' : 'match';
+        const celdas = lados.map(([lado, t]) => {
+          const fila = p[lado] === null ? null : t.filas[p[lado]];
+          return t.cols.map((c, j) => `<td class="${borde(lado, j)}">${celda(fila, c, lado, false)}</td>`).join('');
+        }).join('');
+        return `<tr class="${clase}" data-k="${k}">${celdas}</tr>`;
+      }).join('');
+      return `<table><thead><tr>${grupo}</tr><tr>${cabecera}</tr></thead><tbody>${filas}</tbody></table>`;
+    }
+
+    function render() {
+      const join = joins[actual];
+      const { izq, der, grupos, coincide } = join.datos();
+      pares = calcularPares(join.id === 'self' ? 'inner' : join.id, izq.filas, der.filas, coincide);
+
+      [...$('tabs').children].forEach((b, i) => b.classList.toggle('activo', i === actual));
+      $('venn').innerHTML = join.venn();
+      $('titulo').innerHTML = `${join.apodo}<code>${join.nombre}</code>`;
+      $('desc').textContent = join.desc;
+      $('regla').textContent = join.regla;
+      $('nota').textContent = join.nota ? join.nota() : resumenIds();
+      $('ayuda').textContent = join.editable
+        ? 'cambia un id con − y + y mira qué pasa'
+        : 'pasa el mouse sobre una fila';
+      $('reiniciar').hidden = !join.editable;
+
+      $('tablaIzq').innerHTML = tablaOrigen(izq, 'l', join.editable);
+      $('tablaDer').innerHTML = tablaOrigen(der, 'r', join.editable);
+      $('resultado').innerHTML = tablaFinal(izq, der, grupos);
+      $('conteo').textContent = `${pares.length} ${pares.length === 1 ? 'fila' : 'filas'}`;
+
+      enfocar(null);
+      dibujarLineas();
+    }
+
+    // Une con una curva cada fila de la izquierda con su pareja de la derecha.
+    function dibujarLineas() {
+      const stage = $('stage');
+      const svg = $('lineas');
+      const base = stage.getBoundingClientRect();
+      const borde = (lado, i) => {
+        const r = stage.querySelector(`tr[data-lado="${lado}"][data-i="${i}"]`).getBoundingClientRect();
+        return { x: (lado === 'l' ? r.right : r.left) - base.left, y: r.top + r.height / 2 - base.top };
+      };
+      svg.setAttribute('viewBox', `0 0 ${base.width} ${base.height}`);
+      svg.classList.toggle('muchas', pares.length > 6);
+      svg.innerHTML = pares.map((p, k) => {
+        if (p.l === null || p.r === null) return '';
+        const a = borde('l', p.l), b = borde('r', p.r);
+        const m = (a.x + b.x) / 2;
+        return `<path data-k="${k}" d="M${a.x} ${a.y} C${m} ${a.y}, ${m} ${b.y}, ${b.x} ${b.y}"/>`;
+      }).join('');
+    }
+
+    // Resalta los pares que cumplen el filtro (o quita el resaltado con null).
+    function enfocar(filtro) {
+      document.querySelectorAll('.hl').forEach(el => el.classList.remove('hl'));
+      document.body.classList.toggle('enfocando', !!filtro);
+      if (!filtro) return;
+      const marcar = sel => document.querySelectorAll(sel).forEach(el => el.classList.add('hl'));
+      if (filtro.lado) marcar(`tr[data-lado="${filtro.lado}"][data-i="${filtro.i}"]`);
+      pares.forEach((p, k) => {
+        const activo = filtro.lado ? p[filtro.lado] === filtro.i : k === filtro.k;
+        if (!activo) return;
+        marcar(`[data-k="${k}"]`);
+        if (p.l !== null) marcar(`tr[data-lado="l"][data-i="${p.l}"]`);
+        if (p.r !== null) marcar(`tr[data-lado="r"][data-i="${p.r}"]`);
+      });
+    }
+
+    // ---------- Eventos ----------
+
+    function ir(i) {
+      actual = (i + joins.length) % joins.length;
+      render();
+    }
+
+    $('tabs').innerHTML = joins.map((j, i) => `<button data-idx="${i}">${j.nombre}</button>`).join('');
+    $('tabs').addEventListener('click', e => {
+      const btn = e.target.closest('button');
+      if (btn) ir(Number(btn.dataset.idx));
+    });
+
+    $('stage').addEventListener('click', e => {
+      const btn = e.target.closest('[data-paso]');
+      if (!btn) return;
+      const tr = btn.closest('tr');
+      const fila = tablas[tr.dataset.lado][Number(tr.dataset.i)];
+      fila.id = Math.min(ID_MAX, Math.max(ID_MIN, fila.id + Number(btn.dataset.paso)));
+      render();
+    });
+
+    $('reiniciar').addEventListener('click', () => {
+      tablas = structuredClone(inicial);
+      render();
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight') ir(actual + 1);
+      if (e.key === 'ArrowLeft') ir(actual - 1);
+    });
+
+    document.addEventListener('mouseover', e => {
+      const tr = e.target.closest('tbody tr');
+      if (!tr) return enfocar(null);
+      if (tr.dataset.k !== undefined) enfocar({ k: Number(tr.dataset.k) });
+      else enfocar({ lado: tr.dataset.lado, i: Number(tr.dataset.i) });
+    });
+
+    window.addEventListener('resize', dibujarLineas);
+
+    render();
+  </script>
+</body>
+</html>

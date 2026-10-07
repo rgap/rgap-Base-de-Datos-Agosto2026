@@ -143,6 +143,7 @@
       transition: transform 180ms ease, box-shadow 180ms ease;
     }
 
+    .card[hidden] { display: none; }
     .card:hover { transform: translateY(-4px); box-shadow: 0 22px 50px rgba(23, 32, 51, 0.14); }
 
     .badge {
@@ -213,12 +214,13 @@
           <select id="sessionFilter">
             <option value="all">Todas las sesiones</option>
             <option value="sesion02">Sesión 02</option>
+            <option value="sesion17">Sesión 17</option>
           </select>
         </label>
       </div>
 
       <div class="summary" aria-live="polite">
-        <span id="resultCount">1 contenido disponible</span>
+        <span id="resultCount">5 contenidos disponibles</span>
         <span>Selecciona para abrir</span>
       </div>
 
@@ -229,6 +231,38 @@
           <p>Ejemplo práctico para explorar la búsqueda y consulta de productos.</p>
           <a class="open" href="Sesion02/examples/busqueda_producto.html">
             <span>Abrir contenido</span><span aria-hidden="true">→</span>
+          </a>
+        </article>
+        <article class="card" data-session="sesion17" data-search="sesion 17 tipos de join sql inner left right full cross self consultas">
+          <span class="badge">Sesión 17 · Ejemplo</span>
+          <h2>Tipos de JOIN</h2>
+          <p>Explora los tipos de JOIN con consultas SQL, diagramas y resultados interactivos.</p>
+          <a class="open" href="Sesion17/examples/index.html">
+            <span>Abrir contenido</span><span aria-hidden="true">→</span>
+          </a>
+        </article>
+        <article class="card" data-session="sesion17" data-search="sesion 17 join con tablas ids relaciones inner left right full cross self">
+          <span class="badge">Sesión 17 · Ejemplo</span>
+          <h2>JOIN con tablas e ids</h2>
+          <p>Visualiza cómo se relacionan las filas de dos tablas mediante sus identificadores.</p>
+          <a class="open" href="Sesion17/examples/tablas.html">
+            <span>Abrir contenido</span><span aria-hidden="true">→</span>
+          </a>
+        </article>
+        <article class="card" data-session="sesion17" data-search="sesion 17 busqueda sin indice indices correo rendimiento">
+          <span class="badge">Sesión 17 · Índices</span>
+          <h2>Búsqueda sin índice</h2>
+          <p>Demostración de búsqueda por correo sin índice. Requiere ejecutar el servidor local del ejemplo.</p>
+          <a class="open" href="Sesion17/indices/sin-indice/public/index.html">
+            <span>Ver interfaz</span><span aria-hidden="true">→</span>
+          </a>
+        </article>
+        <article class="card" data-session="sesion17" data-search="sesion 17 busqueda con indice indices correo rendimiento">
+          <span class="badge">Sesión 17 · Índices</span>
+          <h2>Búsqueda con índice</h2>
+          <p>Demostración de búsqueda por correo con índice. Requiere ejecutar el servidor local del ejemplo.</p>
+          <a class="open" href="Sesion17/indices/con-indice/public/index.html">
+            <span>Ver interfaz</span><span aria-hidden="true">→</span>
           </a>
         </article>
       </div>
@@ -271,6 +305,7 @@
 
     search.addEventListener('input', filterContent);
     sessionFilter.addEventListener('change', filterContent);
+    filterContent();
   </script>
 </body>
 </html>

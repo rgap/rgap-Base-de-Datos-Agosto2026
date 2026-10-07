@@ -1,0 +1,233 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+
+\title{Primeros pasos en SQL}
+\subtitle{Del modelo E-R a SQL:\\ nombres de tablas, columnas y tipos de datos}
+\date{Semana 06 - Sesión 11}
+\author{Rel Guzman}
+
+% Espacio en blanco para completar
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Parte nueva de un bloque de codigo que crece paso a paso
+\newcommand{\nuevo}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!14}{#1}}}
+% Marcas de clave
+\newcommand{\pk}{{\scriptsize\color{utpRojo}\textbf{PK}}}
+\newcommand{\fk}{{\scriptsize\color{utpNaranja}\textbf{FK}}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Bloque de código SQL sobre fondo gris
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.6em}}
+% Tabla de tres columnas para alinear nombre / tipo / restricciones
+\newenvironment{sqltab}
+  {\begin{tabular}{@{}l@{\hspace{1.4em}}l@{\hspace{1.4em}}l@{}}}
+  {\end{tabular}}
+\newcommand{\sqlline}[1]{\multicolumn{3}{@{}l}{#1}}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás tomar una entidad del \textbf{dibujo} de una base de datos y escribir una tabla en \textbf{SQL}, con sus columnas y tipos de datos.
+\end{block}
+\end{frame}
+
+% 3 ---------------------------------------------------------------------
+\begin{frame}{Dónde estamos}
+\begin{center}
+\begin{tikzpicture}
+  \node[caja,text width=3.1cm,font=\small,align=center] (a) {\textbf{El dibujo}\\[2pt] \scriptsize el modelo E-R};
+  \node[cajanaranja,text width=3.1cm,font=\small,align=center,right=16mm of a] (b) {\textbf{SQL}\\[2pt] \scriptsize lo que se escribe};
+  \node[cajaverde,text width=3.1cm,font=\small,align=center,right=16mm of b] (c) {\textbf{La base de datos}\\[2pt] \scriptsize tablas de verdad};
+  \draw[flecha] (a)--(b);
+  \draw[flecha] (b)--(c);
+  \node[font=\scriptsize,below=2mm of a] {sesiones 06 a 09};
+  \node[font=\scriptsize,below=2mm of b,text=utpRojo] {\textbf{hoy}};
+  \node[font=\scriptsize,below=2mm of c] {a partir de hoy};
+\end{tikzpicture}
+\end{center}
+\vspace{0.55cm}
+\begin{block}{La idea de la sesión}
+\small El dibujo ya está hecho. Falta \textbf{escribirlo}, porque nadie puede guardar un pedido dentro de un dibujo.
+\end{block}
+\end{frame}
+
+% 4 ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{70mm}{!}{\bfseries\color{utpNegro}¿Qué es SQL?}};
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{70mm}{1.6pt}};
+  \end{tikzpicture}
+\end{frame}
+
+% 5 ---------------------------------------------------------------------
+\begin{frame}{¿Qué es SQL y para qué sirve?}
+\concepto{SQL}{\small El idioma con el que se le \textbf{pide} algo a una base de datos.}
+\vspace{0.4cm}
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}
+  \node[caja,text width=2.2cm,font=\scriptsize,align=center] (yo) {\textbf{tú}};
+  \node[cajanaranja,text width=2.8cm,font=\scriptsize,align=center,right=16mm of yo] (sql) {\textbf{una frase\\ en SQL}};
+  \node[caja,text width=2.6cm,font=\scriptsize,align=center,right=16mm of sql] (ges) {\textbf{el gestor}\\ \scriptsize MySQL};
+  \node[cajaverde,text width=2.4cm,font=\scriptsize,align=center,right=16mm of ges] (bd) {\textbf{las tablas}};
+  \draw[flecha] (yo)--(sql); \draw[flecha] (sql)--(ges); \draw[flecha] (ges)--(bd);
+  \node[font=\scriptsize,below=2mm of sql,text width=3.2cm,align=center] {escribes \textbf{qué} quieres};
+  \node[font=\scriptsize,below=2mm of ges,text width=3.2cm,align=center] {él decide \textbf{cómo} hacerlo};
+\end{tikzpicture}}
+\end{center}
+\vspace{0.45cm}
+\small Sirve para \textbf{crear} las tablas (hoy), \textbf{guardar} filas y \textbf{consultarlas} (las próximas sesiones). Es un \textbf{estándar}: lo mismo sirve en MySQL, PostgreSQL, SQL Server u Oracle.
+\end{frame}
+
+% 6 ---------------------------------------------------------------------
+\begin{frame}{¿Y dónde se escribe SQL?}
+\small En un programa que se conecta al gestor. Todos hacen lo mismo:
+\begin{itemize}\setlength\itemsep{3pt}\small
+  \item MySQL Workbench
+  \item DBeaver
+  \item phpMyAdmin \textnormal{(en el navegador)}
+  \item la consola \texttt{mysql} \textnormal{(solo texto)}
+\end{itemize}
+\vspace{6pt}
+\small Escribes la instrucción, la ejecutas, y el gestor \textbf{responde}.
+\end{frame}
+
+% 7 ---------------------------------------------------------------------
+\begin{frame}{Una instrucción se lee casi como una frase}
+\begin{sqlcode}[.64\textwidth]
+\kw{CREATE TABLE} cliente ( \ldots );
+\end{sqlcode}
+\vspace{0.2cm}
+\begin{center}
+\small
+\begin{tabular}{>{\ttfamily}l>{\raggedright\arraybackslash}p{6.4cm}}
+\toprule
+\normalfont\bfseries En SQL & \bfseries En español \\
+\midrule
+CREATE & crea \\
+TABLE & una tabla \\
+cliente & que se llame cliente \\
+( \ldots ) & con estas columnas \\
+; & y aquí termino de pedirte \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4cm}
+\begin{block}{Tres costumbres, no reglas}
+\small SQL \textbf{no} distingue mayúsculas de minúsculas, pero: las palabras del idioma van en \textbf{MAYÚSCULA}, los nombres que inventamos en minúscula, y cada instrucción termina en \textbf{punto y coma}.
+\end{block}
+\end{frame}
+
+% 8 ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 1} Lee y escribe qué hace}
+\begin{center}
+\small
+\begin{tabular}{>{\ttfamily}p{5.4cm}>{\raggedright\arraybackslash}p{6.2cm}}
+\toprule
+\normalfont\bfseries La instrucción & \bfseries Qué le estoy pidiendo al gestor \\
+\midrule
+CREATE DATABASE colegio; & \bl[5.4cm] \\[9pt]
+CREATE TABLE alumno ( \ldots ); & \bl[5.4cm] \\[9pt]
+DROP TABLE alumno; & \bl[5.4cm] \\[9pt]
+USE colegio; & \bl[5.4cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4cm}
+\small \textbf{Pista:} traduce palabra por palabra. \texttt{CREATE} es «crea», \texttt{DROP} es «elimina», \texttt{USE} es «usa». Lo que sigue dice \textbf{qué cosa}.
+\end{frame}
+
+% 9 ---------------------------------------------------------------------
+\begin{frame}{Paso 1: el nombre de la tabla}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+\begin{sqlcode}[\textwidth]
+\nuevo{\kw{CREATE TABLE} cliente}\\
+(\\
+);
+\end{sqlcode}
+\column{.40\textwidth}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=2.7cm,font=\scriptsize,align=left]
+    {\textbf{cliente}\\[3pt] \texttt{id} \ \pk\\ \texttt{nombre}\\ \texttt{correo}};
+\end{tikzpicture}
+\end{center}
+\vspace{4pt}
+\centering\scriptsize vamos a escribir\\ este dibujo
+\end{columns}
+\vspace{0.5cm}
+\small \texttt{CREATE TABLE} es «crea una tabla nueva», y \texttt{cliente} es cómo se va a llamar. Entre los \textbf{paréntesis} van a ir las columnas: por ahora está vacío.
+\vspace{0.2cm}
+
+\small El nombre no se inventa: sale del dibujo, donde la entidad ya se llamaba \tbl{cliente}.
+\end{frame}
+
+% 10 ---------------------------------------------------------------------
+\begin{frame}{Paso 2: la primera columna}
+\begin{sqlcode}[.56\textwidth]
+\kw{CREATE TABLE} cliente\\
+(\\
+\ind \nuevo{nombre \ VARCHAR(80)}\\
+);
+\end{sqlcode}
+\vspace{0.35cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajaverde,text width=2.4cm,font=\scriptsize,align=center] (n) {\texttt{nombre}};
+  \node[font=\scriptsize,below=2mm of n] {cómo se llama};
+  \node[cajanaranja,text width=2.9cm,font=\scriptsize,align=center,right=18mm of n] (t) {\texttt{VARCHAR(80)}};
+  \node[font=\scriptsize,below=2mm of t] {qué se puede guardar};
+\end{tikzpicture}
+\end{center}
+\vspace{0.55cm}
+\small \textbf{Una columna son siempre dos cosas: un nombre y un tipo.} Aquí estamos diciendo «guarda texto, de hasta 80 caracteres».
+\end{frame}
+
+% 11 ---------------------------------------------------------------------
+\begin{frame}{Paso 3: las demás columnas}
+\begin{sqlcode}[.56\textwidth]
+\kw{CREATE TABLE} cliente\\
+(\\
+\ind nombre \ VARCHAR(80)\nuevo{,}\\
+\ind \nuevo{correo \ VARCHAR(120)}\\
+);
+\end{sqlcode}
+\vspace{0.35cm}
+\small Se agregan una debajo de otra, y \textbf{la coma las separa}.
+\vspace{0.4cm}
+\begin{alertblock}{El error número uno del primer día}
+\small La coma \textbf{separa} columnas, no las termina: \textbf{la última no lleva coma}. Si sobra una, el gestor responde \texttt{You have an error in your SQL syntax\ldots near ')'} y señala la línea \textbf{siguiente} a la del problema.
+\end{alertblock}
+\end{frame}
+
+% 12 ---------------------------------------------------------------------
+\begin{frame}[plain,c]
+\centering
+{\fontsize{30}{36}\selectfont\bfseries
+Resolvemos un poco\\[6pt]
+de la práctica\par}
+\end{frame}
+
+\end{document}

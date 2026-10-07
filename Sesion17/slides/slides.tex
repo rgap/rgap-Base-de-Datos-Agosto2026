@@ -1,0 +1,913 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+\usepackage[normalem]{ulem}
+
+\title{Tipos de JOIN e introducción a los índices}
+\subtitle{Unir tablas paso a paso, con ejemplos sencillos,\\ y una primera mirada a los índices}
+\date{Semana 09 - Sesión 17}
+\author{Rel Guzman}
+
+% Espacio en blanco para completar
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Parte nueva de un bloque de codigo que crece paso a paso
+\newcommand{\nuevo}[1]{{%
+  \setlength{\fboxsep}{1.2pt}%
+  \begingroup
+  \renewcommand{\kw}[1]{\textcolor{utpNegro}{\textbf{##1}}}%
+  \colorbox{yellow!45}{\textcolor{utpNegro}{#1}}%
+  \endgroup}}
+% Comentario dentro de un bloque de código SQL
+\newcommand{\com}[1]{\textcolor{utpGris}{-- #1}}
+% Marcas de clave primaria y clave foránea
+\newcommand{\pk}{{\scriptsize\color{utpRojo}\textbf{PK}}}
+\newcommand{\fk}{{\scriptsize\color{utpNaranja}\textbf{FK}}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre del gestor o de la forma de escribir algo
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Celda de una fila que se quedó sin pareja
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% Valor desconocido
+\newcommand{\nulo}{\textcolor{utpGrisMedio}{\textit{NULL}}}
+% Bloque de código sobre fondo gris
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.6em}}
+% Anatomía de una instrucción: cada pieza del código con su pregunta al lado
+\tikzset{
+  pieza/.style={fill=utpGrisClaro,font=\ttfamily\footnotesize,anchor=west,inner sep=5pt,
+    minimum height=0.62cm},
+  para/.style={font=\small,anchor=west,text=utpNegro}
+}
+\newcommand{\piezax}{7.6}
+\newcommand{\pieza}[3]{%
+  \node[pieza] at (0,#1) {#2};
+  \node[para] at (\piezax,#1) {\textcolor{utpRojo}{$\blacktriangleleft$}\ #3};}
+% Diapositiva de sección: una palabra bien grande (\seccion[0]{...} la deja sin línea roja)
+\newcommand{\seccion}[2][1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#2}};
+    \ifnum#1=1
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+    \fi
+  \end{tikzpicture}
+\end{frame}}
+% Diagrama de dos círculos: se pinta la parte que el JOIN conserva.
+% \venn[escala]{izquierda}{centro}{derecha}, cada uno con \von o \voff
+\newcommand{\von}{utpRojo!45}
+\newcommand{\voff}{white}
+\newcommand{\venn}[4][1]{%
+  \begin{tikzpicture}[scale=#1,baseline=-0.6ex]
+    \fill[#2] (0,0) circle (0.62);
+    \fill[#4] (0.74,0) circle (0.62);
+    \begin{scope}
+      \clip (0,0) circle (0.62);
+      \fill[#3] (0.74,0) circle (0.62);
+    \end{scope}
+    \draw[thick,utpNegro] (0,0) circle (0.62);
+    \draw[thick,utpNegro] (0.74,0) circle (0.62);
+  \end{tikzpicture}}
+% Tablas de ejemplo: la tienda
+\newcommand{\tablaclientes}{%
+  \centering\tbl{clientes}\\[4pt]
+  \scriptsize\ttfamily
+  \begin{tabular}{rl}
+  \toprule
+  \normalfont\bfseries id & \normalfont\bfseries nombre \\
+  \midrule
+  1 & Ana \\
+  2 & Luis \\
+  3 & María \\
+  \bottomrule
+  \end{tabular}}
+\newcommand{\tablapedidos}{%
+  \centering\tbl{pedidos}\\[4pt]
+  \scriptsize\ttfamily
+  \begin{tabular}{rlr}
+  \toprule
+  \normalfont\bfseries id & \normalfont\bfseries producto & \normalfont\bfseries cliente\_id \\
+  \midrule
+  101 & Laptop & 1 \\
+  102 & Mouse & 1 \\
+  103 & Teclado & 2 \\
+  104 & Monitor & \nulo \\
+  \bottomrule
+  \end{tabular}}
+% Tablas de práctica: la universidad
+\newcommand{\tablacarreras}{%
+  \centering\tbl{carreras}\\[4pt]
+  \scriptsize\ttfamily
+  \begin{tabular}{rl}
+  \toprule
+  \normalfont\bfseries id & \normalfont\bfseries nombre \\
+  \midrule
+  1 & Sistemas \\
+  2 & Industrial \\
+  3 & Civil \\
+  \bottomrule
+  \end{tabular}}
+\newcommand{\tablaalumnos}{%
+  \centering\tbl{alumnos}\\[4pt]
+  \scriptsize\ttfamily
+  \begin{tabular}{rlr}
+  \toprule
+  \normalfont\bfseries id & \normalfont\bfseries nombre & \normalfont\bfseries carrera\_id \\
+  \midrule
+  1 & Paola & 1 \\
+  2 & Jorge & 1 \\
+  3 & Inés & 3 \\
+  4 & Tomás & \nulo \\
+  \bottomrule
+  \end{tabular}}
+% Resultado de un JOIN entre clientes y pedidos: \resultado{filas}
+\newcommand{\resultado}[1]{%
+  \centering{\scriptsize\color{utpGris}resultado}\\[3pt]
+  \footnotesize\ttfamily
+  \begin{tabular}{ll}
+  \toprule
+  \normalfont\bfseries nombre & \normalfont\bfseries producto \\
+  \midrule
+  #1
+  \bottomrule
+  \end{tabular}}
+\newcommand{\filasinner}{Ana & Laptop \\ Ana & Mouse \\ Luis & Teclado \\}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás \textbf{unir dos tablas} con \texttt{JOIN}, \textbf{elegir el tipo de JOIN} según lo que quieras conservar, y explicar \textbf{qué es un índice} y \textbf{para qué se usa}.
+\end{block}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Lo de hoy: cinco paradas}
+\begin{center}
+\begin{tikzpicture}
+  \tikzset{parada/.style={cajaverde,font=\footnotesize\bfseries,text width=1.95cm,minimum height=1.15cm}}
+  \node[parada] (a) {1. ¿Por qué unir tablas?};
+  \node[parada,right=4.5mm of a] (b) {2. \texttt{INNER JOIN}};
+  \node[parada,right=4.5mm of b] (c) {3. \texttt{LEFT} y \texttt{RIGHT}};
+  \node[parada,right=4.5mm of c] (d) {4. \texttt{FULL}, \texttt{CROSS} y \texttt{SELF}};
+  \node[parada,right=4.5mm of d] (e) {5. Índices};
+  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c); \draw[flecha] (c)--(d); \draw[flecha] (d)--(e);
+\end{tikzpicture}
+\end{center}
+\vspace{0.5cm}
+\begin{itemize}\setlength\itemsep{8pt}
+  \item Ya sabes consultar \textbf{una tabla}. Hoy consultamos \textbf{dos a la vez}.
+  \item Usaremos \textbf{las mismas dos tablas} todo el tiempo: solo cambia el tipo de \texttt{JOIN}.
+  \item Al final, una idea nueva y corta: los \textbf{índices}.
+\end{itemize}
+\vspace{0.4cm}
+\ojo{Vamos \textbf{de a pocos}: una idea por diapositiva y una práctica después de cada parada.}
+\end{frame}
+% =======================================================================
+\seccion{Unir tablas}
+% ---------------------------------------------------------------------
+\begin{frame}{Los datos viven en tablas separadas}
+\begin{columns}[c,onlytextwidth]
+\column{.22\textwidth}
+\tablaclientes
+\column{.36\textwidth}
+\tablapedidos
+\column{.38\textwidth}
+\small \textbf{Pregunta:} ¿quién pidió el \textbf{Teclado}?
+\begin{enumerate}\setlength\itemsep{4pt}
+  \item En \tbl{pedidos}: el Teclado tiene \texttt{cliente\_id} = \textbf{2}.
+  \item En \tbl{clientes}: el \texttt{id} \textbf{2} es \textbf{Luis}.
+\end{enumerate}
+\end{columns}
+\vspace{0.35cm}
+\concepto{La idea}{\small Tú lo resolviste \textbf{mirando dos tablas} y juntando lo que coincide. Eso mismo hace un \texttt{JOIN}, en \textbf{una sola consulta}.}
+\vspace{0.1cm}
+\analogia{Tienes una hoja con \textbf{códigos y notas}, y otra con \textbf{códigos y nombres}. Las pones lado a lado para saber de quién es cada nota.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Un \texttt{JOIN}, pieza por pieza}
+\begin{center}
+\begin{tikzpicture}[y=0.82cm]
+  \renewcommand{\piezax}{6.0}
+  \pieza{3}{\kw{SELECT} c.nombre, p.producto}{qué columnas quiero, y \textbf{de qué tabla}}
+  \pieza{2}{\kw{FROM} clientes c}{la tabla de la \textbf{izquierda}: se escribe primero}
+  \pieza{1}{\nuevo{\kw{JOIN}} pedidos p}{la tabla de la \textbf{derecha}: se escribe después}
+  \pieza{0}{\nuevo{\kw{ON}} p.cliente\_id = c.id;}{cómo se \textbf{emparejan} las filas}
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\begin{itemize}\setlength\itemsep{7pt}
+  \item \texttt{c} y \texttt{p} son \textbf{apodos} (alias) de las tablas: ahorran escribir el nombre completo.
+  \item \texttt{c.nombre} se lee «la columna \texttt{nombre} de \tbl{clientes}».
+  \item El \texttt{ON} casi siempre compara la \textbf{clave foránea} con la \textbf{clave primaria}.
+\end{itemize}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Al emparejar, algunos se quedan sin pareja}
+\begin{center}
+\begin{tikzpicture}[y=0.74cm]
+  \tikzset{
+    fila/.style={draw=utpNegro,thick,fill=utpGrisClaro,font=\footnotesize\ttfamily,
+      minimum height=0.52cm,text width=2.7cm,align=left,inner sep=3pt},
+    sola/.style={fila,draw=utpRojo!75,fill=utpRojo!12}
+  }
+  \node[fila] (a) at (0,-0.5) {1 \ Ana};
+  \node[fila] (l) at (0,-1.5) {2 \ Luis};
+  \node[sola] (m) at (0,-2.5) {3 \ María};
+  \node[fila] (p1) at (6.6,0) {Laptop \hfill 1};
+  \node[fila] (p2) at (6.6,-1) {Mouse \hfill 1};
+  \node[fila] (p3) at (6.6,-2) {Teclado \hfill 2};
+  \node[sola] (p4) at (6.6,-3) {Monitor \hfill \nulo};
+  \draw[very thick,utpNegro] (a.east)--(p1.west);
+  \draw[very thick,utpNegro] (a.east)--(p2.west);
+  \draw[very thick,utpNegro] (l.east)--(p3.west);
+  \node[font=\small] at (0,0.75) {\tbl{clientes}};
+  \node[font=\small] at (6.6,0.75) {\tbl{pedidos}};
+  \node[font=\scriptsize,text=utpRojo,left=2mm of m] {no pidió nada};
+  \node[font=\scriptsize,text=utpRojo,right=2mm of p4] {no tiene cliente};
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\begin{itemize}\setlength\itemsep{5pt}
+  \item \textbf{Con pareja:} Ana (dos pedidos) y Luis (un pedido).
+  \item \textbf{Sin pareja:} \mal{María} y el \mal{Monitor}.
+\end{itemize}
+\vspace{0.2cm}
+\concepto{La única pregunta de hoy}{\small Cada tipo de \texttt{JOIN} responde lo mismo: \textbf{¿qué hago con los que se quedaron sin pareja?}}
+\end{frame}
+% =======================================================================
+\seccion[0]{INNER JOIN}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{INNER JOIN}: solo los que tienen pareja}
+\begin{columns}[c,onlytextwidth]
+\column{.60\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} c.nombre, p.producto\\
+\kw{FROM} clientes c\\
+\nuevo{\kw{INNER JOIN}} pedidos p \kw{ON} p.cliente\_id = c.id;
+\end{sqlcode}
+\vspace{-0.15cm}
+\centering\venn{\voff}{\von}{\voff}\\[3pt]
+{\scriptsize\color{utpGris}solo lo que está en \textbf{las dos} tablas}
+\column{.34\textwidth}
+\resultado{\filasinner}
+\end{columns}
+\vspace{0.35cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Los que no tienen pareja \textbf{quedan fuera}: no aparecen ni María ni el Monitor.
+  \item Ana aparece \textbf{dos veces}: una fila por cada pedido suyo.
+  \item Escribir solo \texttt{JOIN} es lo mismo que \texttt{INNER JOIN}. Es el más usado.
+\end{itemize}
+\vspace{0.15cm}
+\analogia{Es una \textbf{fiesta solo para parejas}: el que llega solo, no entra.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 1} \texttt{INNER JOIN} en la universidad}
+\begin{columns}[c,onlytextwidth]
+\column{.24\textwidth}
+\tablacarreras
+\column{.34\textwidth}
+\tablaalumnos
+\column{.40\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} c.nombre, a.nombre\\
+\kw{FROM} carreras c\\
+\kw{INNER JOIN} alumnos a\\
+\ind \kw{ON} a.carrera\_id = c.id;
+\end{sqlcode}
+\end{columns}
+\vspace{0.2cm}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{8.6cm}>{\raggedright\arraybackslash}p{3.4cm}}
+\toprule
+\bfseries Pregunta & \bfseries Respuesta \\
+\midrule
+¿Cuántas filas tiene el resultado? & \bl[3.2cm] \\[9pt]
+¿Qué carrera \textbf{no} aparece? ¿Por qué? & \bl[3.2cm] \\[9pt]
+¿Qué alumno \textbf{no} aparece? ¿Por qué? & \bl[3.2cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\small \textbf{Para escribir:} anota en tu cuaderno las filas del resultado, una por una.
+\end{frame}
+% =======================================================================
+\seccion{LEFT y RIGHT}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{LEFT JOIN}: toda la tabla izquierda}
+\begin{columns}[c,onlytextwidth]
+\column{.60\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} c.nombre, p.producto\\
+\kw{FROM} clientes c\\
+\nuevo{\kw{LEFT JOIN}} pedidos p \kw{ON} p.cliente\_id = c.id;
+\end{sqlcode}
+\vspace{-0.15cm}
+\centering\venn{\von}{\von}{\voff}\\[3pt]
+{\scriptsize\color{utpGris}\textbf{toda} la izquierda, tenga pareja o no}
+\column{.34\textwidth}
+\resultado{\filasinner \mal{María} & \mal{\nulo} \\}
+\end{columns}
+\vspace{0.35cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item La \textbf{izquierda} es la tabla del \texttt{FROM}: \tbl{clientes}. \textbf{Ninguno} de sus clientes se pierde.
+  \item María no tiene pedido: su \texttt{producto} se rellena con \nulo.
+  \item El Monitor sigue fuera: está en la tabla de la \textbf{derecha}.
+\end{itemize}
+\vspace{0.15cm}
+\analogia{Es la \textbf{lista de asistencia}: salen todos los alumnos, y al que faltó se le deja el casillero vacío.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{RIGHT JOIN}: toda la tabla derecha}
+\begin{columns}[c,onlytextwidth]
+\column{.60\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} c.nombre, p.producto\\
+\kw{FROM} clientes c\\
+\nuevo{\kw{RIGHT JOIN}} pedidos p \kw{ON} p.cliente\_id = c.id;
+\end{sqlcode}
+\vspace{-0.15cm}
+\centering\venn{\voff}{\von}{\von}\\[3pt]
+{\scriptsize\color{utpGris}\textbf{toda} la derecha, tenga pareja o no}
+\column{.34\textwidth}
+\resultado{\filasinner \mal{\nulo} & \mal{Monitor} \\}
+\end{columns}
+\vspace{0.35cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item La \textbf{derecha} es la tabla del \texttt{JOIN}: \tbl{pedidos}. \textbf{Ningún} pedido se pierde.
+  \item El Monitor no tiene cliente: su \texttt{nombre} se rellena con \nulo.
+  \item Ahora la que queda fuera es María.
+\end{itemize}
+\vspace{0.15cm}
+\small Es el \textbf{mismo} \texttt{LEFT JOIN}, visto desde el otro lado.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{LEFT} y \texttt{RIGHT}: lo mismo, al revés}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{Con RIGHT}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{FROM} clientes c\\
+\kw{RIGHT JOIN} \nuevo{pedidos p}\\
+\ind \kw{ON} p.cliente\_id = c.id;
+\end{sqlcode}
+\column{.48\textwidth}
+\centering\etiqueta{Con LEFT}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{FROM} \nuevo{pedidos p}\\
+\kw{LEFT JOIN} clientes c\\
+\ind \kw{ON} p.cliente\_id = c.id;
+\end{sqlcode}
+\end{columns}
+\vspace{0.1cm}
+\begin{center}
+\small Las dos conservan \textbf{todos los pedidos}. Solo cambió \textbf{el orden} en que se escriben las tablas.
+\end{center}
+\vspace{0.2cm}
+\begin{itemize}\setlength\itemsep{7pt}
+  \item \textbf{Truco:} pregúntate «¿de qué tabla \textbf{no quiero perder} ninguna fila?».
+  \item Pon esa tabla en el \texttt{FROM} y usa \texttt{LEFT JOIN}.
+\end{itemize}
+\vspace{0.3cm}
+\enlarealidad{Casi todos escriben siempre \texttt{LEFT JOIN} y acomodan el orden de las tablas. El \texttt{RIGHT JOIN} se ve muy poco.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Un clásico: encontrar a los que no tienen pareja}
+\small \textbf{Pregunta:} ¿qué clientes \textbf{nunca} han hecho un pedido?
+\vspace{0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.60\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} c.nombre\\
+\kw{FROM} clientes c\\
+\kw{LEFT JOIN} pedidos p \kw{ON} p.cliente\_id = c.id\\
+\nuevo{\kw{WHERE} p.id \kw{IS NULL};}
+\end{sqlcode}
+\column{.34\textwidth}
+\centering{\scriptsize\color{utpGris}resultado}\\[3pt]
+\footnotesize\ttfamily
+\begin{tabular}{l}
+\toprule
+\normalfont\bfseries nombre \\
+\midrule
+María \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.2cm}
+\begin{enumerate}\setlength\itemsep{6pt}
+  \item El \texttt{LEFT JOIN} trae a \textbf{todos} los clientes; a María le pone \nulo{} en el pedido.
+  \item El \texttt{WHERE} se queda \textbf{solo con las filas que tienen ese \nulo}.
+\end{enumerate}
+\vspace{0.3cm}
+\enlarealidad{Así se buscan los alumnos \textbf{sin matrícula}, los productos \textbf{que nadie compró} o los empleados \textbf{sin área}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 2} \texttt{LEFT} y \texttt{RIGHT} en la universidad}
+\begin{columns}[c,onlytextwidth]
+\column{.24\textwidth}
+\tablacarreras
+\column{.34\textwidth}
+\tablaalumnos
+\column{.40\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} c.nombre, a.nombre\\
+\kw{FROM} carreras c\\
+\bl[1.3cm] \kw{JOIN} alumnos a\\
+\ind \kw{ON} a.carrera\_id = c.id;
+\end{sqlcode}
+\end{columns}
+\vspace{0.2cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{3.6cm}>{\raggedright\arraybackslash}p{3.6cm}}
+\toprule
+& \bfseries Con \texttt{LEFT} & \bfseries Con \texttt{RIGHT} \\
+\midrule
+¿Cuántas filas salen? & \bl[3.0cm] & \bl[3.0cm] \\[9pt]
+¿Qué fila lleva un \nulo? & \bl[3.0cm] & \bl[3.0cm] \\[9pt]
+¿Quién queda fuera? & \bl[3.0cm] & \bl[3.0cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\small \textbf{Para escribir:} la consulta que muestra las carreras que \textbf{no tienen alumnos}.
+\end{frame}
+% =======================================================================
+\seccion{FULL, CROSS y SELF}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{FULL OUTER JOIN}: nadie queda fuera}
+\begin{columns}[c,onlytextwidth]
+\column{.60\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} c.nombre, p.producto\\
+\kw{FROM} clientes c\\
+\nuevo{\kw{FULL OUTER JOIN}} pedidos p \kw{ON} p.cliente\_id = c.id;
+\end{sqlcode}
+\vspace{-0.15cm}
+\centering\venn{\von}{\von}{\von}\\[3pt]
+{\scriptsize\color{utpGris}\textbf{todo} lo de las dos tablas}
+\column{.34\textwidth}
+\resultado{\filasinner \mal{María} & \mal{\nulo} \\ \mal{\nulo} & \mal{Monitor} \\}
+\end{columns}
+\vspace{0.35cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Es un \texttt{LEFT} y un \texttt{RIGHT} \textbf{juntos}: aparecen María \textbf{y} el Monitor.
+  \item A cada uno se le rellena con \nulo{} el lado que le falta.
+\end{itemize}
+\vspace{0.2cm}
+\ojo{\textbf{MySQL no tiene} \texttt{FULL OUTER JOIN}. Ahí se arma juntando un \texttt{LEFT JOIN} y un \texttt{RIGHT JOIN} con \texttt{UNION}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{CROSS JOIN}: todos con todos}
+\begin{columns}[c,onlytextwidth]
+\column{.16\textwidth}
+\centering\tbl{tallas}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{l}
+\toprule
+\normalfont\bfseries talla \\
+\midrule
+S \\ M \\
+\bottomrule
+\end{tabular}
+\column{.18\textwidth}
+\centering\tbl{colores}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{l}
+\toprule
+\normalfont\bfseries color \\
+\midrule
+rojo \\ azul \\ negro \\
+\bottomrule
+\end{tabular}
+\column{.38\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} t.talla, c.color\\
+\kw{FROM} tallas t\\
+\nuevo{\kw{CROSS JOIN}} colores c;
+\end{sqlcode}
+\column{.24\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{ll}
+\toprule
+\normalfont\bfseries talla & \normalfont\bfseries color \\
+\midrule
+S & rojo \\ S & azul \\ S & negro \\
+M & rojo \\ M & azul \\ M & negro \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.3cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item \textbf{No lleva} \texttt{ON}: no empareja nada, combina \textbf{cada fila con todas} las de la otra tabla.
+  \item Las filas se \textbf{multiplican}: 2 tallas $\times$ 3 colores = \textbf{6 filas}.
+\end{itemize}
+\vspace{0.2cm}
+\ojo{Con tablas grandes explota: 1\,000 $\times$ 1\,000 = \textbf{1\,000\,000} de filas. Se usa poco, y a propósito.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{SELF JOIN}: una tabla unida consigo misma}
+\begin{columns}[c,onlytextwidth]
+\column{.27\textwidth}
+\centering\tbl{empleados}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{rlr}
+\toprule
+\normalfont\bfseries id & \normalfont\bfseries nombre & \normalfont\bfseries jefe\_id \\
+\midrule
+1 & Rosa & \nulo \\
+2 & Carlos & 1 \\
+3 & Elena & 1 \\
+4 & Diego & 2 \\
+\bottomrule
+\end{tabular}
+\column{.44\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} e.nombre \kw{AS} empleado,\\
+\ind\ind\ \ j.nombre \kw{AS} jefe\\
+\kw{FROM} empleados \nuevo{e}\\
+\kw{JOIN} empleados \nuevo{j} \kw{ON} e.jefe\_id = j.id;
+\end{sqlcode}
+\column{.25\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{ll}
+\toprule
+\normalfont\bfseries empleado & \normalfont\bfseries jefe \\
+\midrule
+Carlos & Rosa \\
+Elena & Rosa \\
+Diego & Carlos \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.3cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item El jefe \textbf{también es un empleado}: está en la misma tabla.
+  \item \textbf{No es una palabra nueva}: es un \texttt{JOIN} de siempre, con la tabla escrita \textbf{dos veces}.
+  \item Los apodos son \textbf{obligatorios}: \texttt{e} es el empleado y \texttt{j} es su jefe.
+\end{itemize}
+\vspace{0.15cm}
+\small Rosa no aparece como empleado porque no tiene jefe. ¿Con qué \texttt{JOIN} sí aparecería?
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Todos los \texttt{JOIN} en una tabla}
+\begin{center}
+\renewcommand{\arraystretch}{1.75}
+\small
+\begin{tabular}{>{\centering\arraybackslash}m{1.7cm}>{\ttfamily\bfseries\raggedright\arraybackslash}m{3.0cm}>{\raggedright\arraybackslash}m{6.1cm}>{\centering\arraybackslash}m{1.5cm}}
+\toprule
+& \normalfont\bfseries Tipo & \bfseries Qué conserva & \bfseries Filas \\
+\midrule
+\venn[0.42]{\voff}{\von}{\voff} & INNER JOIN & solo los que tienen pareja & 3 \\
+\venn[0.42]{\von}{\von}{\voff} & LEFT JOIN & toda la izquierda & 4 \\
+\venn[0.42]{\voff}{\von}{\von} & RIGHT JOIN & toda la derecha & 4 \\
+\venn[0.42]{\von}{\von}{\von} & FULL OUTER JOIN & todo, de los dos lados & 5 \\
+$\times$ & CROSS JOIN & todas las combinaciones, sin \texttt{ON} & 12 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\small Las filas son las de \tbl{clientes} (3) con \tbl{pedidos} (4). El \texttt{SELF JOIN} no está: es cualquiera de estos, con la misma tabla dos veces.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 3} ¿Qué \texttt{JOIN} usarías?}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{9.6cm}>{\raggedright\arraybackslash}p{2.8cm}}
+\toprule
+\bfseries Lo que piden & \bfseries \texttt{JOIN} \\
+\midrule
+Cada alumno con su carrera; \textbf{solo} los que tienen carrera. & \bl[2.6cm] \\[8pt]
+\textbf{Todas} las carreras, tengan alumnos o no. & \bl[2.6cm] \\[8pt]
+Carreras y alumnos, \textbf{sin dejar a nadie} fuera. & \bl[2.6cm] \\[8pt]
+Todas las combinaciones de 3 polos y 4 colores. & \bl[2.6cm] \\[8pt]
+Cada empleado con el nombre de \textbf{su jefe}. & \bl[2.6cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\begin{itemize}\setlength\itemsep{5pt}
+  \item ¿Cuántas filas salen en la cuarta? \bl[1.5cm]
+  \item Con \tbl{carreras} (3) y \tbl{alumnos} (4), ¿cuántas filas da el \texttt{FULL OUTER JOIN}? \bl[1.5cm]
+\end{itemize}
+\end{frame}
+% =======================================================================
+\seccion[0]{Índices}
+% ---------------------------------------------------------------------
+\begin{frame}{Antes de empezar: tres preguntas}
+\begin{columns}[T,onlytextwidth]
+\column{.31\textwidth}
+\centering\etiqueta{Un diccionario}\\[6pt]
+\raggedright\small ¿Cómo encuentras la palabra «zapato»? ¿Lees desde la «a»?
+\column{.31\textwidth}
+\centering\etiqueta{Un libro de 500 páginas}\\[6pt]
+\raggedright\small ¿Cómo encuentras el capítulo de «JOIN»? ¿Pasas hoja por hoja?
+\column{.31\textwidth}
+\centering\etiqueta{Tu celular}\\[6pt]
+\raggedright\small ¿Cómo encuentras a «Mamá» entre 400 contactos?
+\end{columns}
+\vspace{0.5cm}
+\begin{itemize}\setlength\itemsep{7pt}
+  \item En los tres casos hay algo \textbf{ordenado} que te dice \textbf{dónde ir}.
+  \item Por eso \textbf{no revisas todo}: saltas casi directo al lugar correcto.
+\end{itemize}
+\vspace{0.4cm}
+\concepto{La idea}{\small Una base de datos tiene el mismo problema cuando busca una fila, y lo resuelve igual: con un \textbf{índice}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Buscar sin índice: fila por fila}
+\begin{columns}[c,onlytextwidth]
+\column{.30\textwidth}
+\centering\tbl{clientes}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{rl}
+\toprule
+\normalfont\bfseries id & \normalfont\bfseries nombre \\
+\midrule
+1 & Rosa \\
+2 & Beto \\
+3 & Zoe \\
+4 & Ana \\
+5 & Luis \\
+\bottomrule
+\end{tabular}
+\column{.66\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} * \kw{FROM} clientes\\
+\kw{WHERE} nombre = 'Luis';
+\end{sqlcode}
+\vspace{-0.15cm}
+\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item Los nombres están \textbf{desordenados}: el gestor pregunta fila por fila. ¿Rosa? no. ¿Beto? no. ¿Zoe? no\ldots
+  \item Tiene que revisar \textbf{toda la tabla}.
+\end{itemize}
+\end{columns}
+\vspace{0.1cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{>{\raggedright\arraybackslash}p{4.6cm}>{\raggedright\arraybackslash}p{6.6cm}}
+\toprule
+\bfseries Si la tabla tiene\ldots & \bfseries Revisa\ldots \\
+\midrule
+5 filas & 5 filas: no se nota \\
+1\,000\,000 de filas & \mal{1\,000\,000 de filas}, en \textbf{cada} búsqueda \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{-0.1cm}
+\analogia{Es buscar una palabra en un libro \textbf{sin índice}: toca leerlo completo, página por página.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Qué es un índice?}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\centering
+\begin{tikzpicture}[y=0.56cm]
+  \tikzset{
+    celda/.style={draw=utpNegro,thick,font=\scriptsize\ttfamily,minimum height=0.48cm,
+      inner sep=2.5pt,align=left},
+    idx/.style={celda,fill=yellow!35,text width=1.15cm},
+    dato/.style={celda,fill=utpGrisClaro,text width=1.75cm}
+  }
+  \node[idx] (i1) at (0,0) {Ana};
+  \node[idx] (i2) at (0,-1) {Beto};
+  \node[idx] (i3) at (0,-2) {Luis};
+  \node[idx] (i4) at (0,-3) {Rosa};
+  \node[idx] (i5) at (0,-4) {Zoe};
+  \node[dato] (t1) at (4.3,0) {1 \ Rosa};
+  \node[dato] (t2) at (4.3,-1) {2 \ Beto};
+  \node[dato] (t3) at (4.3,-2) {3 \ Zoe};
+  \node[dato] (t4) at (4.3,-3) {4 \ Ana};
+  \node[dato] (t5) at (4.3,-4) {5 \ Luis};
+  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i1.east)--(t4.west);
+  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i2.east)--(t2.west);
+  \draw[-{Stealth[length=1.8mm]},utpRojo,very thick] (i3.east)--(t5.west);
+  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i4.east)--(t1.west);
+  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i5.east)--(t3.west);
+  \node[font=\scriptsize\bfseries,above=1mm of i1] {índice};
+  \node[font=\scriptsize,above=1mm of t1] {\tbl{clientes}};
+  \node[font=\tiny,text=utpGris,below=1mm of i5] {ordenado};
+  \node[font=\tiny,text=utpGris,below=1mm of t5] {en el orden en que llegaron};
+\end{tikzpicture}
+\column{.46\textwidth}
+\begin{itemize}\setlength\itemsep{8pt}
+  \item Es una \textbf{lista aparte}, \textbf{ordenada} por una columna.
+  \item Cada entrada \textbf{apunta} a su fila en la tabla.
+  \item La tabla \textbf{no cambia}: sigue igual, con todos sus datos.
+\end{itemize}
+\end{columns}
+\vspace{0.3cm}
+\small Para encontrar a Luis, el gestor busca en la lista ordenada y \textbf{salta directo} a la fila 5.
+\vspace{0.2cm}
+\analogia{Es el \textbf{índice al final de un libro}: las palabras en orden alfabético y, al lado, la página donde están.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{CREATE INDEX}: crear un índice}
+\begin{center}
+\begin{tikzpicture}[y=0.80cm]
+  \renewcommand{\piezax}{6.0}
+  \pieza{1}{\nuevo{\kw{CREATE INDEX}} idx\_clientes\_nombre}{el \textbf{nombre} que le pones al índice}
+  \pieza{0}{\nuevo{\kw{ON}} clientes (nombre);}{la \textbf{tabla} y la \textbf{columna} que ordena}
+\end{tikzpicture}
+\end{center}
+\vspace{0.15cm}
+\begin{columns}[c,onlytextwidth]
+\column{.50\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Se crea \textbf{una sola vez}.
+  \item Tus consultas \textbf{no cambian}: el gestor decide solo cuándo usarlo.
+  \item Se borra con \texttt{DROP INDEX}. Los datos \textbf{no se tocan}.
+\end{itemize}
+\column{.46\textwidth}
+\centering\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{2.9cm}}
+\toprule
+\multicolumn{2}{c}{\bfseries Buscar entre 1\,000\,000 de filas} \\
+\midrule
+Sin índice & \mal{hasta 1\,000\,000} de pasos \\
+Con índice & unos \textbf{20} pasos \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.3cm}
+\analogia{Con la lista ordenada se busca como en el diccionario: abres \textbf{por la mitad}, descartas una mitad, y repites. En 20 mitades ya llegaste.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿La clave primaria es un índice?}
+\concepto{Sí}{\small Al declarar una \texttt{PRIMARY KEY}, el gestor crea \textbf{un índice por su cuenta}. Ya lo venías usando sin saberlo.}
+\vspace{0.1cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{>{\ttfamily\bfseries\raggedright\arraybackslash}p{2.9cm}>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{6.0cm}}
+\toprule
+\normalfont\bfseries Columna & \bfseries ¿Tiene índice? & \bfseries ¿Por qué? \\
+\midrule
+PRIMARY KEY & \textbf{Sí}, automático & para encontrar una fila por su \texttt{id} al instante \\
+UNIQUE & \textbf{Sí}, automático & para revisar rápido que el valor no se repita \\
+FOREIGN KEY & depende del gestor & MySQL lo crea solo; SQLite no \\
+Las demás & \textcolor{utpRojo}{\textbf{No}} & lo creas tú, con \texttt{CREATE INDEX} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\small \textbf{Y esto se junta con lo de hoy:} un \texttt{JOIN} empareja con \texttt{ON p.cliente\_id = c.id}. Como \texttt{c.id} es clave primaria, encontrar a cada cliente es \textbf{rápido}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Entonces le pongo índice a todo?}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{Lo que ganas}\\[6pt]
+\raggedright\small
+\begin{itemize}\setlength\itemsep{5pt}
+  \item Búsquedas con \texttt{WHERE} más rápidas.
+  \item \texttt{JOIN} más rápidos.
+  \item \texttt{ORDER BY} más rápidos: ya está ordenado.
+\end{itemize}
+\column{.48\textwidth}
+\centering\etiqueta{Lo que pagas}\\[6pt]
+\raggedright\small
+\begin{itemize}\setlength\itemsep{5pt}
+  \item El índice \textbf{ocupa espacio}.
+  \item Cada \texttt{INSERT}, \texttt{UPDATE} y \texttt{DELETE} es \textbf{más lento}: también hay que actualizar el índice.
+\end{itemize}
+\end{columns}
+\vspace{0.35cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{>{\raggedright\arraybackslash}p{6.0cm}>{\raggedright\arraybackslash}p{6.0cm}}
+\toprule
+\bfseries Conviene un índice & \bfseries No hace falta \\
+\midrule
+Columnas por las que \textbf{buscas seguido} & Columnas que casi nunca consultas \\
+Tablas \textbf{grandes} & Tablas de pocas filas \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\analogia{Si a un libro le agregas páginas, hay que \textbf{rehacer su índice}. Con diez índices, lo rehaces diez veces.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 4} ¿Índice sí o no?}
+La tabla \tbl{alumnos} de una universidad tiene \textbf{50\,000 filas}.
+\vspace{0.2cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{8.4cm}>{\raggedright\arraybackslash}p{4.0cm}}
+\toprule
+\bfseries Situación & \bfseries ¿Creo un índice? ¿Por qué? \\
+\midrule
+Se busca a cada rato por \texttt{codigo}, que es la clave primaria. & \bl[3.8cm] \\[8pt]
+Secretaría busca todos los días por \texttt{apellido}. & \bl[3.8cm] \\[8pt]
+La columna \texttt{correo} está declarada \texttt{UNIQUE}. & \bl[3.8cm] \\[8pt]
+La columna \texttt{observaciones} casi nunca se consulta. & \bl[3.8cm] \\[8pt]
+Otra tabla, \tbl{dias}, tiene solo 7 filas. & \bl[3.8cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.25cm}
+\small \textbf{Para escribir:} la instrucción que crea el índice que sí hace falta.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Cierre: lo de hoy en una tabla}
+\begin{center}
+\renewcommand{\arraystretch}{1.45}
+\begin{tabular}{>{\raggedright\bfseries}p{3.4cm}>{\raggedright\arraybackslash}p{9.0cm}}
+\toprule
+& \bfseries En una frase \\
+\midrule
+\texttt{JOIN} & Junta filas de dos tablas que coinciden en el \texttt{ON}. \\
+\texttt{INNER} & Solo los que tienen pareja. \\
+\texttt{LEFT} / \texttt{RIGHT} & Toda una tabla; lo que falta del otro lado queda en \nulo. \\
+\texttt{FULL} / \texttt{CROSS} / \texttt{SELF} & Todo de ambas; todos con todos; la tabla consigo misma. \\
+Índice & Una lista ordenada que dice dónde está cada fila. \\
+Clave primaria & Ya trae su índice, creado por el gestor. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\small La pregunta para elegir un \texttt{JOIN}: \textbf{¿qué hago con los que no tienen pareja?}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Referencias}
+\footnotesize
+Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración} (9.ª ed.). Cengage Learning.
+
+\vspace{0.3cm}
+Elmasri, R., \& Navathe, S. (2007). \textit{Fundamentos de sistemas de bases de datos} (5.ª ed.). Addison Wesley.
+
+\vspace{0.3cm}
+Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2020). \textit{Database system concepts} (7th ed.). McGraw-Hill.
+
+\vspace{0.3cm}
+Oracle. (s.\,f.). \textit{MySQL reference manual: JOIN clause}. \texttt{https://dev.mysql.com/doc/refman/8.4/en/join.html}
+
+\vspace{0.3cm}
+SQLite. (s.\,f.). \textit{Query planning}. \texttt{https://www.sqlite.org/queryplanner.html}
+\end{frame}
+% ---------------------------------------------------------------------
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}

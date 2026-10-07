@@ -1,0 +1,918 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+\usepackage[normalem]{ulem}
+
+\title{Manipulación de datos (DML)}
+\subtitle{Agregar, leer, cambiar y borrar filas con\\ \texttt{INSERT}, \texttt{SELECT}, \texttt{UPDATE}, \texttt{DELETE} y \texttt{TRUNCATE}}
+\date{Semana 07 - Sesión 14}
+\author{Rel Guzman}
+
+% Espacio en blanco para completar
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Parte nueva de un bloque de codigo que crece paso a paso
+\newcommand{\nuevo}[1]{{%
+  \setlength{\fboxsep}{1.2pt}%
+  \begingroup
+  \renewcommand{\kw}[1]{\textcolor{utpNegro}{\textbf{##1}}}%
+  \colorbox{yellow!45}{\textcolor{utpNegro}{#1}}%
+  \endgroup}}
+% Comentario dentro de un bloque de código
+\newcommand{\com}[1]{\textcolor{utpGris}{-- #1}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre del gestor o de la forma de escribir algo
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Celda con un dato que rompe una regla
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% Fila borrada: tachada y en gris
+\newcommand{\fuera}[1]{\color{utpGrisMedio}\sout{#1}}
+% Bloque de código SQL sobre fondo gris
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.6em}}
+% Una forma de escribir algo: etiqueta a la izquierda, código a la derecha
+\newcommand{\forma}[3]{%
+  \begin{columns}[c,onlytextwidth]
+  \column{.30\textwidth}\etiqueta{#1}\\[3pt]{\scriptsize\color{utpGris} #2}
+  \column{.68\textwidth}\begin{sqlcode}[\textwidth]\scriptsize #3\end{sqlcode}
+  \end{columns}\vspace{-0.35cm}}
+% Anatomía de una instrucción: cada pieza del código con su pregunta al lado
+\tikzset{
+  pieza/.style={fill=utpGrisClaro,font=\ttfamily\footnotesize,anchor=west,inner sep=5pt,
+    minimum height=0.62cm},
+  para/.style={font=\small,anchor=west,text=utpNegro}
+}
+\newcommand{\pieza}[3]{%
+  \node[pieza] at (0,#1) {#2};
+  \node[para] at (8.6,#1) {\textcolor{utpRojo}{$\blacktriangleleft$}\ #3};}
+% Diapositiva de sección: una palabra bien grande (\seccion[0]{...} la deja sin línea roja)
+\newcommand{\seccion}[2][1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#2}};
+    \ifnum#1=1
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+    \fi
+  \end{tikzpicture}
+\end{frame}}
+% Encabezado de la tabla de ejemplo
+\newcommand{\cabproducto}{%
+  \normalfont\bfseries id & \normalfont\bfseries nombre & \normalfont\bfseries categoria
+  & \normalfont\bfseries precio & \normalfont\bfseries stock \\}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás \textbf{agregar} filas con \texttt{INSERT}, \textbf{leerlas} con \texttt{SELECT}, \textbf{cambiarlas} con \texttt{UPDATE}, \textbf{borrarlas} con \texttt{DELETE} y \textbf{vaciar} una tabla con \texttt{TRUNCATE}, sabiendo cuándo conviene usar cada una.
+\end{block}
+\end{frame}
+
+% 3 ---------------------------------------------------------------------
+\begin{frame}{Dónde estamos}
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small]
+  \node[cajaverde,text width=3.2cm] (a) {\textbf{Sesión 13}\\[2pt] reglas y primer DML};
+  \node[cajanaranja,text width=3.2cm,right=12mm of a] (b) {\textbf{Hoy, parte 1}\\[2pt] agregar y leer};
+  \node[cajanaranja,text width=3.2cm,right=12mm of b] (c) {\textbf{Hoy, parte 2}\\[2pt] cambiar y borrar};
+  \draw[flecha] (a)--(b);
+  \draw[flecha] (b)--(c);
+  \node[font=\tiny,below=2mm of a,text=utpGris] {integridad, restricciones, variables};
+  \node[font=\tiny,below=2mm of b,text=utpGris] {\texttt{INSERT SELECT}};
+  \node[font=\tiny,below=2mm of c,text=utpGris] {\texttt{UPDATE DELETE TRUNCATE}};
+\end{tikzpicture}}
+\end{center}
+\vspace{0.75cm}
+\analogia{La sesión pasada vimos DML de pasada, como quien prueba el control remoto. Hoy aprendemos \textbf{cada botón con calma}: qué hace, cómo se escribe y en qué se equivoca uno al empezar.}
+\end{frame}
+
+% =======================================================================
+\seccion[0]{DML}
+
+% ---------------------------------------------------------------------
+\begin{frame}{DDL construye, DML llena}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{DDL: el envase}\\[6pt]
+\raggedright\small Crea y cambia la \textbf{forma} de las tablas: qué columnas tienen, de qué tipo, con qué reglas.
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} \ldots\\
+\kw{ALTER TABLE} \ldots\\
+\kw{DROP TABLE} \ldots
+\end{sqlcode}
+\column{.48\textwidth}
+\centering\etiqueta{DML: el contenido}\\[6pt]
+\raggedright\small Trabaja con las \textbf{filas}: las agrega, las lee, las cambia y las borra. La tabla sigue igual.
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{INSERT} \ \ \ \kw{SELECT}\\
+\kw{UPDATE} \ \ \ \kw{DELETE}\\
+\kw{TRUNCATE}
+\end{sqlcode}
+\end{columns}
+\vspace{0.3cm}
+\analogia{Un armario es el \textbf{DDL}: sus repisas y cajones. La ropa que metes, sacas o cambias de lugar es el \textbf{DML}. Puedes ordenar la ropa mil veces sin tocar el armario.}
+\vspace{0.1cm}
+\footnotesize\color{utpGris} DML = \textit{Data Manipulation Language}, lenguaje de manipulación de datos.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Cinco palabras para cinco acciones}
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}
+  \node[cajanaranja,text width=2.5cm,font=\scriptsize,align=center] (i)
+    {\textbf{\texttt{INSERT}}\\[3pt] \textbf{agrega}\\ filas nuevas\\[3pt] \color{utpGris}llega un producto};
+  \node[cajaverde,text width=2.5cm,font=\scriptsize,align=center,right=5mm of i] (s)
+    {\textbf{\texttt{SELECT}}\\[3pt] \textbf{lee}\\ sin cambiar nada\\[3pt] \color{utpGris}ver el catálogo};
+  \node[cajanaranja,text width=2.5cm,font=\scriptsize,align=center,right=5mm of s] (u)
+    {\textbf{\texttt{UPDATE}}\\[3pt] \textbf{cambia}\\ datos que ya están\\[3pt] \color{utpGris}sube un precio};
+  \node[cajanaranja,text width=2.5cm,font=\scriptsize,align=center,right=5mm of u] (d)
+    {\textbf{\texttt{DELETE}}\\[3pt] \textbf{borra}\\ las filas que elijas\\[3pt] \color{utpGris}se descontinúa uno};
+  \node[cajanaranja,text width=2.5cm,font=\scriptsize,align=center,right=5mm of d] (t)
+    {\textbf{\texttt{TRUNCATE}}\\[3pt] \textbf{vacía}\\ toda la tabla\\[3pt] \color{utpGris}empezar de cero};
+\end{tikzpicture}}
+\end{center}
+\vspace{0.5cm}
+\small Cuatro de ellas \textbf{cambian} los datos. Solo \texttt{SELECT} se limita a \textbf{mirar}: por eso es la más segura para practicar.
+\vspace{0.3cm}
+
+\enlarealidad{Cada vez que compras en línea pasan estas cosas: tu pedido se \textbf{inserta}, el catálogo se \textbf{consulta}, el stock se \textbf{actualiza} y tu carrito, al pagar, se \textbf{borra}.}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{La tabla de ejemplo: una bodega}
+\begin{columns}[c,onlytextwidth]
+\column{.50\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} producto (\\
+\ind id \ \ \ \ \ \ \ INT \kw{PRIMARY KEY} \kw{AUTO\_INCREMENT},\\
+\ind nombre \ \ \ VARCHAR(60) \kw{NOT NULL},\\
+\ind categoria VARCHAR(30),\\
+\ind precio \ \ \ DECIMAL(6,2) \kw{NOT NULL},\\
+\ind stock \ \ \ \ INT \kw{DEFAULT} 0\\
+);
+\end{sqlcode}
+\column{.46\textwidth}
+\centering\tbl{producto}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+1 & Arroz & abarrotes & 4.50 & 30 \\
+2 & Gaseosa & bebidas & 3.00 & 12 \\
+3 & Agua & bebidas & 1.50 & 0 \\
+4 & Galletas & snacks & 1.20 & 50 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.5cm}
+\small Cada ejemplo parte de \textbf{estas cuatro filas}, y al lado verás \textbf{cómo queda la tabla} después de la instrucción. Lo que cambia se marca en \nuevo{amarillo}.
+\vspace{0.3cm}
+
+\ojo{Los ejemplos están en MySQL. \texttt{INSERT}, \texttt{SELECT}, \texttt{UPDATE} y \texttt{DELETE} \textbf{se escriben igual} en SQL Server y SQLite; las pocas diferencias se señalan en su diapositiva.}
+\end{frame}
+
+% =======================================================================
+\seccion{INSERT}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{INSERT}: tres preguntas, tres partes}
+\begin{center}
+\begin{tikzpicture}
+  \pieza{0}{\kw{INSERT INTO} producto}{¿En \textbf{qué tabla}?}
+  \pieza{-0.85}{(nombre, categoria, precio, stock)}{¿Qué \textbf{columnas} voy a llenar?}
+  \pieza{-1.7}{\kw{VALUES} ('Leche', 'bebidas', 3.80, 20);}{¿Con \textbf{qué datos}?}
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\begin{columns}[c,onlytextwidth]
+\column{.44\textwidth}
+\small El \texttt{id} no aparece: lo pone el \textbf{autoincremento}. La fila nueva se suma al final.
+\column{.52\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+1 & Arroz & abarrotes & 4.50 & 30 \\
+2 & Gaseosa & bebidas & 3.00 & 12 \\
+3 & Agua & bebidas & 1.50 & 0 \\
+4 & Galletas & snacks & 1.20 & 50 \\
+\nuevo{5} & \nuevo{Leche} & \nuevo{bebidas} & \nuevo{3.80} & \nuevo{20} \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Cada valor va a su columna, en orden}
+\begin{center}
+\begin{tikzpicture}[
+  col/.style={draw=utpNegro,thick,rounded corners=1.5pt,fill=utpGrisClaro,font=\ttfamily\small,
+    minimum width=2.5cm,minimum height=0.65cm},
+  val/.style={draw=utpRojo!75,thick,rounded corners=1.5pt,fill=utpRojo!7,font=\ttfamily\small,
+    minimum width=2.5cm,minimum height=0.65cm}]
+  \foreach \x/\c/\v [count=\i] in {0/nombre/'Leche', 3/categoria/'bebidas', 6/precio/3.80, 9/stock/20} {
+    \node[col] (c\i) at (\x,0) {\c};
+    \node[val] (v\i) at (\x,-1.6) {\v};
+    \draw[flecha,utpGris] (v\i.north) -- (c\i.south);
+  }
+  \node[font=\scriptsize,text=utpGris,anchor=east] at (-1.5,0) {columnas};
+  \node[font=\scriptsize,text=utpGris,anchor=east] at (-1.5,-1.6) {valores};
+  \node[font=\scriptsize,text=utpGris] at (1.5,-2.35) {texto: \textbf{con comillas}};
+  \node[font=\scriptsize,text=utpGris] at (7.5,-2.35) {números: \textbf{sin comillas}, con punto decimal};
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\begin{itemize}\setlength\itemsep{5pt}
+  \item El \textbf{primer} valor va a la \textbf{primera} columna, el segundo a la segunda, y así.
+  \item Debe haber \textbf{tantos valores como columnas}: ni uno más, ni uno menos.
+  \item El texto va entre \textbf{comillas simples} \texttt{'así'}. Las fechas también: \texttt{'2026-09-26'}.
+\end{itemize}
+\vspace{0.2cm}
+\analogia{Es como llenar un formulario en papel: cada dato va en \textbf{su casillero}. Si escribes tu edad donde iba tu nombre, el formulario queda mal aunque «tenga todos los datos».}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 1} Encuentra el error}
+\small Cada \texttt{INSERT} tiene \textbf{un} error. Escribe cuál es.
+\vspace{0.3cm}
+\begin{center}
+\small
+\begin{tabular}{>{\ttfamily\scriptsize}l>{\raggedright\arraybackslash}p{3.6cm}}
+\toprule
+\normalfont\small\bfseries Instrucción & \bfseries ¿Qué está mal? \\
+\midrule
+\kw{INSERT INTO} producto (nombre, precio) \kw{VALUES} ('Pan', 0.30, 100); & \bl[3.3cm] \\[8pt]
+\kw{INSERT INTO} producto (nombre, precio) \kw{VALUES} (Pan, 0.30); & \bl[3.3cm] \\[8pt]
+\kw{INSERT INTO} producto (nombre, precio) \kw{VALUES} (0.30, 'Pan'); & \bl[3.3cm] \\[8pt]
+\kw{INSERT INTO} producto (categoria, precio) \kw{VALUES} ('snacks', 2.00); & \bl[3.3cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4cm}
+\small \textbf{Pista:} revisa la cantidad de valores, las comillas, el orden y las reglas de la tabla (¿qué columna era \texttt{NOT NULL}?).
+\end{frame}
+
+% =======================================================================
+\seccion{SELECT}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{SELECT}: ¿qué columnas y de qué tabla?}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\begin{sqlcode}[\textwidth]
+\com{todas las columnas}\\
+\kw{SELECT} \nuevo{*} \kw{FROM} producto;
+\end{sqlcode}
+\vspace{-0.2cm}
+\centering\scriptsize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+1 & Arroz & abarrotes & 4.50 & 30 \\
+2 & Gaseosa & bebidas & 3.00 & 12 \\
+3 & Agua & bebidas & 1.50 & 0 \\
+4 & Galletas & snacks & 1.20 & 50 \\
+\bottomrule
+\end{tabular}
+\column{.48\textwidth}
+\begin{sqlcode}[\textwidth]
+\com{solo las que me interesan}\\
+\kw{SELECT} \nuevo{nombre, precio} \kw{FROM} producto;
+\end{sqlcode}
+\vspace{-0.2cm}
+\centering\scriptsize\ttfamily
+\begin{tabular}{lr}
+\toprule
+\normalfont\bfseries nombre & \normalfont\bfseries precio \\
+\midrule
+Arroz & 4.50 \\
+Gaseosa & 3.00 \\
+Agua & 1.50 \\
+Galletas & 1.20 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.4cm}
+\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item \texttt{*} se lee «\textbf{todas las columnas}». Útil para echar un vistazo rápido.
+  \item Con nombres, el resultado trae \textbf{solo esas} columnas y \textbf{en ese orden}.
+  \item \texttt{SELECT} \textbf{nunca} cambia la tabla: el resultado es una copia para mirar.
+\end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{WHERE}: quedarse solo con algunas filas}
+\begin{columns}[c,onlytextwidth]
+\column{.66\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre, precio \kw{FROM} producto \nuevo{\kw{WHERE} precio < 2};
+\end{sqlcode}
+\column{.30\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{lr}
+\toprule
+\normalfont\bfseries nombre & \normalfont\bfseries precio \\
+\midrule
+Agua & 1.50 \\
+Galletas & 1.20 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.66\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre \kw{FROM} producto \nuevo{\kw{WHERE} categoria = 'bebidas'};
+\end{sqlcode}
+\column{.30\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{l}
+\toprule
+\normalfont\bfseries nombre \\
+\midrule
+Gaseosa \\
+Agua \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.3cm}
+\begin{center}
+\small
+\begin{tabular}{*{6}{>{\centering\arraybackslash}p{1.75cm}}}
+\toprule
+\texttt{\kw{=}} & \texttt{\kw{<>}} & \texttt{\kw{>}} & \texttt{\kw{<}} & \texttt{\kw{>=}} & \texttt{\kw{<=}} \\
+igual & distinto & mayor & menor & mayor o igual & menor o igual \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\analogia{\texttt{WHERE} es un \textbf{colador}: la tabla pasa fila por fila y solo quedan las que \textbf{cumplen} la condición. Las demás siguen en la tabla; simplemente no se muestran.}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{ORDER BY}: ordenar el resultado}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre, precio \kw{FROM} producto\\
+\nuevo{\kw{ORDER BY} precio};
+\end{sqlcode}
+\vspace{-0.25cm}
+\centering\scriptsize\ttfamily
+\begin{tabular}{lr}
+\toprule
+\normalfont\bfseries nombre & \normalfont\bfseries precio \\
+\midrule
+Galletas & 1.20 \\
+Agua & 1.50 \\
+Gaseosa & 3.00 \\
+Arroz & 4.50 \\
+\bottomrule
+\end{tabular}\\[6pt]
+\normalfont\small De menor a mayor (\texttt{ASC}, el normal).
+\column{.48\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre, precio \kw{FROM} producto\\
+\nuevo{\kw{ORDER BY} precio \kw{DESC}};
+\end{sqlcode}
+\vspace{-0.25cm}
+\centering\scriptsize\ttfamily
+\begin{tabular}{lr}
+\toprule
+\normalfont\bfseries nombre & \normalfont\bfseries precio \\
+\midrule
+Arroz & 4.50 \\
+Gaseosa & 3.00 \\
+Agua & 1.50 \\
+Galletas & 1.20 \\
+\bottomrule
+\end{tabular}\\[6pt]
+\normalfont\small De mayor a menor (\texttt{DESC}, descendente).
+\end{columns}
+\vspace{0.4cm}
+\small \textbf{Sin \texttt{ORDER BY}, el orden no está garantizado.} Suele salir en el orden en que se guardó, pero el gestor no lo promete. Si el orden importa, \textbf{pídelo}.
+\vspace{0.15cm}
+
+\small Con texto ordena alfabéticamente: \texttt{ORDER BY nombre} da Agua, Arroz, Galletas, Gaseosa.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{El orden de las piezas de un \texttt{SELECT}}
+\begin{center}
+\begin{tikzpicture}
+  \pieza{0}{\kw{SELECT} \ \ nombre, precio}{¿Qué \textbf{columnas} quiero ver?}
+  \pieza{-0.85}{\kw{FROM} \ \ \ \ producto}{¿De qué \textbf{tabla}?}
+  \pieza{-1.7}{\kw{WHERE} \ \ \ stock > 0}{¿Qué \textbf{filas} me quedo?}
+  \pieza{-2.55}{\kw{ORDER BY} precio \kw{DESC};}{¿En qué \textbf{orden}?}
+\end{tikzpicture}
+\end{center}
+\vspace{0.35cm}
+\small Solo \texttt{SELECT} y \texttt{FROM} son obligatorias. Las demás son \textbf{opcionales}, pero si aparecen, van \textbf{en este orden}. Escribir \texttt{ORDER BY} antes de \texttt{WHERE} da error.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 2} ¿Qué filas salen?}
+\begin{columns}[c,onlytextwidth]
+\column{.44\textwidth}
+\centering\tbl{producto}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+1 & Arroz & abarrotes & 4.50 & 30 \\
+2 & Gaseosa & bebidas & 3.00 & 12 \\
+3 & Agua & bebidas & 1.50 & 0 \\
+4 & Galletas & snacks & 1.20 & 50 \\
+\bottomrule
+\end{tabular}
+\column{.54\textwidth}
+\small Escribe los \textbf{nombres} que devuelve cada consulta. Si no sale ninguno, escribe «ninguno».
+\end{columns}
+\vspace{0.4cm}
+\begin{center}
+\small
+\begin{tabular}{>{\ttfamily\scriptsize}p{8.4cm}>{\raggedright\arraybackslash}p{3.4cm}}
+\toprule
+\normalfont\bfseries Consulta & \bfseries Resultado \\
+\midrule
+\kw{SELECT} nombre \kw{FROM} producto \kw{WHERE} stock >= 30; & \bl[3.1cm] \\[8pt]
+\kw{SELECT} nombre \kw{FROM} producto \kw{WHERE} categoria <> 'bebidas'; & \bl[3.1cm] \\[8pt]
+\kw{SELECT} nombre \kw{FROM} producto \kw{WHERE} stock = 0; & \bl[3.1cm] \\[8pt]
+\kw{SELECT} nombre \kw{FROM} producto \kw{WHERE} precio > 5; & \bl[3.1cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 3} Escribe la consulta}
+\small Sobre la misma tabla \tbl{producto}, escribe el \texttt{SELECT} para cada pedido del bodeguero:
+\vspace{0.35cm}
+\begin{enumerate}\setlength\itemsep{10pt}
+  \item «Muéstrame \textbf{todo} lo que tengo de la categoría \texttt{abarrotes}».
+  \item «Dame \textbf{nombre y stock} de lo que tiene menos de 15 unidades».
+  \item «Lista los productos \textbf{del más barato al más caro}».
+  \item «¿Qué productos cuestan \textbf{más de S/ 2}?».
+\end{enumerate}
+\vspace{0.4cm}
+\begin{sqlcode}[.60\textwidth]
+\kw{SELECT} \bl[2.2cm] \kw{FROM} producto\\
+\ldots
+\end{sqlcode}
+\vspace{-0.1cm}
+\small \textbf{Pista:} primero responde \textbf{qué columnas}, luego \textbf{qué filas}, luego \textbf{en qué orden}.
+\end{frame}
+
+% =======================================================================
+\seccion{UPDATE}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{UPDATE}: cambiar lo que ya está}
+\begin{center}
+\begin{tikzpicture}
+  \pieza{0}{\kw{UPDATE} producto}{¿En \textbf{qué tabla}?}
+  \pieza{-0.85}{\kw{SET} \ \ \ precio = 3.50}{¿\textbf{Qué cambio}?}
+  \pieza{-1.7}{\kw{WHERE} \ id = 2;}{¿A \textbf{qué filas}?}
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\begin{columns}[c,onlytextwidth]
+\column{.44\textwidth}
+\small La gaseosa subió de precio. Solo cambia \textbf{esa celda}: el resto de la fila y las demás filas quedan igual.
+\column{.52\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+1 & Arroz & abarrotes & 4.50 & 30 \\
+2 & Gaseosa & bebidas & \nuevo{3.50} & 12 \\
+3 & Agua & bebidas & 1.50 & 0 \\
+4 & Galletas & snacks & 1.20 & 50 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.3cm}
+\analogia{Es como corregir con \textbf{corrector líquido}: no arrancas la hoja, solo tapas el dato viejo y escribes el nuevo encima.}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{El olvido más caro: \texttt{UPDATE} sin \texttt{WHERE}}
+\begin{columns}[c,onlytextwidth]
+\column{.46\textwidth}
+\begin{sqlcode}[\textwidth]
+\kw{UPDATE} producto \kw{SET} precio = 3.50;\\
+\com{¡se olvidó el WHERE!}
+\end{sqlcode}
+\column{.50\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+1 & Arroz & abarrotes & \mal{3.50} & 30 \\
+2 & Gaseosa & bebidas & \mal{3.50} & 12 \\
+3 & Agua & bebidas & \mal{3.50} & 0 \\
+4 & Galletas & snacks & \mal{3.50} & 50 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.2cm}
+\ojo{Sin \texttt{WHERE}, \textbf{todas las filas} reciben el cambio. Toda la bodega pasa a costar S/ 3.50 y los precios anteriores \textbf{se perdieron}: no hay «deshacer».}
+\vspace{0.15cm}
+\begin{block}{Buena costumbre: primero mira, luego cambia}
+\small Prueba el \texttt{WHERE} con un \texttt{SELECT}. Si salen justo las filas que querías, recién haz el \texttt{UPDATE}.
+\begin{sqlcode}[.92\textwidth]
+\scriptsize
+\kw{SELECT} * \kw{FROM} producto \nuevo{\kw{WHERE} id = 2}; \ \ \ \ \com{1. ¿son estas?}\\
+\kw{UPDATE} producto \kw{SET} precio = 3.50 \nuevo{\kw{WHERE} id = 2}; \ \com{2. ahora sí}
+\end{sqlcode}
+\end{block}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 4} Escribe el \texttt{UPDATE}}
+\small Partiendo de la tabla original de \tbl{producto}, escribe la instrucción para cada situación:
+\vspace{0.3cm}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{5.6cm}>{\raggedright\arraybackslash}p{6.2cm}}
+\toprule
+\bfseries Situación & \bfseries Tu \texttt{UPDATE} \\
+\midrule
+Las galletas ahora cuestan S/ 1.30. & \bl[5.8cm] \\[10pt]
+Ahora hay 24 botellas de agua. & \bl[5.8cm] \\[10pt]
+Todas las bebidas cuestan S/ 2.00. & \bl[5.8cm] \\[10pt]
+El arroz pasa a la categoría \texttt{granos}. & \bl[5.8cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.35cm}
+\small \textbf{Pista:} ¿qué \textbf{columna} cambia, a qué \textbf{valor}, y en qué \textbf{filas}?
+\end{frame}
+
+% =======================================================================
+\seccion{DELETE}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{DELETE}: borrar filas}
+\begin{center}
+\begin{tikzpicture}
+  \pieza{0}{\kw{DELETE FROM} producto}{¿De \textbf{qué tabla}?}
+  \pieza{-0.85}{\kw{WHERE} \ \ \ \ \ \ stock = 0;}{¿\textbf{Cuáles} filas se van?}
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\begin{columns}[c,onlytextwidth]
+\column{.44\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{4pt}
+  \item Se borra la \textbf{fila entera}, con todas sus columnas.
+  \item No se escriben columnas: \texttt{DELETE nombre FROM\ldots} es un error.
+\end{itemize}
+\column{.52\textwidth}
+\centering\scriptsize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+1 & Arroz & abarrotes & 4.50 & 30 \\
+2 & Gaseosa & bebidas & 3.00 & 12 \\
+\fuera{3} & \fuera{Agua} & \fuera{bebidas} & \fuera{1.50} & \fuera{0} \\
+4 & Galletas & snacks & 1.20 & 50 \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.35cm}
+\analogia{¿Y si solo quiero \textbf{vaciar un dato}, no la fila? Eso no es \texttt{DELETE}, es un \texttt{UPDATE}: \texttt{UPDATE producto SET categoria = NULL WHERE id = 3;}}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Antes de borrar, tres cuidados}
+\begin{columns}[T,onlytextwidth]
+\column{.31\textwidth}
+\centering\etiqueta{1. No olvides el WHERE}\\[6pt]
+\raggedright\small \texttt{DELETE FROM producto;} borra \textbf{todas} las filas. La tabla sigue existiendo, pero vacía.
+\column{.31\textwidth}
+\centering\etiqueta{2. No hay papelera}\\[6pt]
+\raggedright\small Lo borrado \textbf{no se recupera} con un clic. Mira antes con un \texttt{SELECT} y el mismo \texttt{WHERE}.
+\column{.31\textwidth}
+\centering\etiqueta{3. Las claves foráneas}\\[6pt]
+\raggedright\small Si una \tbl{venta} apunta al producto, el gestor \textbf{no deja borrarlo} (salvo \texttt{ON DELETE CASCADE}).
+\end{columns}
+\vspace{0.5cm}
+\begin{sqlcode}[.80\textwidth]
+\kw{SELECT} * \kw{FROM} producto \nuevo{\kw{WHERE} stock = 0}; \ \ \ \com{1. ¿cuáles se irían?}\\
+\kw{DELETE FROM} producto \nuevo{\kw{WHERE} stock = 0}; \ \ \ \ \ \com{2. ahora sí}
+\end{sqlcode}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 5} ¿Cuántas filas se borran?}
+\begin{columns}[c,onlytextwidth]
+\column{.44\textwidth}
+\centering\tbl{producto}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+1 & Arroz & abarrotes & 4.50 & 30 \\
+2 & Gaseosa & bebidas & 3.00 & 12 \\
+3 & Agua & bebidas & 1.50 & 0 \\
+4 & Galletas & snacks & 1.20 & 50 \\
+\bottomrule
+\end{tabular}
+\column{.54\textwidth}
+\small Cada instrucción parte de la tabla \textbf{completa}. ¿Cuántas filas borra y cuáles?
+\end{columns}
+\vspace{0.4cm}
+\begin{center}
+\small
+\begin{tabular}{>{\ttfamily\scriptsize}p{6.8cm}>{\centering\arraybackslash}p{1.6cm}>{\raggedright\arraybackslash}p{3.2cm}}
+\toprule
+\normalfont\bfseries Instrucción & \bfseries ¿Cuántas? & \bfseries ¿Cuáles? \\
+\midrule
+\kw{DELETE FROM} producto \kw{WHERE} id = 7; & \bl[1.0cm] & \bl[2.9cm] \\[8pt]
+\kw{DELETE FROM} producto \kw{WHERE} categoria = 'bebidas'; & \bl[1.0cm] & \bl[2.9cm] \\[8pt]
+\kw{DELETE FROM} producto \kw{WHERE} precio > 1; & \bl[1.0cm] & \bl[2.9cm] \\[8pt]
+\kw{DELETE FROM} producto; & \bl[1.0cm] & \bl[2.9cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\small \textbf{Pista:} un \texttt{WHERE} que no encuentra filas \textbf{no da error}: simplemente borra cero.
+\end{frame}
+
+% =======================================================================
+\seccion{TRUNCATE}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{TRUNCATE}: vaciar la tabla de golpe}
+\begin{sqlcode}[.60\textwidth]
+\kw{TRUNCATE TABLE} producto;
+\end{sqlcode}
+\vspace{0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{5pt}
+  \item Borra \textbf{todas} las filas, siempre. No acepta \texttt{WHERE}.
+  \item La tabla \textbf{sigue existiendo}, con sus columnas y reglas.
+  \item El autoincremento \textbf{vuelve a empezar} en 1.
+  \item Es \textbf{más rápido} que \texttt{DELETE} en tablas grandes.
+\end{itemize}
+\column{.44\textwidth}
+\centering\tbl{producto}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{lllrr}
+\toprule
+\cabproducto
+\midrule
+\multicolumn{5}{c}{\normalfont\color{utpGris}\textit{(vacía)}} \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.2cm}
+\analogia{\texttt{DELETE} es borrar renglones de un cuaderno \textbf{con borrador}, uno por uno, eligiendo cuáles. \texttt{TRUNCATE} es \textbf{arrancar todas las hojas escritas}: el cuaderno queda como nuevo y vuelves a la página 1.}
+\vspace{0.1cm}
+\footnotesize\color{utpGris} Funciona igual en MySQL y SQL Server. SQLite no lo tiene: ahí se usa \texttt{DELETE FROM producto;}.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{DELETE}, \texttt{TRUNCATE} y \texttt{DROP}: no son lo mismo}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{>{\raggedright\arraybackslash}p{3.4cm}>{\raggedright\arraybackslash}p{2.8cm}>{\raggedright\arraybackslash}p{2.8cm}>{\raggedright\arraybackslash}p{2.8cm}}
+\toprule
+& \etiqueta{DELETE} & \etiqueta{TRUNCATE} & \etiqueta{DROP TABLE} \\
+\midrule
+¿Qué borra? & las filas \textbf{que elijas} & \textbf{todas} las filas & la tabla \textbf{entera} \\
+¿Acepta \texttt{WHERE}? & sí & no & no \\
+¿La tabla sigue? & sí & sí & \textbf{no} \\
+¿El \texttt{id} vuelve a 1? & no, sigue contando & \textbf{sí} & ya no hay tabla \\
+¿Con tablas grandes? & lento & rápido & rápido \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[cajanaranja,text width=3.3cm,font=\scriptsize,align=center] (d) {\textbf{DELETE}\\ borrar renglones};
+  \node[cajanaranja,text width=3.3cm,font=\scriptsize,align=center,right=6mm of d] (t) {\textbf{TRUNCATE}\\ arrancar las hojas escritas};
+  \node[cajaverde,text width=3.3cm,font=\scriptsize,align=center,right=6mm of t] (p) {\textbf{DROP}\\ botar el cuaderno};
+  \draw[flecha] (d)--(t);
+  \draw[flecha] (t)--(p);
+  \node[font=\tiny,text=utpGris,below=1.5mm of t] {cada vez más fuerte};
+\end{tikzpicture}
+\end{center}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 6} ¿\texttt{DELETE}, \texttt{TRUNCATE} o \texttt{DROP}?}
+\small Elige la instrucción adecuada para cada caso y escríbela:
+\vspace{0.35cm}
+\begin{center}
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{7.0cm}>{\centering\arraybackslash}p{1.8cm}>{\raggedright\arraybackslash}p{3.2cm}}
+\toprule
+\bfseries Caso & \bfseries ¿Cuál? & \bfseries Instrucción \\
+\midrule
+La bodega dejó de vender galletas. & \bl[1.5cm] & \bl[3.1cm] \\[12pt]
+Terminé de practicar y quiero la tabla vacía, con el \texttt{id} desde 1. & \bl[1.5cm] & \bl[3.1cm] \\[12pt]
+La tabla \tbl{producto\_viejo} ya no se usa para nada. & \bl[1.5cm] & \bl[3.1cm] \\[12pt]
+Quitar todo lo que tenga stock 0. & \bl[1.5cm] & \bl[3.1cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.35cm}
+\small \textbf{Pista:} pregúntate: ¿borro \textbf{algunas} filas, \textbf{todas} las filas o la \textbf{tabla misma}?
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+
+% =======================================================================
+\seccion{Todo junto}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Resumen: las cinco instrucciones}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{>{\leavevmode\color{utpRojo}\ttfamily\bfseries}p{2.0cm}>{\raggedright\arraybackslash}p{2.6cm}>{\ttfamily\scriptsize}p{5.4cm}>{\centering\arraybackslash}p{1.8cm}}
+\toprule
+\normalfont\bfseries Instrucción & \bfseries Qué hace & \normalfont\small\bfseries Forma básica & \bfseries ¿Cambia datos? \\
+\midrule
+INSERT & agrega filas & INSERT INTO t (a, b) VALUES (1, 2); & sí \\
+SELECT & lee filas & SELECT a, b FROM t WHERE \ldots; & \textbf{no} \\
+UPDATE & cambia valores & UPDATE t SET a = 1 WHERE \ldots; & sí \\
+DELETE & borra filas elegidas & DELETE FROM t WHERE \ldots; & sí \\
+TRUNCATE & vacía la tabla & TRUNCATE TABLE t; & sí \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.4cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}\small \textbf{\texttt{WHERE} es el mismo} en \texttt{SELECT}, \texttt{UPDATE} y \texttt{DELETE}: aprendes a filtrar una vez y sirve para las tres.
+\column{.48\textwidth}\small \textbf{La regla de oro:} antes de un \texttt{UPDATE} o \texttt{DELETE}, prueba su \texttt{WHERE} con un \texttt{SELECT}.
+\end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 7} ¿Cómo queda la tabla?}
+\small Parte de la tabla original de \tbl{producto}. Ejecuta en orden y dibuja \textbf{cómo queda} al final:
+\vspace{0.2cm}
+\begin{columns}[c,onlytextwidth]
+\column{.60\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\com{1}\\
+\kw{INSERT INTO} producto (nombre, categoria, precio, stock)\\
+\kw{VALUES} ('Pan', 'abarrotes', 0.30, 100);\\[4pt]
+\com{2}\\
+\kw{UPDATE} producto \kw{SET} stock = 22 \kw{WHERE} id = 2;\\[4pt]
+\com{3}\\
+\kw{DELETE FROM} producto \kw{WHERE} precio < 1.50;\\[4pt]
+\com{4}\\
+\kw{SELECT} nombre, stock \kw{FROM} producto\\
+\kw{WHERE} stock > 20 \kw{ORDER BY} stock \kw{DESC};
+\end{sqlcode}
+\column{.36\textwidth}
+\centering\scriptsize
+\begin{tabular}{p{0.4cm}p{1.2cm}p{0.7cm}p{0.7cm}}
+\toprule
+\bfseries id & \bfseries nombre & \bfseries precio & \bfseries stock \\
+\midrule
+\bl[0.3cm] & \bl[1.1cm] & \bl[0.6cm] & \bl[0.6cm] \\[6pt]
+\bl[0.3cm] & \bl[1.1cm] & \bl[0.6cm] & \bl[0.6cm] \\[6pt]
+\bl[0.3cm] & \bl[1.1cm] & \bl[0.6cm] & \bl[0.6cm] \\[6pt]
+\bl[0.3cm] & \bl[1.1cm] & \bl[0.6cm] & \bl[0.6cm] \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.3cm}
+\small ¿Qué muestra el \texttt{SELECT} del paso 4, y en qué orden? \ \bl[4cm]
+\vspace{0.1cm}
+
+\small \textbf{Ojo con el paso 3:} ¿el agua, que cuesta justo 1.50, se borra o se queda?
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Sigue practicando: \texttt{aprendesql.dev}}
+\begin{columns}[c,onlytextwidth]
+\column{.46\textwidth}
+\centering
+\begin{tikzpicture}
+  \draw[utpGrisMedio,rounded corners=3pt,fill=white] (0,0) rectangle (5.6,-3.9);
+  \fill[utpGrisMedio!60,rounded corners=3pt] (0,0) rectangle (5.6,-0.4);
+  \fill[utpGrisMedio!60] (0,-0.2) rectangle (5.6,-0.4);
+  \foreach \x/\c in {0.2/utpRojo,0.38/utpNaranja,0.56/utpGris} \fill[\c] (\x,-0.2) circle (0.055);
+  \node[fill=white,rounded corners=2pt,font=\scriptsize\ttfamily,minimum width=3.6cm,inner sep=2pt]
+    at (3.0,-0.2) {aprendesql.dev};
+  \node[font=\small\bfseries,anchor=west] at (0.3,-0.85) {Aprende SQL};
+  \node[fill=utpGrisClaro,font=\ttfamily\scriptsize,anchor=north west,text width=4.6cm,inner sep=5pt]
+    at (0.3,-1.25) {\kw{SELECT} nombre, precio\\ \kw{FROM} producto \kw{WHERE} stock > 0;};
+  \node[fill=utpRojo,text=white,font=\scriptsize\bfseries,rounded corners=2pt,anchor=north west,
+    inner xsep=8pt,inner ysep=3pt] at (0.3,-2.75) {Ejecutar};
+  \node[font=\tiny,text=utpGris,anchor=north west] at (1.9,-2.83) {sin instalar nada};
+\end{tikzpicture}
+\column{.50\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Curso de SQL \textbf{gratuito} y \textbf{en español}.
+  \item Cada lección trae un \textbf{editor en el navegador}: escribes la consulta, la ejecutas y ves el resultado al instante.
+  \item Para repasar lo de hoy: los módulos \textbf{Fundamentos} (\texttt{SELECT}, \texttt{WHERE}, \texttt{ORDER BY}) y \textbf{Manipulación} (\texttt{INSERT}, \texttt{UPDATE}, \texttt{DELETE}).
+\end{itemize}
+\end{columns}
+\vspace{0.5cm}
+\begin{center}
+\tikz\node[rounded corners=3pt,fill=utpNegro,text=white,font=\bfseries\large,inner xsep=14pt,inner ysep=7pt]
+  {\texttt{aprendesql.dev}};
+\end{center}
+\vspace{0.1cm}
+\centering\small SQL se aprende \textbf{escribiendo}: diez minutos diarios valen más que una noche antes del examen.
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Cierre: completa en voz alta}
+\begin{itemize}\setlength\itemsep{14pt}
+  \item DDL construye la tabla; DML \bl[5cm]
+  \item En un \texttt{INSERT}, cada valor va \bl[5cm]
+  \item Para leer solo algunas filas uso \bl[2.5cm], y para ordenarlas \bl[2.5cm]
+  \item Si olvido el \texttt{WHERE} en un \texttt{UPDATE} o \texttt{DELETE}\ldots \bl[4cm]
+  \item \texttt{TRUNCATE} se diferencia de \texttt{DELETE} en que \bl[5cm]
+  \item Antes de cambiar o borrar, conviene probar con un \bl[3cm]
+\end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Referencias}
+\footnotesize
+Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración} (9.ª ed.). Cengage Learning.
+
+\vspace{0.35cm}
+Elmasri, R., \& Navathe, S. (2007). \textit{Fundamentos de sistemas de bases de datos} (5.ª ed.). Addison Wesley.
+
+\vspace{0.35cm}
+Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2020). \textit{Database system concepts} (7th ed.). McGraw-Hill.
+\end{frame}
+
+% ---------------------------------------------------------------------
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}
