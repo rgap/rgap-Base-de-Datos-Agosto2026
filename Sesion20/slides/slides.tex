@@ -1,0 +1,458 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+
+\title{Del modelo conceptual al modelo físico}
+\subtitle{Orden de SELECT, modelos de datos y\\ Forward Engineering y Reverse Engineering}
+\date{Semana 10 - Sesión 20}
+\author{Rel Guzman}
+
+% Espacio en blanco para completar
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Parte nueva de un bloque de codigo que crece paso a paso
+\newcommand{\nuevo}[1]{{%
+  \setlength{\fboxsep}{1.2pt}%
+  \begingroup
+  \renewcommand{\kw}[1]{\textcolor{utpNegro}{\textbf{##1}}}%
+  \colorbox{yellow!45}{\textcolor{utpNegro}{#1}}%
+  \endgroup}}
+% Comentario dentro de un bloque de código SQL
+\newcommand{\com}[1]{\textcolor{utpGris}{-- #1}}
+% Marcas de clave primaria y clave foránea
+\newcommand{\pk}{{\scriptsize\color{utpRojo}\textbf{PK}}}
+\newcommand{\fk}{{\scriptsize\color{utpNaranja}\textbf{FK}}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre del gestor o de la forma de escribir algo
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Celda resaltada en rojo claro
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% Barra invertida de las rutas de Windows
+\newcommand{\bs}{\textbackslash{}}
+% Bloque de código sobre fondo gris
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.6em}}
+% Anatomía de una instrucción: cada pieza del código con su pregunta al lado
+\tikzset{
+  pieza/.style={fill=utpGrisClaro,font=\ttfamily\footnotesize,anchor=west,inner sep=5pt,
+    minimum height=0.62cm},
+  para/.style={font=\small,anchor=west,text=utpNegro}
+}
+\newcommand{\piezax}{7.6}
+\newcommand{\pieza}[3]{%
+  \node[pieza] at (0,#1) {#2};
+  \node[para] at (\piezax,#1) {\textcolor{utpRojo}{$\blacktriangleleft$}\ #3};}
+% Diapositiva de sección: una palabra bien grande (\seccion[0]{...} la deja sin línea roja)
+\newcommand{\seccion}[2][1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#2}};
+    \ifnum#1=1
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+    \fi
+  \end{tikzpicture}
+\end{frame}}
+% Cabecera de columna dentro de una tabla en monoespaciado
+\newcommand{\cab}[1]{\normalfont\bfseries #1}
+% Resultado de una consulta: \res{columnas}{cabecera}{filas}
+\newcommand{\res}[3]{%
+  \centering{\scriptsize\color{utpGris}resultado}\\[3pt]
+  \footnotesize\ttfamily
+  \begin{tabular}{#1}
+  \toprule
+  #2 \\
+  \midrule
+  #3
+  \bottomrule
+  \end{tabular}}
+% Columna del modelo lógico: nombre y, en gris, su tipo
+\newcommand{\col}[2]{\texttt{#1}~{\color{utpGris}#2}}
+\begin{document}
+{\setbeamertemplate{footline}{}\maketitle}
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás explicar el \textbf{orden lógico de un SELECT}, distinguir los modelos \textbf{conceptual, lógico y físico}, y reconocer cómo \textbf{Forward Engineering} y \textbf{Reverse Engineering} relacionan el diseño con la base de datos. También compararás el modelo físico en \textbf{SQL Server, MySQL y SQLite}.
+\end{block}
+\end{frame}
+\begin{frame}{Revisión de la sesión anterior: orden de SELECT}
+\begin{center}
+\begin{tikzpicture}[y=0.54cm]
+  \renewcommand{\piezax}{7.4}
+  \pieza{7}{\kw{SELECT} c.nombre, \kw{COUNT}(*) \kw{AS} pedidos}{qué columnas o cálculos se \textbf{muestran}}
+  \pieza{6}{\kw{FROM} cliente c}{la tabla \textbf{principal}}
+  \pieza{5}{\kw{JOIN} pedido p \kw{ON} c.id = p.cliente\_id}{qué otra tabla se \textbf{une}, y por dónde}
+  \pieza{4}{\kw{WHERE} p.fecha >= '2026-01-01'}{qué \textbf{filas} entran}
+  \pieza{3}{\kw{GROUP BY} c.nombre}{cómo se \textbf{agrupan}}
+  \pieza{2}{\kw{HAVING} \kw{COUNT}(*) >= 2}{qué \textbf{grupos} se quedan}
+  \pieza{1}{\kw{ORDER BY} pedidos \kw{DESC}}{en qué \textbf{orden} salen}
+  \pieza{0}{\kw{LIMIT} 5;}{cuántas filas, \textbf{como máximo}}
+\end{tikzpicture}
+\end{center}
+\vspace{-0.05cm}
+\begin{itemize}\setlength\itemsep{3pt}
+  \item \texttt{SELECT} indica qué mostrar. \texttt{FROM} se usa al consultar tablas. Lo demás se agrega si hace falta.
+  \item Si se usan, se escriben \textbf{siempre en este orden}.
+  \item \texttt{SELECT DISTINCT} quita las filas \textbf{repetidas} del resultado.
+\end{itemize}
+\vspace{0.05cm}
+\small\color{utpGris} Se lee: «los 5 clientes con más pedidos este año, entre los que tienen 2 o más».
+\end{frame}
+\begin{frame}{Se escribe en un orden, se resuelve en otro}
+\small Este es el \textbf{orden lógico} de la consulta. El motor puede usar otro plan físico para ejecutarla:
+\vspace{0.25cm}
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small]
+  \tikzset{paso/.style={caja,text width=1.75cm,minimum height=1.0cm,font=\small\ttfamily\bfseries}}
+  \node[paso,cajanaranja] (a) {FROM\\[-1pt]JOIN};
+  \node[paso,right=4mm of a] (b) {WHERE};
+  \node[paso,right=4mm of b] (c) {GROUP BY};
+  \node[paso,right=4mm of c] (d) {HAVING};
+  \node[paso,cajanaranja,right=4mm of d] (e) {SELECT};
+  \node[paso,right=4mm of e] (f) {ORDER BY};
+  \node[paso,right=4mm of f] (g) {LIMIT};
+  \foreach \u/\v in {a/b,b/c,c/d,d/e,e/f,f/g} \draw[flecha] (\u)--(\v);
+  \foreach \n/\t/\q in {a/1/junta las tablas,b/2/descarta filas,c/3/arma los grupos,
+                     d/4/descarta grupos,e/5/elige las columnas,f/6/ordena,g/7/corta} {
+    \node[font=\scriptsize\bfseries,text=utpRojo,above=1.5mm of \n] {\t};
+    \node[font=\scriptsize,text=utpGris,below=1.5mm of \n,text width=1.8cm,align=center] {\q};
+  }
+\end{tikzpicture}}
+\end{center}
+\vspace{0.2cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Por eso \texttt{WHERE COUNT(*) >= 2} da error: en el paso 2 los grupos \textbf{todavía no existen}.
+  \item Y por eso \texttt{ORDER BY pedidos} funciona: en el paso 6 el \texttt{SELECT} \textbf{ya puso} ese nombre.
+\end{itemize}
+\vspace{0.1cm}
+\ojo{Si aparece \texttt{DISTINCT}, quita duplicados después de \texttt{SELECT} y antes de \texttt{ORDER BY}. Aquí usamos \texttt{LIMIT}, como en MySQL y SQLite.}
+\end{frame}
+
+% Repaso: alias de agregación y diferencia entre WHERE y HAVING.
+\begin{frame}{¿Por qué da error \texttt{WHERE total > 1}?}
+\small Queremos mostrar los desarrolladores que tienen \textbf{más de un videojuego}.
+\vspace{0.2cm}
+\begin{columns}[c,onlytextwidth]
+\column{.49\textwidth}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\kw{SELECT} developer, \kw{COUNT}(*) \kw{AS} total\\
+\kw{FROM} videogames\\
+\mal{\kw{WHERE} total > 1}\\
+\kw{GROUP BY} developer;
+\end{sqlcode}
+\column{.47\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{7pt}
+  \item \texttt{AS total} pone un \textbf{nombre al resultado del conteo}. No crea una columna en \texttt{videogames}.
+  \item \texttt{WHERE} revisa los videojuegos \textbf{fila por fila}, antes de formar los grupos.
+  \item En ese paso todavía no hay un conteo por desarrollador que se pueda comparar con 1.
+\end{itemize}
+\end{columns}
+\vspace{0.2cm}
+\ojo{Cambiarlo por \texttt{WHERE COUNT(*) > 1} \textbf{también da error}: un conteo del grupo no se filtra en \texttt{WHERE}.}
+\vspace{0.1cm}
+\footnotesize\color{utpGris} Esta consulta falla también en SQLite. Aunque permite algunos alias en \texttt{WHERE}, no permite allí este alias de \texttt{COUNT(*)}.
+\note{Fuentes: https://dev.mysql.com/doc/refman/8.0/en/problems-with-alias.html ; https://www.postgresql.org/docs/current/sql-select.html ; https://www.sqlite.org/lang_select.html . Consulta comprobada con SQLite, sobre una tabla videogames que solo contiene developer.}
+\end{frame}
+
+\begin{frame}{¿Por qué sí funciona \texttt{HAVING COUNT(*) > 1}?}
+\begin{columns}[c,onlytextwidth]
+\column{.49\textwidth}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\kw{SELECT} developer, \kw{COUNT}(*) \kw{AS} total\\
+\kw{FROM} videogames\\
+\kw{GROUP BY} developer\\
+\nuevo{\kw{HAVING COUNT}(*) > 1};
+\end{sqlcode}
+\column{.47\textwidth}
+\small\textbf{Ejemplo: 6 videojuegos en la tabla}
+\vspace{0.15cm}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lcl@{}}
+\toprule
+\textbf{Desarrollador} & \textbf{Conteo} & \textbf{¿Se queda?} \\
+\midrule
+Aurora & 3 & Sí: $3 > 1$ \\
+Pixel & 1 & No: $1 \not> 1$ \\
+Nube & 2 & Sí: $2 > 1$ \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.2cm}
+\small
+\begin{enumerate}\setlength\itemsep{5pt}
+  \item \texttt{GROUP BY developer} reúne los juegos del mismo desarrollador.
+  \item \texttt{HAVING COUNT(*) > 1} cuenta los juegos de cada grupo y conserva los grupos con más de uno.
+  \item \texttt{SELECT} muestra el desarrollador y su conteo, con el nombre \texttt{total}: \textbf{Aurora, 3} y \textbf{Nube, 2}. El orden no está garantizado sin \texttt{ORDER BY}.
+\end{enumerate}
+\vspace{0.1cm}
+\concepto{La diferencia}{\small \texttt{WHERE} decide \textbf{qué filas entran al grupo}. \texttt{HAVING} decide \textbf{qué grupos aparecen en el resultado}.}
+\note{Fuentes: https://www.postgresql.org/docs/current/sql-select.html ; https://www.sqlite.org/lang_select.html . Se escribe COUNT(*) en HAVING para no depender del soporte de alias de cada gestor.}
+\end{frame}
+
+\seccion[0]{Modelos de datos}
+% ---------------------------------------------------------------------
+\begin{frame}{Un mismo diseño, en tres niveles de detalle}
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small]
+  \tikzset{nivel/.style={caja,text width=2.3cm,minimum height=1.1cm}}
+  \node[nivel,cajaazul] (a) {Caso de\\estudio};
+  \node[nivel,right=6mm of a] (b) {\textbf{Modelo}\\\textbf{conceptual}};
+  \node[nivel,right=6mm of b] (c) {\textbf{Modelo}\\\textbf{lógico}};
+  \node[nivel,cajanaranja,right=6mm of c] (d) {\textbf{Modelo}\\\textbf{físico}};
+  \node[nivel,cajaverde,right=6mm of d] (e) {Optimización};
+  \foreach \u/\v in {a/b,b/c,c/d,d/e} \draw[flecha] (\u)--(\v);
+  \foreach \n/\q/\f in {a/el problema\\en palabras/1\_contexto.md,
+                        b/qué cosas hay y\\cómo se relacionan/2\_modelo\_conceptual.dbml,
+                        c/{tablas, columnas,\\PK y FK}/3\_modelo\_logico.dbml,
+                        d/el SQL exacto\\de un gestor/4\_modelo\_fisico.sql,
+                        e/índices para que\\sea rápido/\textrm{\color{utpGris}después}} {
+    \node[font=\scriptsize,below=2mm of \n,text width=2.9cm,align=center] (q\n) {\q};
+    \node[font=\tiny\ttfamily,text=utpRojo,below=0.5mm of q\n,text width=2.7cm,align=center] {\f};
+  }
+\end{tikzpicture}}
+\end{center}
+\vspace{0.1cm}
+\begin{itemize}\setlength\itemsep{4pt}
+  \item Cada modelo \textbf{agrega detalle} al anterior. No se tira nada: se completa.
+  \item Los archivos están en la carpeta \texttt{modelado/} de esta sesión.
+\end{itemize}
+\vspace{0.1cm}
+\analogia{Es construir una casa: primero el \textbf{dibujo} de qué ambientes hay, luego el \textbf{plano} con medidas y, al final, los \textbf{planos de obra} con los materiales reales. Ya viviendo en ella, se hacen \textbf{mejoras}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{El caso: una peluquería de mascotas}
+\begin{columns}[T,onlytextwidth]
+\column{.58\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Se registran \textbf{clientes} y sus \textbf{mascotas}.
+  \item Una \textbf{cita} es de una mascota, para un \textbf{servicio}, con un \textbf{empleado}, en una fecha y hora. Tiene un estado.
+  \item Cada servicio tiene una \textbf{duración} y un \textbf{precio}.
+  \item Al completarse la cita se registra su \textbf{pago}: monto y método.
+  \item El \textbf{encargado} inicia sesión con usuario y contraseña.
+\end{itemize}
+\column{.38\textwidth}
+\begin{exampleblock}{Fuera de alcance}
+\small Varias sedes, inventario, recordatorios, pagos parciales, varias cuentas o roles.
+\end{exampleblock}
+\end{columns}
+\vspace{0.35cm}
+\concepto{El primer paso}{\small Los \textbf{sustantivos importantes} del problema (en negrita) son candidatos a \textbf{entidades}. Lo que se dice de ellos, a \textbf{atributos}. Los verbos que los unen, a \textbf{relaciones}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Modelo conceptual: qué hay y cómo se relaciona}
+\small Describe el negocio con \textbf{entidades}, \textbf{atributos} y \textbf{relaciones}.
+\vspace{0.2cm}
+\begin{itemize}\setlength\itemsep{9pt}
+  \item \textbf{Entidades:} cliente, mascota, cita, servicio, empleado, pago y encargado.
+  \item \textbf{Atributos:} el cliente tiene nombre y teléfono. La mascota tiene nombre, especie y raza. La cita tiene fecha, hora y estado.
+  \item \textbf{Relaciones:} un cliente es dueño de muchas mascotas. Una mascota puede tener muchas citas. Cada cita corresponde a un servicio y un empleado.
+  \item \textbf{Regla del negocio:} al completar una cita se registra su pago total, con monto y método.
+\end{itemize}
+\vspace{0.2cm}
+\concepto{Qué define este nivel}{\small Explica \textbf{qué información necesita la peluquería} y cómo se relaciona. Todavía no elige tipos SQL, claves foráneas ni gestor.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Modelo lógico: tablas, columnas y claves}
+\small Organiza la información en \textbf{tablas} y define cómo identificar y relacionar sus filas.
+\vspace{0.2cm}
+\begin{itemize}\setlength\itemsep{9pt}
+  \item \textbf{Tablas y columnas:} \tbl{cliente} guarda \texttt{id}, \texttt{nombre} y \texttt{telefono}. \tbl{mascota} agrega \texttt{cliente\_id} a sus datos.
+  \item \textbf{Clave primaria (PK):} \texttt{id} identifica cada fila de una tabla.
+  \item \textbf{Clave foránea (FK):} \texttt{mascota.cliente\_id} referencia a \texttt{cliente.id}. La tabla \tbl{cita} referencia a mascota, servicio y empleado.
+  \item \textbf{Dominios y reglas:} se distingue texto, números y fechas. Se indica qué datos son obligatorios y cuáles no se pueden repetir.
+\end{itemize}
+\vspace{0.2cm}
+\concepto{Qué define este nivel}{\small Establece la \textbf{estructura y las restricciones}. En el físico se eligen los tipos y la sintaxis exacta de cada gestor.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Conceptual, lógico y físico: lado a lado}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}>{\raggedright\bfseries}p{2.1cm}>{\raggedright\arraybackslash}p{4.3cm}>{\raggedright\arraybackslash}p{4.3cm}>{\centering\arraybackslash}p{1.8cm}@{}}
+\toprule
+& \bfseries Qué muestra & \bfseries La cita, en ese modelo & \bfseries ¿Depende del gestor? \\
+\midrule
+Conceptual & entidades, atributos y relaciones con verbos & «una mascota \textit{tiene} muchas citas» & No \\
+Lógico & tablas y columnas;\newline claves, tipos y reglas & \texttt{cita(id \pk, fecha\_hora, \ldots, mascota\_id \fk)} & No \\
+Físico & el SQL exacto que crea la base & \texttt{CREATE TABLE cita (\ldots);} & \textbf{Sí} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\concepto{La idea clave}{\small El conceptual y el lógico son \textbf{los mismos} para SQL Server, MySQL o SQLite. Solo el \textbf{físico} cambia según el gestor.}
+\vspace{0.1cm}
+\small En el curso: conceptual y lógico en \textbf{DBML} (dbdiagram), físico en un archivo \texttt{.sql}.
+\end{frame}
+% =======================================================================
+\seccion{Modelo físico}
+\begin{frame}{Modelo físico: el SQL que crea la base de datos}
+\begin{columns}[c,onlytextwidth]
+\column{.58\textwidth}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+\kw{CREATE TABLE} cita (\\
+\ind id \nuevo{INTEGER \kw{PRIMARY KEY}},\\
+\ind fecha\_hora TEXT \kw{NOT NULL},\\
+\ind estado TEXT \kw{NOT NULL} \nuevo{\kw{DEFAULT} 'programada'}\\
+\ind\ind \nuevo{\kw{CHECK} (estado \kw{IN} ('programada', 'completada',}\\
+\ind\ind \nuevo{\hspace*{4.6em}'cancelada'))},\\
+\ind mascota\_id \ INTEGER \kw{NOT NULL},\\
+\ind servicio\_id INTEGER \kw{NOT NULL},\\
+\ind empleado\_id INTEGER \kw{NOT NULL},\\
+\ind \nuevo{\kw{FOREIGN KEY} (mascota\_id) \kw{REFERENCES} mascota(id)},\\
+\ind \com{\ldots{} y lo mismo para servicio y empleado}\\
+\ind \com{un empleado no atiende dos citas a la misma hora}\\
+\ind \nuevo{\kw{UNIQUE} (empleado\_id, fecha\_hora)}\\
+);
+\end{sqlcode}
+\column{.38\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{7pt}
+  \item Es el archivo \texttt{4\_modelo\_fisico.sql}.
+  \item Está escrito para \textbf{un gestor}: aquí, SQLite.
+  \item Aquí las reglas se vuelven \textbf{de verdad}: la base de datos \textbf{rechaza} lo que no las cumple.
+\end{itemize}
+\vspace{0.2cm}
+\enlarealidad{Con este archivo, cualquiera crea la misma base de datos \textbf{vacía} en su computadora.}
+\end{columns}
+\end{frame}
+
+% Fuentes: https://dev.mysql.com/doc/workbench/en/wb-forward-engineering.html
+\begin{frame}{Forward Engineering: del modelo a la base de datos}
+\concepto{Ingeniería directa}{\small Parte de un \textbf{modelo definido para un gestor} y genera el SQL que crea su estructura. Puede exportar un script o ejecutarlo en un servidor.}
+\vspace{0.2cm}
+\begin{enumerate}\setlength\itemsep{5pt}
+  \item Definir tablas, tipos, claves y restricciones en el modelo.
+  \item Generar y revisar las instrucciones \texttt{CREATE TABLE} y los demás objetos.
+  \item Ejecutar el script para crear la estructura de la base de datos.
+\end{enumerate}
+\vspace{0.2cm}
+\enlarealidad{En MySQL Workbench, el modelo de la peluquería permite generar un script para MySQL. Al ejecutarlo se crean tablas como \texttt{cliente}, \texttt{mascota} y \texttt{cita}.}
+\vspace{0.15cm}
+\small Generar las tablas \textbf{no llena automáticamente los datos} de clientes o citas.
+\end{frame}
+% Fuentes: https://dev.mysql.com/doc/workbench/en/wb-reverse-engineering.html
+\begin{frame}{Reverse Engineering: de la base de datos al modelo}
+\concepto{Ingeniería inversa}{\small Parte de una \textbf{base de datos existente} o de su script de creación y reconstruye un modelo de su estructura.}
+\vspace{0.2cm}
+\begin{enumerate}\setlength\itemsep{5pt}
+  \item Leer las tablas, columnas, claves y restricciones existentes.
+  \item Importar esa estructura en una herramienta de modelado.
+  \item Revisar el modelo obtenido para documentar o modificar la base.
+\end{enumerate}
+\vspace{0.2cm}
+\enlarealidad{Si recibimos la base MySQL de la peluquería sin su modelo, Workbench puede importar el esquema y mostrar las relaciones declaradas con claves foráneas.}
+\vspace{0.15cm}
+\ojo{Recupera lo que está definido en la base. Las reglas que solo conoce la aplicación y el significado del negocio requieren revisión humana.}
+\end{frame}
+\begin{frame}{MySQL, SQL Server y SQLite: resumen}
+\small
+\begin{description}\setlength\itemsep{16pt}
+  \item[MySQL] Gestor relacional que funciona como \textbf{servidor}. \textbf{InnoDB} es su motor de almacenamiento predeterminado: admite transacciones y claves foráneas. \textbf{MySQL Workbench} permite administrar bases y trabajar con modelos.
+  \item[SQL Server] Gestor relacional de \textbf{Microsoft}, también con servidor. Usa \textbf{Transact-SQL (T-SQL)}. \textbf{SSMS} es una herramienta para conectarse, ejecutar consultas y administrar las bases.
+  \item[SQLite] Motor integrado en la propia aplicación, \textbf{sin un servidor separado}. Guarda la base en un archivo local. \textbf{DB Browser for SQLite} permite abrirla y trabajar con sus tablas.
+\end{description}
+\vspace{0.3cm}
+\analogia{El gestor ejecuta SQL y administra los datos. Workbench, SSMS y DB Browser son programas que permiten trabajar con esos gestores.}
+\end{frame}
+\begin{frame}{Los tres gestores, lado a lado}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}>{\raggedright\bfseries}p{2.9cm}>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{3.2cm}@{}}
+\toprule
+& \etiqueta{SQL Server} & \etiqueta{MySQL} & \etiqueta{SQLite} \\
+\midrule
+¿Hay servidor? & sí & sí & \textbf{no} \\
+Programa para usarlo & SSMS & MySQL Workbench & DB Browser for SQLite \\
+Su SQL se llama & Transact-SQL & SQL de MySQL & SQL de SQLite \\
+Dónde se guarda & \texttt{.mdf} y \texttt{.ldf} & carpeta de datos; \texttt{.ibd} por tabla* & un archivo, p. ej.\ \texttt{.db} \\
+Numerar solo el \texttt{id} & \texttt{IDENTITY(1,1)} & \texttt{AUTO\_INCREMENT} & \texttt{INTEGER PRIMARY KEY} \\
+Las 5 primeras filas & \texttt{SELECT TOP 5 \ldots} & \texttt{\ldots{} LIMIT 5} & \texttt{\ldots{} LIMIT 5} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.05cm}
+{\scriptsize\color{utpGris} *MySQL: InnoDB con un archivo por tabla. SQLite puede crear archivos auxiliares.\\
+Las 5 primeras filas requieren \texttt{ORDER BY} para definir un orden predecible.\par}
+\vspace{0.15cm}
+\small El modelo conceptual y el lógico de la peluquería \textbf{no cambian}. Para cada gestor solo se reescribe el \textbf{físico}.
+\end{frame}
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+\begin{frame}{Cierre: lo de hoy en una tabla}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.45}
+\begin{tabular}{>{\raggedright\bfseries}p{4.2cm}>{\raggedright\arraybackslash}p{8.6cm}}
+\toprule
+& \bfseries En una frase \\
+\midrule
+Orden de \texttt{SELECT} & El orden escrito difiere del orden lógico. \\
+Modelo conceptual & Entidades, atributos y relaciones del negocio. \\
+Modelo lógico & Tablas, columnas, claves y restricciones. \\
+Modelo físico & Tipos y SQL concretos para el gestor elegido. \\
+Forward Engineering & Genera la estructura de la base a partir del modelo. \\
+Reverse Engineering & Reconstruye un modelo a partir de una estructura existente. \\
+Gestores & SQL Server y MySQL usan servidor. SQLite se integra en la aplicación. \\
+
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.25cm}
+\small El conceptual y el lógico de la peluquería \textbf{se mantienen}. Adaptamos el \textbf{físico} a cada gestor.
+\end{frame}
+
+\begin{frame}{Referencias}
+\footnotesize
+\begin{itemize}\setlength\itemsep{10pt}
+\item Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración}. Cengage Learning.
+\item Microsoft Learn. \href{https://learn.microsoft.com/en-us/sql/t-sql/queries/select-transact-sql}{\textit{SELECT (Transact-SQL): orden lógico de procesamiento}}.
+\item Oracle. MySQL Workbench Manual: \href{https://dev.mysql.com/doc/workbench/en/wb-forward-engineering.html}{\textit{Forward Engineering}} y \href{https://dev.mysql.com/doc/workbench/en/wb-reverse-engineering.html}{\textit{Reverse Engineering}}.
+\item Oracle. MySQL Reference Manual: \href{https://dev.mysql.com/doc/refman/8.4/en/innodb-file-per-table-tablespaces.html}{\textit{File-Per-Table Tablespaces}}.
+\item Microsoft Learn. \href{https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-files-and-filegroups}{\textit{Database Files and Filegroups}}.
+\item SQLite. \href{https://www.sqlite.org/whentouse.html}{\textit{Appropriate Uses For SQLite}} y \href{https://www.sqlite.org/autoinc.html}{\textit{Autoincrement}}.
+\end{itemize}
+\end{frame}
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}

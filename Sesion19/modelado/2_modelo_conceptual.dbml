@@ -1,0 +1,90 @@
+// @visual table=cliente x=213 y=17
+Table cliente {
+  id integer [pk]
+  nombre varchar(255)
+  telefono varchar(255)
+}
+
+// @visual table=mascota x=471 y=-29
+Table mascota {
+  id integer [pk]
+  nombre varchar(255)
+  especie varchar(255)
+  raza varchar(255)
+  cliente_id integer [not null]
+}
+
+// @visual table=servicio x=544 y=221
+Table servicio {
+  id integer [pk]
+  nombre varchar(255)
+  duracion varchar(255)
+  precio varchar(255)
+  orden varchar(255)
+}
+
+// @visual table=empleado x=982 y=225
+Table empleado {
+  id integer [pk]
+  nombre varchar(255)
+  orden varchar(255)
+}
+
+// @visual table=cita x=760 y=0
+Table cita {
+  id integer [pk]
+  fecha_hora varchar(255)
+  estado varchar(255)
+  mascota_id integer [not null]
+  servicio_id integer [not null]
+  empleado_id integer [not null]
+}
+
+// @visual table=pago x=1109 y=-13
+Table pago {
+  id integer [pk]
+  monto varchar(255)
+  metodo varchar(255)
+  cita_id integer [unique, not null]
+}
+
+// @visual table=encargado x=299 y=252
+Table encargado {
+  id integer [pk]
+  usuario varchar(255)
+  contrasena varchar(255)
+}
+
+// Cada cliente necesita al menos un mascota (1..N).
+// La base de datos no lo comprueba: hazlo con un trigger o en la aplicación.
+// @relation-meta
+// sourceLabel="es dueño de"
+// targetLabel="pertenece a"
+// ownsForeignKey="true"
+Ref: cliente.id < mascota.cliente_id
+
+// Cada mascota necesita al menos un cita (1..N).
+// La base de datos no lo comprueba: hazlo con un trigger o en la aplicación.
+// @relation-meta
+// sourceLabel="tiene"
+// targetLabel="es para"
+// ownsForeignKey="true"
+Ref: mascota.id < cita.mascota_id
+
+// @relation-meta
+// sourceLabel="se presta en"
+// targetLabel="incluye"
+// ownsForeignKey="true"
+Ref: servicio.id <? cita.servicio_id
+
+// @relation-meta
+// sourceLabel="atiende"
+// targetLabel="es atendida por"
+// ownsForeignKey="true"
+Ref: empleado.id <? cita.empleado_id
+
+// @relation-meta
+// sourceLabel="se paga con"
+// targetLabel="corresponde a"
+// ownsForeignKey="true"
+Ref: cita.id -? pago.cita_id

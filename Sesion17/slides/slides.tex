@@ -4,8 +4,8 @@
 \input{header.tex}
 \usepackage[normalem]{ulem}
 
-\title{Tipos de JOIN e introducción a los índices}
-\subtitle{Unir tablas paso a paso, con ejemplos sencillos,\\ y una primera mirada a los índices}
+\title{Tipos de JOIN}
+\subtitle{Unir tablas paso a paso, con ejemplos sencillos}
 \date{Semana 09 - Sesión 17}
 \author{Rel Guzman}
 
@@ -157,11 +157,11 @@
 % 2 ---------------------------------------------------------------------
 \begin{frame}[c]
 \begin{block}{Logro de la sesión}
-Al finalizar, podrás \textbf{unir dos tablas} con \texttt{JOIN}, \textbf{elegir el tipo de JOIN} según lo que quieras conservar, y explicar \textbf{qué es un índice} y \textbf{para qué se usa}.
+Al finalizar, podrás \textbf{unir dos tablas} con \texttt{JOIN} y \textbf{elegir el tipo de JOIN} según lo que quieras conservar.
 \end{block}
 \end{frame}
 % ---------------------------------------------------------------------
-\begin{frame}{Lo de hoy: cinco paradas}
+\begin{frame}{Lo de hoy: cuatro paradas}
 \begin{center}
 \begin{tikzpicture}
   \tikzset{parada/.style={cajaverde,font=\footnotesize\bfseries,text width=1.95cm,minimum height=1.15cm}}
@@ -169,15 +169,13 @@ Al finalizar, podrás \textbf{unir dos tablas} con \texttt{JOIN}, \textbf{elegir
   \node[parada,right=4.5mm of a] (b) {2. \texttt{INNER JOIN}};
   \node[parada,right=4.5mm of b] (c) {3. \texttt{LEFT} y \texttt{RIGHT}};
   \node[parada,right=4.5mm of c] (d) {4. \texttt{FULL}, \texttt{CROSS} y \texttt{SELF}};
-  \node[parada,right=4.5mm of d] (e) {5. Índices};
-  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c); \draw[flecha] (c)--(d); \draw[flecha] (d)--(e);
+  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c); \draw[flecha] (c)--(d);
 \end{tikzpicture}
 \end{center}
 \vspace{0.5cm}
 \begin{itemize}\setlength\itemsep{8pt}
   \item Ya sabes consultar \textbf{una tabla}. Hoy consultamos \textbf{dos a la vez}.
   \item Usaremos \textbf{las mismas dos tablas} todo el tiempo: solo cambia el tipo de \texttt{JOIN}.
-  \item Al final, una idea nueva y corta: los \textbf{índices}.
 \end{itemize}
 \vspace{0.4cm}
 \ojo{Vamos \textbf{de a pocos}: una idea por diapositiva y una práctica después de cada parada.}
@@ -625,230 +623,6 @@ Cada empleado con el nombre de \textbf{su jefe}. & \bl[2.6cm] \\
   \item Con \tbl{carreras} (3) y \tbl{alumnos} (4), ¿cuántas filas da el \texttt{FULL OUTER JOIN}? \bl[1.5cm]
 \end{itemize}
 \end{frame}
-% =======================================================================
-\seccion[0]{Índices}
-% ---------------------------------------------------------------------
-\begin{frame}{Antes de empezar: tres preguntas}
-\begin{columns}[T,onlytextwidth]
-\column{.31\textwidth}
-\centering\etiqueta{Un diccionario}\\[6pt]
-\raggedright\small ¿Cómo encuentras la palabra «zapato»? ¿Lees desde la «a»?
-\column{.31\textwidth}
-\centering\etiqueta{Un libro de 500 páginas}\\[6pt]
-\raggedright\small ¿Cómo encuentras el capítulo de «JOIN»? ¿Pasas hoja por hoja?
-\column{.31\textwidth}
-\centering\etiqueta{Tu celular}\\[6pt]
-\raggedright\small ¿Cómo encuentras a «Mamá» entre 400 contactos?
-\end{columns}
-\vspace{0.5cm}
-\begin{itemize}\setlength\itemsep{7pt}
-  \item En los tres casos hay algo \textbf{ordenado} que te dice \textbf{dónde ir}.
-  \item Por eso \textbf{no revisas todo}: saltas casi directo al lugar correcto.
-\end{itemize}
-\vspace{0.4cm}
-\concepto{La idea}{\small Una base de datos tiene el mismo problema cuando busca una fila, y lo resuelve igual: con un \textbf{índice}.}
-\end{frame}
-% ---------------------------------------------------------------------
-\begin{frame}{Buscar sin índice: fila por fila}
-\begin{columns}[c,onlytextwidth]
-\column{.30\textwidth}
-\centering\tbl{clientes}\\[4pt]
-\scriptsize\ttfamily
-\begin{tabular}{rl}
-\toprule
-\normalfont\bfseries id & \normalfont\bfseries nombre \\
-\midrule
-1 & Rosa \\
-2 & Beto \\
-3 & Zoe \\
-4 & Ana \\
-5 & Luis \\
-\bottomrule
-\end{tabular}
-\column{.66\textwidth}
-\begin{sqlcode}[\textwidth]
-\scriptsize
-\kw{SELECT} * \kw{FROM} clientes\\
-\kw{WHERE} nombre = 'Luis';
-\end{sqlcode}
-\vspace{-0.15cm}
-\small
-\begin{itemize}\setlength\itemsep{4pt}
-  \item Los nombres están \textbf{desordenados}: el gestor pregunta fila por fila. ¿Rosa? no. ¿Beto? no. ¿Zoe? no\ldots
-  \item Tiene que revisar \textbf{toda la tabla}.
-\end{itemize}
-\end{columns}
-\vspace{0.1cm}
-\begin{center}
-\small
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{>{\raggedright\arraybackslash}p{4.6cm}>{\raggedright\arraybackslash}p{6.6cm}}
-\toprule
-\bfseries Si la tabla tiene\ldots & \bfseries Revisa\ldots \\
-\midrule
-5 filas & 5 filas: no se nota \\
-1\,000\,000 de filas & \mal{1\,000\,000 de filas}, en \textbf{cada} búsqueda \\
-\bottomrule
-\end{tabular}
-\end{center}
-\vspace{-0.1cm}
-\analogia{Es buscar una palabra en un libro \textbf{sin índice}: toca leerlo completo, página por página.}
-\end{frame}
-% ---------------------------------------------------------------------
-\begin{frame}{¿Qué es un índice?}
-\begin{columns}[c,onlytextwidth]
-\column{.52\textwidth}
-\centering
-\begin{tikzpicture}[y=0.56cm]
-  \tikzset{
-    celda/.style={draw=utpNegro,thick,font=\scriptsize\ttfamily,minimum height=0.48cm,
-      inner sep=2.5pt,align=left},
-    idx/.style={celda,fill=yellow!35,text width=1.15cm},
-    dato/.style={celda,fill=utpGrisClaro,text width=1.75cm}
-  }
-  \node[idx] (i1) at (0,0) {Ana};
-  \node[idx] (i2) at (0,-1) {Beto};
-  \node[idx] (i3) at (0,-2) {Luis};
-  \node[idx] (i4) at (0,-3) {Rosa};
-  \node[idx] (i5) at (0,-4) {Zoe};
-  \node[dato] (t1) at (4.3,0) {1 \ Rosa};
-  \node[dato] (t2) at (4.3,-1) {2 \ Beto};
-  \node[dato] (t3) at (4.3,-2) {3 \ Zoe};
-  \node[dato] (t4) at (4.3,-3) {4 \ Ana};
-  \node[dato] (t5) at (4.3,-4) {5 \ Luis};
-  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i1.east)--(t4.west);
-  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i2.east)--(t2.west);
-  \draw[-{Stealth[length=1.8mm]},utpRojo,very thick] (i3.east)--(t5.west);
-  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i4.east)--(t1.west);
-  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i5.east)--(t3.west);
-  \node[font=\scriptsize\bfseries,above=1mm of i1] {índice};
-  \node[font=\scriptsize,above=1mm of t1] {\tbl{clientes}};
-  \node[font=\tiny,text=utpGris,below=1mm of i5] {ordenado};
-  \node[font=\tiny,text=utpGris,below=1mm of t5] {en el orden en que llegaron};
-\end{tikzpicture}
-\column{.46\textwidth}
-\begin{itemize}\setlength\itemsep{8pt}
-  \item Es una \textbf{lista aparte}, \textbf{ordenada} por una columna.
-  \item Cada entrada \textbf{apunta} a su fila en la tabla.
-  \item La tabla \textbf{no cambia}: sigue igual, con todos sus datos.
-\end{itemize}
-\end{columns}
-\vspace{0.3cm}
-\small Para encontrar a Luis, el gestor busca en la lista ordenada y \textbf{salta directo} a la fila 5.
-\vspace{0.2cm}
-\analogia{Es el \textbf{índice al final de un libro}: las palabras en orden alfabético y, al lado, la página donde están.}
-\end{frame}
-% ---------------------------------------------------------------------
-\begin{frame}{\texttt{CREATE INDEX}: crear un índice}
-\begin{center}
-\begin{tikzpicture}[y=0.80cm]
-  \renewcommand{\piezax}{6.0}
-  \pieza{1}{\nuevo{\kw{CREATE INDEX}} idx\_clientes\_nombre}{el \textbf{nombre} que le pones al índice}
-  \pieza{0}{\nuevo{\kw{ON}} clientes (nombre);}{la \textbf{tabla} y la \textbf{columna} que ordena}
-\end{tikzpicture}
-\end{center}
-\vspace{0.15cm}
-\begin{columns}[c,onlytextwidth]
-\column{.50\textwidth}
-\small
-\begin{itemize}\setlength\itemsep{6pt}
-  \item Se crea \textbf{una sola vez}.
-  \item Tus consultas \textbf{no cambian}: el gestor decide solo cuándo usarlo.
-  \item Se borra con \texttt{DROP INDEX}. Los datos \textbf{no se tocan}.
-\end{itemize}
-\column{.46\textwidth}
-\centering\small
-\renewcommand{\arraystretch}{1.25}
-\begin{tabular}{>{\raggedright\arraybackslash}p{2.5cm}>{\raggedright\arraybackslash}p{2.9cm}}
-\toprule
-\multicolumn{2}{c}{\bfseries Buscar entre 1\,000\,000 de filas} \\
-\midrule
-Sin índice & \mal{hasta 1\,000\,000} de pasos \\
-Con índice & unos \textbf{20} pasos \\
-\bottomrule
-\end{tabular}
-\end{columns}
-\vspace{0.3cm}
-\analogia{Con la lista ordenada se busca como en el diccionario: abres \textbf{por la mitad}, descartas una mitad, y repites. En 20 mitades ya llegaste.}
-\end{frame}
-% ---------------------------------------------------------------------
-\begin{frame}{¿La clave primaria es un índice?}
-\concepto{Sí}{\small Al declarar una \texttt{PRIMARY KEY}, el gestor crea \textbf{un índice por su cuenta}. Ya lo venías usando sin saberlo.}
-\vspace{0.1cm}
-\begin{center}
-\small
-\renewcommand{\arraystretch}{1.35}
-\begin{tabular}{>{\ttfamily\bfseries\raggedright\arraybackslash}p{2.9cm}>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{6.0cm}}
-\toprule
-\normalfont\bfseries Columna & \bfseries ¿Tiene índice? & \bfseries ¿Por qué? \\
-\midrule
-PRIMARY KEY & \textbf{Sí}, automático & para encontrar una fila por su \texttt{id} al instante \\
-UNIQUE & \textbf{Sí}, automático & para revisar rápido que el valor no se repita \\
-FOREIGN KEY & depende del gestor & MySQL lo crea solo; SQLite no \\
-Las demás & \textcolor{utpRojo}{\textbf{No}} & lo creas tú, con \texttt{CREATE INDEX} \\
-\bottomrule
-\end{tabular}
-\end{center}
-\vspace{0.2cm}
-\small \textbf{Y esto se junta con lo de hoy:} un \texttt{JOIN} empareja con \texttt{ON p.cliente\_id = c.id}. Como \texttt{c.id} es clave primaria, encontrar a cada cliente es \textbf{rápido}.
-\end{frame}
-% ---------------------------------------------------------------------
-\begin{frame}{¿Entonces le pongo índice a todo?}
-\begin{columns}[T,onlytextwidth]
-\column{.48\textwidth}
-\centering\etiqueta{Lo que ganas}\\[6pt]
-\raggedright\small
-\begin{itemize}\setlength\itemsep{5pt}
-  \item Búsquedas con \texttt{WHERE} más rápidas.
-  \item \texttt{JOIN} más rápidos.
-  \item \texttt{ORDER BY} más rápidos: ya está ordenado.
-\end{itemize}
-\column{.48\textwidth}
-\centering\etiqueta{Lo que pagas}\\[6pt]
-\raggedright\small
-\begin{itemize}\setlength\itemsep{5pt}
-  \item El índice \textbf{ocupa espacio}.
-  \item Cada \texttt{INSERT}, \texttt{UPDATE} y \texttt{DELETE} es \textbf{más lento}: también hay que actualizar el índice.
-\end{itemize}
-\end{columns}
-\vspace{0.35cm}
-\begin{center}
-\small
-\renewcommand{\arraystretch}{1.3}
-\begin{tabular}{>{\raggedright\arraybackslash}p{6.0cm}>{\raggedright\arraybackslash}p{6.0cm}}
-\toprule
-\bfseries Conviene un índice & \bfseries No hace falta \\
-\midrule
-Columnas por las que \textbf{buscas seguido} & Columnas que casi nunca consultas \\
-Tablas \textbf{grandes} & Tablas de pocas filas \\
-\bottomrule
-\end{tabular}
-\end{center}
-\vspace{0.15cm}
-\analogia{Si a un libro le agregas páginas, hay que \textbf{rehacer su índice}. Con diez índices, lo rehaces diez veces.}
-\end{frame}
-% ---------------------------------------------------------------------
-\begin{frame}{\ins{Práctica 4} ¿Índice sí o no?}
-La tabla \tbl{alumnos} de una universidad tiene \textbf{50\,000 filas}.
-\vspace{0.2cm}
-\begin{center}
-\small
-\renewcommand{\arraystretch}{1.15}
-\begin{tabular}{>{\raggedright\arraybackslash}p{8.4cm}>{\raggedright\arraybackslash}p{4.0cm}}
-\toprule
-\bfseries Situación & \bfseries ¿Creo un índice? ¿Por qué? \\
-\midrule
-Se busca a cada rato por \texttt{codigo}, que es la clave primaria. & \bl[3.8cm] \\[8pt]
-Secretaría busca todos los días por \texttt{apellido}. & \bl[3.8cm] \\[8pt]
-La columna \texttt{correo} está declarada \texttt{UNIQUE}. & \bl[3.8cm] \\[8pt]
-La columna \texttt{observaciones} casi nunca se consulta. & \bl[3.8cm] \\[8pt]
-Otra tabla, \tbl{dias}, tiene solo 7 filas. & \bl[3.8cm] \\
-\bottomrule
-\end{tabular}
-\end{center}
-\vspace{0.25cm}
-\small \textbf{Para escribir:} la instrucción que crea el índice que sí hace falta.
-\end{frame}
 % ---------------------------------------------------------------------
 \begin{frame}[plain]
   \begin{tikzpicture}[remember picture,overlay]
@@ -874,8 +648,6 @@ Otra tabla, \tbl{dias}, tiene solo 7 filas. & \bl[3.8cm] \\
 \texttt{INNER} & Solo los que tienen pareja. \\
 \texttt{LEFT} / \texttt{RIGHT} & Toda una tabla; lo que falta del otro lado queda en \nulo. \\
 \texttt{FULL} / \texttt{CROSS} / \texttt{SELF} & Todo de ambas; todos con todos; la tabla consigo misma. \\
-Índice & Una lista ordenada que dice dónde está cada fila. \\
-Clave primaria & Ya trae su índice, creado por el gestor. \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -895,9 +667,6 @@ Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2020). \textit{Database system
 
 \vspace{0.3cm}
 Oracle. (s.\,f.). \textit{MySQL reference manual: JOIN clause}. \texttt{https://dev.mysql.com/doc/refman/8.4/en/join.html}
-
-\vspace{0.3cm}
-SQLite. (s.\,f.). \textit{Query planning}. \texttt{https://www.sqlite.org/queryplanner.html}
 \end{frame}
 % ---------------------------------------------------------------------
 % Cierre UTP

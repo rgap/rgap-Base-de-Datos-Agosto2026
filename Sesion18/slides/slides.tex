@@ -1,0 +1,1036 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+\usepackage[normalem]{ulem}
+
+\title{Índices, nulos, expresiones y agregaciones}
+\subtitle{Buscar más rápido, tratar los datos que faltan, calcular y resumir}
+\date{Semana 09 - Sesión 18}
+\author{Rel Guzman}
+
+% Espacio en blanco para completar
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Parte nueva de un bloque de codigo que crece paso a paso
+\newcommand{\nuevo}[1]{{%
+  \setlength{\fboxsep}{1.2pt}%
+  \begingroup
+  \renewcommand{\kw}[1]{\textcolor{utpNegro}{\textbf{##1}}}%
+  \colorbox{yellow!45}{\textcolor{utpNegro}{#1}}%
+  \endgroup}}
+% Comentario dentro de un bloque de código SQL
+\newcommand{\com}[1]{\textcolor{utpGris}{-- #1}}
+% Marcas de clave primaria y clave foránea
+\newcommand{\pk}{{\scriptsize\color{utpRojo}\textbf{PK}}}
+\newcommand{\fk}{{\scriptsize\color{utpNaranja}\textbf{FK}}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre del gestor o de la forma de escribir algo
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Celda de una fila que se quedó sin pareja
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% Valor desconocido
+\newcommand{\nulo}{\textcolor{utpGrisMedio}{\textit{NULL}}}
+% Bloque de código sobre fondo gris
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.6em}}
+% Anatomía de una instrucción: cada pieza del código con su pregunta al lado
+\tikzset{
+  pieza/.style={fill=utpGrisClaro,font=\ttfamily\footnotesize,anchor=west,inner sep=5pt,
+    minimum height=0.62cm},
+  para/.style={font=\small,anchor=west,text=utpNegro}
+}
+\newcommand{\piezax}{7.6}
+\newcommand{\pieza}[3]{%
+  \node[pieza] at (0,#1) {#2};
+  \node[para] at (\piezax,#1) {\textcolor{utpRojo}{$\blacktriangleleft$}\ #3};}
+% Diapositiva de sección: una palabra bien grande (\seccion[0]{...} la deja sin línea roja)
+\newcommand{\seccion}[2][1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#2}};
+    \ifnum#1=1
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+    \fi
+  \end{tikzpicture}
+\end{frame}}
+% Diagrama de dos círculos: se pinta la parte que el JOIN conserva.
+% \venn[escala]{izquierda}{centro}{derecha}, cada uno con \von o \voff
+\newcommand{\von}{utpRojo!45}
+\newcommand{\voff}{white}
+\newcommand{\venn}[4][1]{%
+  \begin{tikzpicture}[scale=#1,baseline=-0.6ex]
+    \fill[#2] (0,0) circle (0.62);
+    \fill[#4] (0.74,0) circle (0.62);
+    \begin{scope}
+      \clip (0,0) circle (0.62);
+      \fill[#3] (0.74,0) circle (0.62);
+    \end{scope}
+    \draw[thick,utpNegro] (0,0) circle (0.62);
+    \draw[thick,utpNegro] (0.74,0) circle (0.62);
+  \end{tikzpicture}}
+% Cabecera de columna dentro de una tabla en monoespaciado
+\newcommand{\cab}[1]{\normalfont\bfseries #1}
+% Resultado de una consulta: \res{columnas}{cabecera}{filas}
+\newcommand{\res}[3]{%
+  \centering{\scriptsize\color{utpGris}resultado}\\[3pt]
+  \footnotesize\ttfamily
+  \begin{tabular}{#1}
+  \toprule
+  #2 \\
+  \midrule
+  #3
+  \bottomrule
+  \end{tabular}}
+% Tablas de la revisión: la tienda
+\newcommand{\tablacliente}{%
+  \centering\tbl{cliente}\\[4pt]
+  \scriptsize\ttfamily
+  \begin{tabular}{rl}
+  \toprule
+  \cab{id} & \cab{nombre} \\
+  \midrule
+  1 & Ana \\
+  2 & Bruno \\
+  3 & Carla \\
+  \bottomrule
+  \end{tabular}}
+\newcommand{\tablapedido}{%
+  \centering\tbl{pedido}\\[4pt]
+  \scriptsize\ttfamily
+  \begin{tabular}{rl}
+  \toprule
+  \cab{cliente\_id} & \cab{producto} \\
+  \midrule
+  1 & Laptop \\
+  1 & Mouse \\
+  3 & Teclado \\
+  4 & Monitor \\
+  \bottomrule
+  \end{tabular}}
+% Tabla de ejemplo de la sesión: los empleados
+\newcommand{\tablaempleado}{%
+  \centering\tbl{empleado}\\[4pt]
+  \scriptsize\ttfamily
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{rllrrl}
+  \toprule
+  \cab{id} & \cab{nombre} & \cab{area} & \cab{sueldo} & \cab{anio\_ingreso} & \cab{telefono} \\
+  \midrule
+  1 & Ana & Ventas & 2500 & 2018 & 987111222 \\
+  2 & Bruno & Ventas & 1800 & 2021 & \nulo \\
+  3 & Carla & Sistemas & 4200 & 2015 & 955333444 \\
+  4 & Diego & Sistemas & 3100 & 2023 & '' \\
+  5 & Elena & Almacén & 1500 & 2020 & \nulo \\
+  \bottomrule
+  \end{tabular}}
+% Tabla de práctica: los productos
+\newcommand{\tablaproducto}{%
+  \centering\tbl{producto}\\[4pt]
+  \scriptsize\ttfamily
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{rllrr}
+  \toprule
+  \cab{id} & \cab{nombre} & \cab{categoria} & \cab{precio} & \cab{stock} \\
+  \midrule
+  1 & Laptop & Cómputo & 3200 & 5 \\
+  2 & Mouse & Cómputo & 45 & \nulo \\
+  3 & Silla & Muebles & 380 & 12 \\
+  4 & Mesa & Muebles & 650 & 0 \\
+  5 & Lámpara & Hogar & 90 & \nulo \\
+  \bottomrule
+  \end{tabular}}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás explicar \textbf{qué es un índice}, tratar los \textbf{valores nulos}, calcular con \textbf{expresiones} y resumir datos con \textbf{agregaciones}.
+\end{block}
+\end{frame}
+% =======================================================================
+% Revisión de la sesión anterior
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión de la sesión anterior: ¿qué hace un \texttt{JOIN}?}
+\begin{columns}[c,onlytextwidth]
+\column{.20\textwidth}
+\tablacliente\\[3pt]
+{\normalfont\scriptsize\color{utpGris}tabla \textbf{principal}}
+\column{.28\textwidth}
+\tablapedido\\[3pt]
+{\normalfont\scriptsize\color{utpGris}la \textbf{otra} tabla}
+\column{.48\textwidth}
+\small Tienes una \textbf{tabla principal} y buscas \textbf{coincidencias} en otra tabla, usando una \textbf{columna en común}.
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{ON} cliente.id = pedido.cliente\_id
+\end{sqlcode}
+\end{columns}
+\vspace{0.25cm}
+\begin{itemize}\setlength\itemsep{5pt}
+  \item \textbf{Ana} tiene dos coincidencias y \textbf{Carla} una.
+  \item \mal{Bruno} no tiene ninguna: no hizo pedidos.
+  \item El \mal{Monitor} tampoco: su \texttt{cliente\_id} es 4 y ese cliente no existe.
+\end{itemize}
+\vspace{0.2cm}
+\concepto{La pregunta de siempre}{\small Cada tipo de \texttt{JOIN} decide \textbf{qué hacer con las filas que no encontraron coincidencia}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión de la sesión anterior: los cuatro \texttt{JOIN}}
+\begin{center}
+\renewcommand{\arraystretch}{1.7}
+\small
+\begin{tabular}{>{\centering\arraybackslash}m{1.5cm}>{\ttfamily\bfseries\raggedright\arraybackslash}m{2.9cm}>{\raggedright\arraybackslash}m{3.5cm}>{\raggedright\arraybackslash}m{4.9cm}}
+\toprule
+& \normalfont\bfseries Tipo & \bfseries Qué conserva & \bfseries En el ejemplo \\
+\midrule
+\venn[0.42]{\voff}{\von}{\voff} & INNER JOIN & solo las coincidencias & Ana y Carla. Bruno no aparece. \\
+\venn[0.42]{\von}{\von}{\voff} & LEFT JOIN & toda la tabla izquierda & Ana, Bruno y Carla. Bruno con \nulo. \\
+\venn[0.42]{\voff}{\von}{\von} & RIGHT JOIN & toda la tabla derecha & todos los pedidos, también el Monitor. \\
+\venn[0.42]{\von}{\von}{\von} & FULL OUTER JOIN & todo, de ambas tablas & todos; lo que no coincide va con \nulo. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\begin{columns}[T,onlytextwidth]
+\column{.32\textwidth}
+\centering\etiqueta{LEFT JOIN}\\[5pt]
+\small «mi tabla principal \textbf{manda}»
+\column{.32\textwidth}
+\centering\etiqueta{INNER JOIN}\\[5pt]
+\small «solo me interesan las \textbf{coincidencias}»
+\column{.32\textwidth}
+\centering\etiqueta{FULL JOIN}\\[5pt]
+\small «quiero \textbf{todo}, coincida o no»
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión de la sesión anterior: leer un \texttt{LEFT JOIN}}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} c.id, c.nombre, p.producto\\
+\kw{FROM} cliente c\\
+\nuevo{\kw{LEFT JOIN}} pedido p\\
+\ind \kw{ON} c.id = p.cliente\_id;
+\end{sqlcode}
+\column{.42\textwidth}
+\res{rll}{\cab{id} & \cab{nombre} & \cab{producto}}{%
+  1 & Ana & Laptop \\
+  1 & Ana & Mouse \\
+  2 & \mal{Bruno} & \mal{\nulo} \\
+  3 & Carla & Teclado \\}
+\end{columns}
+\vspace{0.2cm}
+\analogia{«Mi tabla principal es \tbl{cliente}. Quiero conservar \textbf{todos} los clientes y buscar coincidencias en \tbl{pedido}. Si las encuentro, agrego esos datos. Si no, pongo \nulo.»}
+\vspace{0.05cm}
+\ojo{Una fila de la tabla principal \textbf{se repite} si tiene varias coincidencias: Ana sale \textbf{dos veces} porque tiene dos pedidos.}
+\end{frame}
+% =======================================================================
+\seccion[0]{Índices}
+% ---------------------------------------------------------------------
+\begin{frame}{Sin índice: buscar fila por fila}
+\begin{columns}[c,onlytextwidth]
+\column{.30\textwidth}
+\centering\tbl{cliente}\\[4pt]
+\scriptsize\ttfamily
+\begin{tabular}{rl}
+\toprule
+\cab{id} & \cab{nombre} \\
+\midrule
+1 & Rosa \\
+2 & Beto \\
+3 & Zoe \\
+4 & Ana \\
+5 & Luis \\
+\bottomrule
+\end{tabular}
+\column{.66\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} * \kw{FROM} cliente\\
+\kw{WHERE} nombre = 'Luis';
+\end{sqlcode}
+\vspace{-0.1cm}
+\small
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Los nombres están \textbf{desordenados}.
+  \item Hay que preguntar \textbf{fila por fila}: ¿Rosa? no. ¿Beto? no. ¿Zoe? no\ldots
+  \item Con 5 filas no se nota. Con \textbf{un millón}, sí.
+\end{itemize}
+\end{columns}
+\vspace{0.5cm}
+\analogia{Es buscar una palabra en un libro \textbf{leyéndolo completo}, página por página.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Con índice: ir directo a la fila}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\centering
+\begin{tikzpicture}[y=0.56cm]
+  \tikzset{
+    celda/.style={draw=utpNegro,thick,font=\scriptsize\ttfamily,minimum height=0.48cm,
+      inner sep=2.5pt,align=left},
+    idx/.style={celda,fill=yellow!35,text width=1.15cm},
+    dato/.style={celda,fill=utpGrisClaro,text width=1.75cm}
+  }
+  \node[idx] (i1) at (0,0) {Ana};
+  \node[idx] (i2) at (0,-1) {Beto};
+  \node[idx] (i3) at (0,-2) {Luis};
+  \node[idx] (i4) at (0,-3) {Rosa};
+  \node[idx] (i5) at (0,-4) {Zoe};
+  \node[dato] (t1) at (4.3,0) {1 \ Rosa};
+  \node[dato] (t2) at (4.3,-1) {2 \ Beto};
+  \node[dato] (t3) at (4.3,-2) {3 \ Zoe};
+  \node[dato] (t4) at (4.3,-3) {4 \ Ana};
+  \node[dato] (t5) at (4.3,-4) {5 \ Luis};
+  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i1.east)--(t4.west);
+  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i2.east)--(t2.west);
+  \draw[-{Stealth[length=1.8mm]},utpRojo,very thick] (i3.east)--(t5.west);
+  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i4.east)--(t1.west);
+  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i5.east)--(t3.west);
+  \node[font=\scriptsize\bfseries,above=1mm of i1] {índice};
+  \node[font=\scriptsize,above=1mm of t1] {\tbl{cliente}};
+  \node[font=\tiny,text=utpGris,below=1mm of i5] {ordenado};
+\end{tikzpicture}
+\column{.46\textwidth}
+\begin{itemize}\setlength\itemsep{9pt}
+  \item Un índice es una \textbf{lista ordenada} de una columna.
+  \item Cada nombre \textbf{señala} dónde está su fila.
+  \item La tabla \textbf{queda igual}.
+\end{itemize}
+\end{columns}
+\vspace{0.4cm}
+\analogia{Es el \textbf{índice de un libro}: buscas la palabra en la lista ordenada y te dice en qué página está.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{CREATE INDEX}: crear un índice}
+\begin{center}
+\begin{tikzpicture}[y=0.80cm]
+  \renewcommand{\piezax}{6.0}
+  \pieza{1}{\nuevo{\kw{CREATE INDEX}} idx\_cliente\_nombre}{el \textbf{nombre} que le pones al índice}
+  \pieza{0}{\nuevo{\kw{ON}} cliente (nombre);}{la \textbf{tabla} y la \textbf{columna}}
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\begin{itemize}\setlength\itemsep{8pt}
+  \item Se crea \textbf{una sola vez}.
+  \item Tus consultas \textbf{se escriben igual}: solo salen más rápido.
+  \item Sirve en las columnas por las que \textbf{buscas seguido}.
+\end{itemize}
+\vspace{0.3cm}
+\ojo{No se le pone índice a todo: cada índice \textbf{ocupa espacio} y hace un poco más lento \textbf{guardar} datos nuevos.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Demostración: buscar entre un millón de contactos}
+\small La carpeta \texttt{indices/} trae \textbf{la misma agenda dos veces}. Solo cambia \textbf{una instrucción}.
+\vspace{0.15cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{sin-indice}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE TABLE} contacto (\\
+\ind id \ \ \ \ \ INTEGER \kw{PRIMARY KEY},\\
+\ind nombre \ TEXT,\\
+\ind correo \ TEXT\\
+);
+\end{sqlcode}
+\column{.48\textwidth}
+\centering\etiqueta{con-indice}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\com{la misma tabla, y además:}\\[4pt]
+\nuevo{\kw{CREATE INDEX} idx\_contacto\_correo}\\
+\nuevo{\ind \kw{ON} contacto (correo);}
+\end{sqlcode}
+\end{columns}
+\vspace{0.15cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{>{\raggedright\arraybackslash}p{6.0cm}>{\raggedright\arraybackslash}p{2.9cm}>{\raggedright\arraybackslash}p{2.9cm}}
+\toprule
+& \bfseries Sin índice & \bfseries Con índice \\
+\midrule
+Buscar un contacto por su correo tarda & \bl[1.8cm] ms & \bl[1.8cm] ms \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\small \textbf{Para probarlo}, en cada carpeta: \texttt{npm install}, \texttt{npm run crear} y \texttt{npm run dev}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 1} ¿Índice sí o no?}
+La tabla \tbl{alumno} de una universidad tiene \textbf{50\,000 filas}.
+\vspace{0.3cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{>{\raggedright\arraybackslash}p{8.4cm}>{\raggedright\arraybackslash}p{4.0cm}}
+\toprule
+\bfseries Situación & \bfseries ¿Creo un índice? ¿Por qué? \\
+\midrule
+Secretaría busca todos los días por \texttt{apellido}. & \bl[3.8cm] \\[10pt]
+La columna \texttt{observacion} casi nunca se consulta. & \bl[3.8cm] \\[10pt]
+Otra tabla, \tbl{dia\_semana}, tiene solo 7 filas. & \bl[3.8cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.35cm}
+\small \textbf{Para escribir:} la instrucción que crea el índice que sí hace falta.
+\end{frame}
+% =======================================================================
+\seccion[0]{Valores nulos}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{NULL}: el dato que falta}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+\tablaempleado
+\column{.40\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{6pt}
+  \item \nulo{} significa \textbf{«no se sabe»} o \textbf{«no hay dato»}.
+  \item Bruno y Elena \textbf{no registraron} teléfono.
+  \item Diego tiene \texttt{''}: un \textbf{texto vacío}. Parece lo mismo, pero \textbf{no es} \nulo.
+\end{itemize}
+\end{columns}
+\vspace{0.0cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{>{\ttfamily\bfseries\raggedright\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}p{9.4cm}}
+\toprule
+\normalfont\bfseries Valor & \bfseries Qué dice \\
+\midrule
+0 & un número: «tiene cero» \\
+'' & un texto sin letras: «lo dejó en blanco» \\
+NULL & \textbf{ningún valor}: «no lo sabemos» \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{-0.15cm}
+\analogia{En un examen: un \textbf{cero} es una nota. Un casillero \textbf{sin nota} es otra cosa: todavía no se sabe cuánto sacó.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{IS NULL}: preguntar si falta el dato}
+\small \textbf{Pregunta:} ¿qué empleados \textbf{no tienen} teléfono registrado?
+\vspace{0.05cm}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre, telefono\\
+\kw{FROM} empleado\\
+\kw{WHERE} telefono \nuevo{\kw{IS NULL}};
+\end{sqlcode}
+\column{.38\textwidth}
+\res{ll}{\cab{nombre} & \cab{telefono}}{%
+  Bruno & \nulo \\
+  Elena & \nulo \\}
+\end{columns}
+\vspace{0.2cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Lo contrario es \texttt{IS NOT NULL}: los que \textbf{sí} tienen un valor.
+  \item Diego \textbf{no sale}: su teléfono es \texttt{''}, y eso es un valor.
+\end{itemize}
+\vspace{0.15cm}
+\ojo{\texttt{WHERE telefono = NULL} \textbf{no devuelve nada}. Comparar con algo desconocido nunca da «verdadero». Para los nulos se usa siempre \texttt{IS NULL}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{COALESCE}: un valor de repuesto}
+\begin{columns}[c,onlytextwidth]
+\column{.58\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre,\\
+\ind \nuevo{\kw{COALESCE}(telefono, 'sin teléfono')} \kw{AS} contacto\\
+\kw{FROM} empleado;
+\end{sqlcode}
+\column{.38\textwidth}
+\res{ll}{\cab{nombre} & \cab{contacto}}{%
+  Ana & 987111222 \\
+  Bruno & \mal{sin teléfono} \\
+  Carla & 955333444 \\
+  Diego & '' \\
+  Elena & \mal{sin teléfono} \\}
+\end{columns}
+\vspace{0.25cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item \texttt{COALESCE(a, b)} devuelve \texttt{a}; y si \texttt{a} es \nulo, devuelve \texttt{b}.
+  \item Acepta más valores: \texttt{COALESCE(a, b, c)} devuelve \textbf{el primero que no sea} \nulo.
+  \item Solo cambia lo que \textbf{se muestra}: la tabla sigue guardando \nulo.
+\end{itemize}
+\vspace{0.1cm}
+\analogia{Es el \textbf{suplente}: si el titular no vino, entra el que sigue en la lista.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{NULLIF}: convertir un valor en \texttt{NULL}}
+\begin{columns}[c,onlytextwidth]
+\column{.58\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre,\\
+\ind \nuevo{\kw{NULLIF}(telefono, '')} \kw{AS} telefono\\
+\kw{FROM} empleado;
+\end{sqlcode}
+\column{.38\textwidth}
+\res{ll}{\cab{nombre} & \cab{telefono}}{%
+  Ana & 987111222 \\
+  Bruno & \nulo \\
+  Carla & 955333444 \\
+  Diego & \mal{\nulo} \\
+  Elena & \nulo \\}
+\end{columns}
+\vspace{0.2cm}
+\begin{itemize}\setlength\itemsep{5pt}
+  \item \texttt{NULLIF(a, b)} devuelve \nulo{} si \texttt{a} \textbf{es igual} a \texttt{b}. Si no, devuelve \texttt{a}.
+  \item Juntos: \texttt{COALESCE(NULLIF(telefono, ''), 'sin teléfono')} y Diego también sale «sin teléfono».
+\end{itemize}
+\vspace{0.1cm}
+\enlarealidad{El uso más común es \textbf{evitar dividir entre cero}: \texttt{total / NULLIF(cantidad, 0)} da \nulo{} en vez de un error.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 2} Valores nulos en la tienda}
+\begin{columns}[c,onlytextwidth]
+\column{.46\textwidth}
+\tablaproducto
+\column{.50\textwidth}
+\small El \texttt{stock} en \nulo{} quiere decir que \textbf{todavía no se contó}.
+\vspace{0.15cm}
+
+El \texttt{stock} en \texttt{0} quiere decir que \textbf{se contó y no hay}.
+\end{columns}
+\vspace{0.25cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{>{\raggedright\arraybackslash}p{8.8cm}>{\raggedright\arraybackslash}p{3.4cm}}
+\toprule
+\bfseries Pregunta & \bfseries Respuesta \\
+\midrule
+¿Cuántas filas devuelve \texttt{WHERE stock IS NULL}? & \bl[3.2cm] \\[8pt]
+¿Cuántas filas devuelve \texttt{WHERE stock = NULL}? & \bl[3.2cm] \\[8pt]
+¿Qué muestra \texttt{COALESCE(stock, 0)} para el Mouse? & \bl[3.2cm] \\[8pt]
+¿Qué muestra \texttt{NULLIF(stock, 0)} para la Mesa? & \bl[3.2cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\small \textbf{Para escribir:} la consulta que muestra el nombre y el stock, con el texto \texttt{'por contar'} donde falte.
+\end{frame}
+% =======================================================================
+\seccion[0]{Expresiones}
+% ---------------------------------------------------------------------
+\begin{frame}{Una expresión: calcular dentro del \texttt{SELECT}}
+\begin{center}
+\begin{tikzpicture}[y=0.82cm]
+  \renewcommand{\piezax}{6.0}
+  \pieza{2}{\kw{SELECT} nombre,}{una columna \textbf{tal cual} está en la tabla}
+  \pieza{1}{\ind \nuevo{sueldo * 12} \kw{AS} sueldo\_anual}{una \textbf{expresión}: un cálculo, con su nombre}
+  \pieza{0}{\kw{FROM} empleado;}{la tabla \textbf{no cambia}}
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.34\textwidth}
+\res{lr}{\cab{nombre} & \cab{sueldo\_anual}}{%
+  Ana & 30000 \\
+  Bruno & 21600 \\
+  Carla & 50400 \\
+  Diego & 37200 \\
+  Elena & 18000 \\}
+\column{.62\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Una \textbf{expresión} combina columnas, valores y operadores: \texttt{+} \ \texttt{-} \ \texttt{*} \ \texttt{/}
+  \item El cálculo se hace \textbf{en cada fila}.
+  \item \texttt{AS} le pone nombre a la columna nueva.
+  \item La columna \texttt{sueldo\_anual} \textbf{no se guarda}: se calcula al consultar.
+\end{itemize}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Expresiones con fechas: la antigüedad}
+\small \textbf{Pregunta:} ¿cuántos años lleva cada empleado en la empresa?
+\vspace{0.05cm}
+\begin{columns}[c,onlytextwidth]
+\column{.64\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre,\\
+\ind \nuevo{\kw{CAST}(strftime('\%Y', 'now') \kw{AS} INTEGER) - anio\_ingreso}\\
+\ind \ind \kw{AS} antiguedad\\
+\kw{FROM} empleado;
+\end{sqlcode}
+\column{.32\textwidth}
+\res{lr}{\cab{nombre} & \cab{antiguedad}}{%
+  Ana & 8 \\
+  Bruno & 5 \\
+  Carla & 11 \\
+  Diego & 3 \\
+  Elena & 6 \\}
+\end{columns}
+\vspace{0.15cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{>{\ttfamily\raggedright\arraybackslash}p{5.2cm}>{\raggedright\arraybackslash}p{7.2cm}}
+\toprule
+\normalfont\bfseries Pieza & \bfseries Qué hace \\
+\midrule
+strftime('\%Y', 'now') & el año de hoy, como \textbf{texto}: \texttt{'2026'} \\
+CAST(... AS INTEGER) & lo convierte en \textbf{número}: \texttt{2026} \\
+- anio\_ingreso & le resta el año en que entró cada uno \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.05cm}
+\small Así se escribe en \textbf{SQLite}. En MySQL la misma idea es \texttt{YEAR(CURDATE()) - anio\_ingreso}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Concatenar: pegar textos con \texttt{||}}
+\begin{columns}[c,onlytextwidth]
+\column{.60\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} \nuevo{nombre || ' (' || area || ')'} \kw{AS} info\\
+\kw{FROM} empleado;
+\end{sqlcode}
+\column{.34\textwidth}
+\res{l}{\cab{info}}{%
+  Ana (Ventas) \\
+  Bruno (Ventas) \\
+  Carla (Sistemas) \\
+  Diego (Sistemas) \\
+  Elena (Almacén) \\}
+\end{columns}
+\vspace{0.25cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item \texttt{||} \textbf{pega} un texto a continuación del otro.
+  \item Lo que va entre comillas se escribe \textbf{tal cual}: aquí, los paréntesis y el espacio.
+  \item También pega números: \texttt{nombre || ' - ' || sueldo} da \texttt{Ana - 2500}.
+\end{itemize}
+\vspace{0.1cm}
+\ojo{Si \textbf{una} de las piezas es \nulo, \textbf{todo} el resultado es \nulo. Se arregla con \texttt{COALESCE(telefono, 'sin teléfono')}.}
+\vspace{0.05cm}
+\small En MySQL se usa \texttt{CONCAT(nombre, ' (', area, ')')}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{CASE WHEN}: decidir fila por fila}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre, sueldo,\\
+\ind \nuevo{\kw{CASE}}\\
+\ind \ind \nuevo{\kw{WHEN} sueldo >= 3000 \kw{THEN} 'alto'}\\
+\ind \ind \nuevo{\kw{WHEN} sueldo >= 2000 \kw{THEN} 'medio'}\\
+\ind \ind \nuevo{\kw{ELSE} 'bajo'}\\
+\ind \nuevo{\kw{END}} \kw{AS} nivel\\
+\kw{FROM} empleado;
+\end{sqlcode}
+\column{.40\textwidth}
+\res{lrl}{\cab{nombre} & \cab{sueldo} & \cab{nivel}}{%
+  Ana & 2500 & medio \\
+  Bruno & 1800 & bajo \\
+  Carla & 4200 & alto \\
+  Diego & 3100 & alto \\
+  Elena & 1500 & bajo \\}
+\end{columns}
+\vspace{0.2cm}
+\begin{itemize}\setlength\itemsep{5pt}
+  \item Las condiciones se revisan \textbf{en orden}: se queda con \textbf{la primera} que se cumple.
+  \item \texttt{ELSE} atrapa a todos los demás. Sin \texttt{ELSE}, a esos les toca \nulo.
+  \item Siempre se cierra con \texttt{END}.
+\end{itemize}
+\vspace{0.05cm}
+\analogia{Es la regla del profesor: «de 18 para arriba, sobresaliente; de 11 para arriba, aprobado; \textbf{si no}, desaprobado».}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Funciones de texto}
+\small Una \textbf{función} recibe un valor y devuelve otro. Estas trabajan con \textbf{texto}.
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{>{\ttfamily\bfseries\raggedright\arraybackslash}p{1.7cm}>{\raggedright\arraybackslash}p{4.3cm}>{\ttfamily\raggedright\arraybackslash}p{4.7cm}>{\ttfamily\raggedright\arraybackslash}p{1.5cm}}
+\toprule
+\normalfont\bfseries Función & \bfseries Qué hace & \normalfont\bfseries Con \texttt{nombre = 'Carla'} & \normalfont\bfseries Resultado \\
+\midrule
+UPPER & pasa todo a mayúsculas & UPPER(nombre) & CARLA \\
+LOWER & pasa todo a minúsculas & LOWER(nombre) & carla \\
+LENGTH & cuenta los caracteres & LENGTH(nombre) & 5 \\
+SUBSTR & saca un pedazo: desde dónde y cuántos & SUBSTR(nombre, 1, 3) & Car \\
+REPLACE & cambia un texto por otro & REPLACE(nombre, 'a', 'o') & Corlo \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{-0.1cm}
+\begin{sqlcode}[.80\textwidth]
+\scriptsize
+\kw{SELECT} \kw{UPPER}(nombre) \kw{AS} nombre, \kw{SUBSTR}(area, 1, 3) \kw{AS} sigla \ \ \com{CARLA | Sis}\\
+\kw{FROM} empleado;
+\end{sqlcode}
+\vspace{-0.1cm}
+\small En \texttt{SUBSTR} las posiciones empiezan en \textbf{1}, no en 0.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Funciones numéricas}
+\begin{columns}[c,onlytextwidth]
+\column{.60\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre,\\
+\ind \nuevo{\kw{ROUND}(sueldo / 30.0, 2)} \kw{AS} sueldo\_diario,\\
+\ind \nuevo{\kw{ABS}(sueldo - 2620)} \kw{AS} distancia\\
+\kw{FROM} empleado;
+\end{sqlcode}
+\column{.38\textwidth}
+\res{lrr}{\cab{nombre} & \cab{sueldo\_diario} & \cab{distancia}}{%
+  Ana & 83.33 & 120 \\
+  Bruno & 60.0 & 820 \\
+  Carla & 140.0 & 1580 \\
+  Diego & 103.33 & 480 \\
+  Elena & 50.0 & 1120 \\}
+\end{columns}
+\vspace{0.15cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{>{\ttfamily\bfseries\raggedright\arraybackslash}p{1.5cm}>{\raggedright\arraybackslash}p{5.6cm}>{\ttfamily\raggedright\arraybackslash}p{3.4cm}>{\ttfamily\raggedright\arraybackslash}p{1.5cm}}
+\toprule
+\normalfont\bfseries Función & \bfseries Qué hace & \normalfont\bfseries Ejemplo & \normalfont\bfseries Resultado \\
+\midrule
+ROUND & redondea a los decimales que pidas & ROUND(83.3333, 2) & 83.33 \\
+ABS & quita el signo: el valor absoluto & ABS(-820) & 820 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.05cm}
+\small \texttt{2620} es el sueldo promedio: \texttt{distancia} dice \textbf{cuánto se aleja} cada uno, por arriba o por abajo.
+\vspace{0.1cm}
+\ojo{Entre dos enteros, \texttt{/} \textbf{bota los decimales}: \texttt{2500 / 30} da \texttt{83}. Por eso se divide entre \texttt{30.0}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 3} Expresiones en la tienda}
+\begin{columns}[c,onlytextwidth]
+\column{.44\textwidth}
+\tablaproducto
+\column{.54\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} \kw{UPPER}(nombre) \kw{AS} nombre,\\
+\ind \kw{ROUND}(precio * 1.18, 1) \kw{AS} precio\_final,\\
+\ind \kw{CASE}\\
+\ind \ind \kw{WHEN} precio >= 500 \kw{THEN} 'caro'\\
+\ind \ind \kw{ELSE} 'económico'\\
+\ind \kw{END} \kw{AS} tipo\\
+\kw{FROM} producto;
+\end{sqlcode}
+\end{columns}
+\vspace{0.1cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{>{\raggedright\arraybackslash}p{8.8cm}>{\raggedright\arraybackslash}p{3.4cm}}
+\toprule
+\bfseries Pregunta & \bfseries Respuesta \\
+\midrule
+¿Qué sale en \texttt{nombre} para la fila 3? & \bl[3.2cm] \\[5pt]
+¿Cuánto es el \texttt{precio\_final} del Mouse? & \bl[3.2cm] \\[5pt]
+¿Cuántos productos salen como \texttt{'caro'}? & \bl[3.2cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\small \textbf{Para escribir:} la consulta que muestra \texttt{Laptop [Cómputo]}, \texttt{Mouse [Cómputo]}\ldots{} en una columna llamada \texttt{etiqueta}.
+\end{frame}
+% =======================================================================
+\seccion[0]{Agregaciones}
+% ---------------------------------------------------------------------
+\begin{frame}{Agregaciones: muchas filas, un solo valor}
+\begin{columns}[c,onlytextwidth]
+\column{.54\textwidth}
+\tablaempleado
+\column{.44\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Una expresión calcula \textbf{fila por fila}.
+  \item Una \textbf{agregación} toma \textbf{toda una columna} y devuelve \textbf{un solo valor}.
+\end{itemize}
+\end{columns}
+\vspace{0.0cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{>{\ttfamily\bfseries\raggedright\arraybackslash}p{1.5cm}>{\raggedright\arraybackslash}p{4.6cm}>{\ttfamily\raggedright\arraybackslash}p{3.4cm}>{\ttfamily\raggedleft\arraybackslash}p{1.7cm}}
+\toprule
+\normalfont\bfseries Función & \bfseries Qué responde & \normalfont\bfseries Ejemplo & \normalfont\bfseries Resultado \\
+\midrule
+COUNT & ¿cuántas filas hay? & COUNT(*) & 5 \\
+SUM & ¿cuánto suman? & SUM(sueldo) & 13100 \\
+AVG & ¿cuál es el promedio? & AVG(sueldo) & 2620.0 \\
+MIN & ¿cuál es el menor? & MIN(sueldo) & 1500 \\
+MAX & ¿cuál es el mayor? & MAX(sueldo) & 4200 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{-0.1cm}
+\begin{sqlcode}[.80\textwidth]
+\scriptsize
+\kw{SELECT} \kw{COUNT}(*) \kw{AS} cantidad, \kw{AVG}(sueldo) \kw{AS} sueldo\_promedio \kw{FROM} empleado;
+\end{sqlcode}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Las agregaciones y los \texttt{NULL}}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} \kw{COUNT}(*) \kw{AS} empleados,\\
+\ind \nuevo{\kw{COUNT}(telefono)} \kw{AS} con\_telefono\\
+\kw{FROM} empleado;
+\end{sqlcode}
+\column{.40\textwidth}
+\res{rr}{\cab{empleados} & \cab{con\_telefono}}{%
+  5 & \mal{3} \\}
+\end{columns}
+\vspace{0.3cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{>{\ttfamily\bfseries\raggedright\arraybackslash}p{3.4cm}>{\raggedright\arraybackslash}p{8.6cm}}
+\toprule
+\normalfont\bfseries Se escribe & \bfseries Cuenta \\
+\midrule
+COUNT(*) & \textbf{todas} las filas \\
+COUNT(telefono) & solo las filas donde \texttt{telefono} \textbf{no es} \nulo \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Bruno y Elena no se cuentan. Diego \textbf{sí}: su \texttt{''} es un valor.
+  \item \texttt{SUM}, \texttt{AVG}, \texttt{MIN} y \texttt{MAX} también \textbf{saltan} los \nulo: no los toman como cero.
+\end{itemize}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{GROUP BY}: un resultado por grupo}
+\small \textbf{Pregunta:} ¿cuántos empleados hay y cuál es el sueldo promedio \textbf{en cada área}?
+\vspace{0.05cm}
+\begin{columns}[c,onlytextwidth]
+\column{.50\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} area,\\
+\ind \kw{COUNT}(*) \kw{AS} cantidad,\\
+\ind \kw{AVG}(sueldo) \kw{AS} sueldo\_promedio\\
+\kw{FROM} empleado\\
+\nuevo{\kw{GROUP BY} area};
+\end{sqlcode}
+\column{.48\textwidth}
+\res{lrr}{\cab{area} & \cab{cantidad} & \cab{sueldo\_promedio}}{%
+  Almacén & 1 & 1500.0 \\
+  Sistemas & 2 & 3650.0 \\
+  Ventas & 2 & 2150.0 \\}
+\end{columns}
+\vspace{0.2cm}
+\begin{enumerate}\setlength\itemsep{5pt}
+  \item Se \textbf{juntan} las filas que tienen la misma \texttt{area}: salen tres grupos.
+  \item La agregación se calcula \textbf{dentro de cada grupo}.
+  \item El resultado tiene \textbf{una fila por grupo}.
+\end{enumerate}
+\vspace{0.1cm}
+\ojo{En el \texttt{SELECT} solo van las columnas del \texttt{GROUP BY} y las agregaciones. Pedir también \texttt{nombre} no tiene sentido: ¿el de cuál de los dos de Ventas?}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{HAVING}: filtrar los grupos}
+\small \textbf{Pregunta:} ¿qué áreas tienen \textbf{dos o más} empleados?
+\vspace{0.05cm}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} area, \kw{COUNT}(*) \kw{AS} cantidad\\
+\kw{FROM} empleado\\
+\kw{GROUP BY} area\\
+\nuevo{\kw{HAVING} \kw{COUNT}(*) >= 2};
+\end{sqlcode}
+\column{.38\textwidth}
+\res{lr}{\cab{area} & \cab{cantidad}}{%
+  Sistemas & 2 \\
+  Ventas & 2 \\}
+\end{columns}
+\vspace{-0.05cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{>{\ttfamily\bfseries\raggedright\arraybackslash}p{1.7cm}>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{5.8cm}}
+\toprule
+& \bfseries Qué filtra & \bfseries Cuándo \\
+\midrule
+WHERE & \textbf{filas} sueltas & \textbf{antes} de agrupar \\
+HAVING & \textbf{grupos} completos & \textbf{después} de agrupar \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{-0.15cm}
+\ojo{\texttt{WHERE COUNT(*) >= 2} da error: cuando actúa el \texttt{WHERE}, los grupos \textbf{todavía no existen}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Todo junto: el orden de una consulta}
+\begin{center}
+\begin{tikzpicture}[y=0.74cm]
+  \renewcommand{\piezax}{7.6}
+  \pieza{5}{\kw{SELECT} area, \kw{AVG}(sueldo) \kw{AS} sueldo\_promedio}{qué se muestra de cada grupo}
+  \pieza{4}{\kw{FROM} empleado}{de qué tabla}
+  \pieza{3}{\kw{WHERE} anio\_ingreso >= 2018}{qué \textbf{filas} entran}
+  \pieza{2}{\kw{GROUP BY} area}{cómo se \textbf{agrupan}}
+  \pieza{1}{\kw{HAVING} \kw{AVG}(sueldo) > 2000}{qué \textbf{grupos} se quedan}
+  \pieza{0}{\kw{ORDER BY} sueldo\_promedio \kw{DESC};}{en qué orden salen}
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.36\textwidth}
+\res{lr}{\cab{area} & \cab{sueldo\_promedio}}{%
+  Sistemas & 3100.0 \\
+  Ventas & 2150.0 \\}
+\column{.60\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{5pt}
+  \item El \texttt{WHERE} deja fuera a \textbf{Carla}, que entró en 2015.
+  \item Quedan tres grupos: Ventas, Sistemas y Almacén.
+  \item El \texttt{HAVING} deja fuera a \textbf{Almacén}: su promedio es 1500.
+\end{itemize}
+\end{columns}
+\vspace{0.15cm}
+\small Las cláusulas se escriben \textbf{siempre en este orden}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 4} Haz tú el \texttt{GROUP BY}, a mano}
+\begin{columns}[c,onlytextwidth]
+\column{.44\textwidth}
+\tablaproducto
+\column{.54\textwidth}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} categoria,\\
+\ind \kw{COUNT}(*) \kw{AS} cantidad,\\
+\ind \kw{MAX}(precio) \kw{AS} precio\_mayor\\
+\kw{FROM} producto\\
+\kw{GROUP BY} categoria;
+\end{sqlcode}
+\end{columns}
+\vspace{0.15cm}
+\begin{columns}[c,onlytextwidth]
+\column{.50\textwidth}
+\small
+\begin{enumerate}\setlength\itemsep{7pt}
+  \item \textbf{Agrupa:} en la tabla, encierra juntas las filas de la misma \texttt{categoria}.
+  \item \textbf{Completa} el resultado: una fila por cada grupo.
+  \item \textbf{Tacha} la fila que desaparece si agregamos \texttt{HAVING COUNT(*) >= 2}.
+\end{enumerate}
+\column{.46\textwidth}
+\centering{\scriptsize\color{utpGris}resultado}\\[3pt]
+\footnotesize
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{lll}
+\toprule
+\ttfamily\cab{categoria} & \ttfamily\cab{cantidad} & \ttfamily\cab{precio\_mayor} \\
+\midrule
+\bl[1.7cm] & \bl[1.2cm] & \bl[1.5cm] \\
+\bl[1.7cm] & \bl[1.2cm] & \bl[1.5cm] \\
+\bl[1.7cm] & \bl[1.2cm] & \bl[1.5cm] \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.4cm}
+\small Trabaja \textbf{en pareja}: uno agrupa, el otro completa. Luego comparen con la pareja de al lado.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Cierre: lo de hoy en una tabla}
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{>{\raggedright\bfseries}p{4.2cm}>{\raggedright\arraybackslash}p{8.6cm}}
+\toprule
+& \bfseries En una frase \\
+\midrule
+Índice & Una lista ordenada que dice dónde está cada fila. \\
+\texttt{IS NULL} & Pregunta si falta el dato. Nunca \texttt{= NULL}. \\
+\texttt{COALESCE} / \texttt{NULLIF} & Poner un repuesto al \nulo; convertir un valor en \nulo. \\
+Expresión & Un cálculo en el \texttt{SELECT}, fila por fila, con su \texttt{AS}. \\
+\texttt{CASE WHEN} & Decide un valor según una condición. \\
+Agregación & Muchas filas, un solo valor: \texttt{COUNT}, \texttt{SUM}, \texttt{AVG}, \texttt{MIN}, \texttt{MAX}. \\
+\texttt{GROUP BY} / \texttt{HAVING} & Un resultado por grupo; quedarse solo con algunos grupos. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\small Para no confundirlos: \texttt{WHERE} filtra \textbf{filas}, \texttt{HAVING} filtra \textbf{grupos}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Referencias}
+\footnotesize
+Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración} (9.ª ed.). Cengage Learning.
+
+\vspace{0.2cm}
+Elmasri, R., \& Navathe, S. (2007). \textit{Fundamentos de sistemas de bases de datos} (5.ª ed.). Addison Wesley.
+
+\vspace{0.2cm}
+Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2020). \textit{Database system concepts} (7th ed.). McGraw-Hill.
+
+\vspace{0.2cm}
+SQLite. (s.\,f.). \textit{Query planning}. \texttt{https://www.sqlite.org/queryplanner.html}
+
+\vspace{0.2cm}
+SQLite. (s.\,f.). \textit{Built-in scalar SQL functions}. \texttt{https://www.sqlite.org/lang\_corefunc.html}
+
+\vspace{0.2cm}
+SQLite. (s.\,f.). \textit{Built-in aggregate functions}. \texttt{https://www.sqlite.org/lang\_aggfunc.html}
+\end{frame}
+% ---------------------------------------------------------------------
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}

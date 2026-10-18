@@ -1,0 +1,438 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+
+\title{Índices compuestos y consultas SELECT}
+\subtitle{Índices compuestos, filtros en una tienda web\\ y estructura de una consulta completa}
+\date{Semana 10 - Sesión 19}
+\author{Rel Guzman}
+
+% Espacio en blanco para completar
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Parte nueva de un bloque de codigo que crece paso a paso
+\newcommand{\nuevo}[1]{{%
+  \setlength{\fboxsep}{1.2pt}%
+  \begingroup
+  \renewcommand{\kw}[1]{\textcolor{utpNegro}{\textbf{##1}}}%
+  \colorbox{yellow!45}{\textcolor{utpNegro}{#1}}%
+  \endgroup}}
+% Comentario dentro de un bloque de código SQL
+\newcommand{\com}[1]{\textcolor{utpGris}{-- #1}}
+% Marcas de clave primaria y clave foránea
+\newcommand{\pk}{{\scriptsize\color{utpRojo}\textbf{PK}}}
+\newcommand{\fk}{{\scriptsize\color{utpNaranja}\textbf{FK}}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre del gestor o de la forma de escribir algo
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Celda resaltada en rojo claro
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% Barra invertida de las rutas de Windows
+\newcommand{\bs}{\textbackslash{}}
+% Bloque de código sobre fondo gris
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.6em}}
+% Anatomía de una instrucción: cada pieza del código con su pregunta al lado
+\tikzset{
+  pieza/.style={fill=utpGrisClaro,font=\ttfamily\footnotesize,anchor=west,inner sep=5pt,
+    minimum height=0.62cm},
+  para/.style={font=\small,anchor=west,text=utpNegro}
+}
+\newcommand{\piezax}{7.6}
+\newcommand{\pieza}[3]{%
+  \node[pieza] at (0,#1) {#2};
+  \node[para] at (\piezax,#1) {\textcolor{utpRojo}{$\blacktriangleleft$}\ #3};}
+% Diapositiva de sección: una palabra bien grande (\seccion[0]{...} la deja sin línea roja)
+\newcommand{\seccion}[2][1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#2}};
+    \ifnum#1=1
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+    \fi
+  \end{tikzpicture}
+\end{frame}}
+% Cabecera de columna dentro de una tabla en monoespaciado
+\newcommand{\cab}[1]{\normalfont\bfseries #1}
+% Resultado de una consulta: \res{columnas}{cabecera}{filas}
+\newcommand{\res}[3]{%
+  \centering{\scriptsize\color{utpGris}resultado}\\[3pt]
+  \footnotesize\ttfamily
+  \begin{tabular}{#1}
+  \toprule
+  #2 \\
+  \midrule
+  #3
+  \bottomrule
+  \end{tabular}}
+% Columna del modelo lógico: nombre y, en gris, su tipo
+\newcommand{\col}[2]{\texttt{#1}~{\color{utpGris}#2}}
+% Diagrama de la peluquería, igual en el modelo conceptual y en el lógico.
+% \diagpelu[1 con verbos | 0 sin verbos]{cliente}{mascota}{cita}{pago}{servicio}{empleado}{encargado}
+\newcommand{\diagpelu}[8][1]{%
+  \ifnum#1=1 \def\entw{1.8cm}\else\def\entw{2.45cm}\fi
+  \begin{tikzpicture}[font=\tiny]
+    \tikzset{ent/.style={cajaverde,text width=\entw,align=left,font=\tiny,inner sep=4pt,
+      minimum height=0pt},
+      verbo/.style={font=\tiny\itshape,text=utpRojo,inner sep=1.5pt}}
+    \node[ent] (cli) at (0,0) {#2};
+    \node[ent] (mas) at (3.6,0) {#3};
+    \node[ent] (cit) at (7.2,0) {#4};
+    \node[ent] (pag) at (10.8,0) {#5};
+    \node[ent] (ser) at (3.6,-3.0) {#6};
+    \node[ent] (emp) at (10.8,-3.0) {#7};
+    \node[ent,fill=white,draw=utpGris] (enc) at (0,-3.0) {#8};
+    \coordinate (s) at ([xshift=-6mm]cit.south);
+    \coordinate (e) at ([xshift=6mm]cit.south);
+    % cliente 1 -- N mascota
+    \draw[relacion] (cli.east) -- (mas.west);
+    \pic at ($(cli.east)+(2.6mm,0)$) {uno};
+    \pic at ($(mas.west)+(-2.6mm,0)$) {muchos};
+    % mascota 1 -- N cita
+    \draw[relacion] (mas.east) -- (cit.west);
+    \pic at ($(mas.east)+(2.6mm,0)$) {uno};
+    \pic at ($(cit.west)+(-2.6mm,0)$) {muchos};
+    % cita 1 -- 1 pago
+    \draw[relacion] (cit.east) -- (pag.west);
+    \pic at ($(cit.east)+(2.6mm,0)$) {uno};
+    \pic at ($(pag.west)+(-2.6mm,0)$) {uno};
+    % servicio 1 -- N cita
+    \draw[relacion] (ser.east) -| (s);
+    \pic at ($(ser.east)+(2.6mm,0)$) {uno};
+    \pic[rotate=90] at ($(s)+(0,-2.6mm)$) {muchos};
+    % empleado 1 -- N cita
+    \draw[relacion] (emp.west) -| (e);
+    \pic at ($(emp.west)+(-2.6mm,0)$) {uno};
+    \pic[rotate=90] at ($(e)+(0,-2.6mm)$) {muchos};
+    \ifnum#1=1
+      \path (cli.east) -- (mas.west) node[midway,above=1mm,verbo] {es dueño de};
+      \path (mas.east) -- (cit.west) node[midway,above=1mm,verbo] {tiene};
+      \path (cit.east) -- (pag.west) node[midway,above=1mm,verbo] {se paga con};
+      \path (ser.east) -- (ser.east -| s) node[midway,above=0.5mm,verbo] {se presta en};
+      \path (emp.west) -- (emp.west -| e) node[midway,above=0.5mm,verbo] {atiende};
+    \fi
+    \node[font=\tiny,text=utpGris,below=1.5mm of enc,text width=2.6cm,align=center]
+      {no se relaciona: solo guarda el acceso};
+  \end{tikzpicture}}
+
+\begin{document}
+
+% 1 ---------------------------------------------------------------------
+{\setbeamertemplate{footline}{}\maketitle}
+
+% 2 ---------------------------------------------------------------------
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás decidir cuándo conviene un \textbf{índice de varias columnas}, elegir el orden de sus columnas y leer la estructura de una \textbf{consulta \texttt{SELECT} completa}.
+\end{block}
+\end{frame}
+% =======================================================================
+% Revisión de la sesión anterior
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión de la sesión anterior: en resumen}
+\vspace{-0.2cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{>{\raggedright\bfseries}p{3.1cm}>{\raggedright\arraybackslash}p{4.9cm}>{\ttfamily\scriptsize\raggedright\arraybackslash}p{5.6cm}}
+\toprule
+& \bfseries En una frase & \normalfont\bfseries Ejemplo \\
+\midrule
+Índice & Una lista ordenada que dice dónde está cada fila. & CREATE INDEX idx\_cliente\_nombre ON cliente (nombre); \\
+\texttt{IS NULL} & Pregunta si falta el dato. Nunca \texttt{= NULL}. & WHERE telefono IS NULL \\
+\texttt{COALESCE} / \texttt{NULLIF} & Un repuesto para el \texttt{NULL}; convertir un valor en \texttt{NULL}. & COALESCE(telefono, 'sin teléfono') \\
+Expresión & Un cálculo fila por fila, con su \texttt{AS}. & sueldo * 12 AS sueldo\_anual \\
+\texttt{CASE WHEN} & Decide un valor según una condición. & CASE WHEN sueldo >= 3000 THEN 'alto' ELSE 'bajo' END \\
+Agregación & Muchas filas, un solo valor. & COUNT(*), SUM, AVG, MIN, MAX \\
+\texttt{GROUP BY} / \texttt{HAVING} & Un resultado por grupo; filtrar los grupos. & GROUP BY area HAVING COUNT(*) >= 2 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.05cm}
+\small Hoy repasamos dos ideas más a fondo: los \textbf{índices de varias columnas} y la \textbf{consulta \texttt{SELECT} completa}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión: un índice de \textbf{varias} columnas}
+\begin{columns}[c,onlytextwidth]
+\column{.54\textwidth}
+\centering
+\begin{tikzpicture}[y=0.56cm]
+  \tikzset{
+    celda/.style={draw=utpNegro,thick,font=\scriptsize\ttfamily,minimum height=0.48cm,
+      inner sep=2.5pt,align=left},
+    idx/.style={celda,fill=yellow!35,text width=2.05cm},
+    dato/.style={celda,fill=utpGrisClaro,text width=2.35cm}
+  }
+  \node[idx] (i1) at (0,0) {Cómputo \ \ 45};
+  \node[idx] (i2) at (0,-1) {Cómputo \ \ 3200};
+  \node[idx] (i3) at (0,-2) {Hogar \ \ \ \ 90};
+  \node[idx] (i4) at (0,-3) {Muebles \ \ 380};
+  \node[idx] (i5) at (0,-4) {Muebles \ \ 650};
+  \node[dato] (t1) at (4.3,0) {1 Laptop \ 3200};
+  \node[dato] (t2) at (4.3,-1) {2 Mouse \ \ 45};
+  \node[dato] (t3) at (4.3,-2) {3 Silla \ \ 380};
+  \node[dato] (t4) at (4.3,-3) {4 Mesa \ \ \ 650};
+  \node[dato] (t5) at (4.3,-4) {5 Lámpara \ 90};
+  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i1.east)--(t2.west);
+  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i2.east)--(t1.west);
+  \draw[-{Stealth[length=1.8mm]},utpGris,thick] (i3.east)--(t5.west);
+  \draw[-{Stealth[length=1.8mm]},utpRojo,very thick] (i4.east)--(t3.west);
+  \draw[-{Stealth[length=1.8mm]},utpRojo,very thick] (i5.east)--(t4.west);
+  \node[font=\scriptsize\bfseries,above=1mm of i1] {índice (categoria, precio)};
+  \node[font=\scriptsize,above=1mm of t1] {\tbl{producto}};
+\end{tikzpicture}
+\column{.44\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{7pt}
+  \item Se ordena primero por \texttt{categoria}.
+  \item Si dos tienen la \textbf{misma} categoría, se ordenan por \texttt{precio}.
+  \item «Muebles de menos de 700» están \textbf{juntos} en la lista.
+\end{itemize}
+\end{columns}
+\vspace{0.1cm}
+\begin{sqlcode}[.72\textwidth]
+\scriptsize
+\kw{CREATE INDEX} idx\_producto\_categoria\_precio\\
+\ind \kw{ON} producto \nuevo{(categoria, precio)};
+\end{sqlcode}
+\vspace{-0.15cm}
+\analogia{Es la \textbf{guía telefónica}: ordenada por apellido y, dentro del mismo apellido, por nombre.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión: el orden de las columnas importa}
+\small Con el índice \texttt{(categoria, precio)}, ¿qué consultas salen rápido?
+\vspace{0.1cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{>{\ttfamily\footnotesize\raggedright\arraybackslash}p{7.0cm}>{\centering\arraybackslash}p{1.5cm}>{\raggedright\arraybackslash}p{4.5cm}}
+\toprule
+\normalfont\bfseries La consulta tiene\ldots & \bfseries ¿Lo usa? & \bfseries Por qué \\
+\midrule
+WHERE categoria = 'Muebles' & Sí & usa la \textbf{primera} columna \\
+WHERE categoria = 'Muebles' AND precio < 700 & Sí & usa las \textbf{dos} columnas \\
+WHERE categoria = 'Muebles' ORDER BY precio & Sí & ya vienen \textbf{ordenados} por precio \\
+WHERE precio < 700 & \mal{No} & se \textbf{saltó} la primera columna \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{-0.1cm}
+\concepto{La regla}{\small El índice se usa \textbf{de izquierda a derecha}. Pon primero la columna que se compara con \texttt{=}, y después la del rango o la del \texttt{ORDER BY}.}
+\vspace{0.05cm}
+\analogia{En la guía buscas rápido a los «Pérez» o a «Pérez, Ana». Pero no a todas las «Ana»: están repartidas por toda la guía.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión: una tienda web con filtros}
+\begin{columns}[c,onlytextwidth]
+\column{.47\textwidth}
+\centering
+\begin{tikzpicture}[font=\tiny]
+  % ventana del navegador
+  \draw[thick,utpNegro,rounded corners=2pt] (0,0) rectangle (6.6,-4.6);
+  \fill[utpGrisClaro,rounded corners=2pt] (0.03,-0.03) rectangle (6.57,-0.45);
+  \foreach \x in {0.2,0.38,0.56} \fill[utpGrisMedio] (\x,-0.24) circle (0.06);
+  \node[draw=utpGrisMedio,fill=white,anchor=west,inner sep=1.5pt,text width=4.6cm,font=\tiny\ttfamily]
+    at (0.85,-0.24) {localhost:3003};
+  \node[anchor=west,font=\small\bfseries] at (0.2,-0.8) {Mi Tienda};
+  % filtros
+  \fill[utpGrisClaro] (0.2,-1.15) rectangle (2.2,-4.4);
+  \node[anchor=west,font=\tiny\bfseries] at (0.3,-1.4) {Categoría};
+  \node[draw,fill=yellow!35,anchor=west,text width=1.55cm,inner sep=2pt] at (0.3,-1.75)
+    {Hogar \hfill$\blacktriangledown$};
+  \node[anchor=west,font=\tiny\bfseries] at (0.3,-2.2) {Precio (S/)};
+  \node[draw,fill=yellow!35,anchor=west,text width=0.55cm,inner sep=2pt] at (0.3,-2.55) {2000};
+  \node[anchor=west] at (1.15,-2.55) {a};
+  \node[draw,fill=yellow!35,anchor=west,text width=0.55cm,inner sep=2pt] at (1.4,-2.55) {2500};
+  \node[anchor=west,font=\tiny\bfseries] at (0.3,-3.0) {Ordenar por};
+  \node[draw,fill=yellow!35,anchor=west,text width=1.55cm,inner sep=2pt] at (0.3,-3.35)
+    {menor precio \hfill$\blacktriangledown$};
+  \node[fill=utpRojo,text=white,font=\tiny\bfseries,text width=1.55cm,align=center,inner sep=2.5pt,
+    anchor=west] at (0.3,-3.95) {Filtrar};
+  % productos
+  \foreach \c in {0,1,2} \foreach \f in {0,1} {
+    \draw[utpGrisMedio,rounded corners=1pt] (2.45+\c*1.4,-1.15-\f*1.65) rectangle ++(1.25,-1.45);
+    \fill[utpGrisClaro] (2.55+\c*1.4,-1.25-\f*1.65) rectangle ++(1.05,-0.7);
+    \node[anchor=west] at (2.5+\c*1.4,-2.15-\f*1.65) {Producto};
+    \node[anchor=west,font=\tiny\bfseries] at (2.5+\c*1.4,-2.4-\f*1.65) {S/ 2000};
+  }
+\end{tikzpicture}
+\column{.50\textwidth}
+\small Cada filtro que elige el cliente se vuelve \textbf{una parte} de la consulta:
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{SELECT} nombre, precio\\
+\kw{FROM} producto\\
+\kw{WHERE} \nuevo{categoria = 'Hogar'}\\
+\ind \kw{AND} \nuevo{precio \kw{BETWEEN} 2000 \kw{AND} 2500}\\
+\kw{ORDER BY} \nuevo{precio}\\
+\kw{LIMIT} 10;
+\end{sqlcode}
+\vspace{-0.15cm}
+\small Esta consulta se repite \textbf{cada vez} que alguien filtra. El índice que la acelera:
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE INDEX} idx\_producto\_categoria\_precio\\
+\ind \kw{ON} producto (\nuevo{categoria}, \nuevo{precio});
+\end{sqlcode}
+\end{columns}
+\vspace{0.1cm}
+\small\color{utpGris} Primero \texttt{categoria}, que va con \texttt{=}; después \texttt{precio}, que es un rango y además ordena.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Demostración: la tienda con un millón de productos}
+\small La carpeta \texttt{tienda/} trae esa página. Con los botones \textbf{creas y borras} el índice, y comparas.
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{Crear índice}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{CREATE INDEX} idx\_producto\_categoria\_precio\\
+\ind \kw{ON} producto (categoria, precio);
+\end{sqlcode}
+\column{.48\textwidth}
+\centering\etiqueta{Borrar índice}
+\begin{sqlcode}[\textwidth]
+\scriptsize
+\kw{DROP INDEX} idx\_producto\_categoria\_precio;
+\end{sqlcode}
+\end{columns}
+\vspace{0.15cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{>{\raggedright\arraybackslash}p{4.4cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{4.0cm}}
+\toprule
+& \bfseries Sin índice & \bfseries Con índice \\
+\midrule
+El filtro tarda & \bl[1.8cm] ms & \bl[1.8cm] ms \\
+«Cómo buscó» dice & \texttt{SCAN producto} & \texttt{SEARCH \ldots{} USING INDEX} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\small \texttt{SCAN} es leer la tabla \textbf{completa}, fila por fila. \texttt{SEARCH} es ir \textbf{directo} con el índice.
+\vspace{0.2cm}
+
+\small \textbf{Para probarlo}, en la carpeta \texttt{tienda/}: \texttt{npm install}, \texttt{npm run crear} y \texttt{npm run dev}. Luego abre \texttt{http://localhost:3003}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 1} ¿Índice? ¿Sobre qué columnas?}
+\small La tabla \tbl{pedido}\texttt{(id, cliente\_id, fecha, estado, total)} de una tienda en línea tiene \textbf{dos millones} de filas.
+\vspace{0.15cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{>{\raggedright\arraybackslash}p{9.2cm}>{\raggedright\arraybackslash}p{3.8cm}}
+\toprule
+\bfseries Situación & \bfseries ¿Índice? ¿Sobre qué? \\
+\midrule
+1. La página «Mis pedidos»: \texttt{WHERE cliente\_id = ? ORDER BY fecha} & \bl[3.6cm] \\[4pt]
+2. El almacén ve los pendientes: \texttt{WHERE estado = 'pendiente' AND fecha >= ?} & \bl[3.6cm] \\[4pt]
+3. Abrir un pedido por su número: \texttt{WHERE id = ?} & \bl[3.6cm] \\[4pt]
+4. Un reporte que se corre \textbf{una vez al año}: \texttt{WHERE total > 1000} & \bl[3.6cm] \\[4pt]
+5. La tabla \tbl{metodo\_pago} tiene solo 3 filas: efectivo, tarjeta, Yape. & \bl[3.6cm] \\[4pt]
+6. Ya existe \texttt{(cliente\_id, fecha)}. ¿Sirve para \texttt{WHERE fecha = ?} & \bl[3.6cm] \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\small \textbf{Para escribir:} el \texttt{CREATE INDEX} de las situaciones 1 y 2. \textbf{Pista:} el número de pedido es la clave primaria.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión: todo junto, lo que puede llevar un \texttt{SELECT}}
+\begin{center}
+\begin{tikzpicture}[y=0.54cm]
+  \renewcommand{\piezax}{7.4}
+  \pieza{7}{\kw{SELECT} c.nombre, \kw{COUNT}(*) \kw{AS} pedidos}{qué columnas o cálculos se \textbf{muestran}}
+  \pieza{6}{\kw{FROM} cliente c}{la tabla \textbf{principal}}
+  \pieza{5}{\kw{JOIN} pedido p \kw{ON} c.id = p.cliente\_id}{qué otra tabla se \textbf{une}, y por dónde}
+  \pieza{4}{\kw{WHERE} p.fecha >= '2026-01-01'}{qué \textbf{filas} entran}
+  \pieza{3}{\kw{GROUP BY} c.nombre}{cómo se \textbf{agrupan}}
+  \pieza{2}{\kw{HAVING} \kw{COUNT}(*) >= 2}{qué \textbf{grupos} se quedan}
+  \pieza{1}{\kw{ORDER BY} pedidos \kw{DESC}}{en qué \textbf{orden} salen}
+  \pieza{0}{\kw{LIMIT} 5;}{cuántas filas, \textbf{como máximo}}
+\end{tikzpicture}
+\end{center}
+\vspace{-0.05cm}
+\begin{itemize}\setlength\itemsep{3pt}
+  \item \texttt{SELECT} indica qué mostrar. \texttt{FROM} se usa al consultar tablas. Lo demás se agrega si hace falta.
+  \item Si se usan, se escriben \textbf{siempre en este orden}.
+  \item \texttt{SELECT DISTINCT} quita las filas \textbf{repetidas} del resultado.
+\end{itemize}
+\vspace{0.05cm}
+\small\color{utpGris} Se lee: «los 5 clientes con más pedidos este año, entre los que tienen 2 o más».
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Cierre: lo de hoy en una tabla}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.45}
+\begin{tabular}{>{\raggedright\bfseries}p{4.2cm}>{\raggedright\arraybackslash}p{8.6cm}}
+\toprule
+& \bfseries En una frase \\
+\midrule
+Índice de varias columnas & Ordena por la primera columna y, dentro de ella, por la siguiente. \\
+Orden de las columnas & Importa el prefijo izquierdo del índice. \\
+Tienda con filtros & Comparamos el plan y el tiempo de consulta con y sin índice. \\
+\texttt{SELECT} completo & Cada cláusula tiene una función y un lugar al escribir la consulta. \\
+\texttt{WHERE} / \texttt{HAVING} & Filtran filas y grupos, respectivamente. \\
+\texttt{ORDER BY} / \texttt{LIMIT} & Ordenan el resultado y limitan la cantidad de filas. \\
+
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.25cm}
+\small El índice se elige según las \textbf{consultas que hace la aplicación}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Referencias}
+\footnotesize
+Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración} (9.ª ed.). Cengage Learning.
+
+\vspace{0.2cm}
+Elmasri, R., \& Navathe, S. (2007). \textit{Fundamentos de sistemas de bases de datos} (5.ª ed.). Addison Wesley.
+
+\vspace{0.2cm}
+Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2020). \textit{Database system concepts} (7th ed.). McGraw-Hill.
+
+\vspace{0.2cm}
+Microsoft. (s.\,f.). \textit{Transact-SQL reference}. \texttt{https://learn.microsoft.com/sql/t-sql/language-reference}
+
+\vspace{0.2cm}
+Microsoft. (s.\,f.). \textit{SQL Server Management Studio (SSMS)}. \texttt{https://learn.microsoft.com/sql/ssms}
+
+\vspace{0.2cm}
+Oracle. (s.\,f.). \textit{MySQL 8.0 reference manual: multiple-column indexes}. \texttt{https://dev.mysql.com/doc/refman/8.0/en/multiple-column-indexes.html}
+
+\vspace{0.2cm}
+SQLite. (s.\,f.). \textit{Query planning}. \texttt{https://www.sqlite.org/queryplanner.html}
+\end{frame}
+% ---------------------------------------------------------------------
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}

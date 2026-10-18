@@ -1,0 +1,12 @@
+{
+  "name": "tienda-con-filtros",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "crear": "node --no-warnings crear_db.js",
+    "dev": "node --no-warnings server.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

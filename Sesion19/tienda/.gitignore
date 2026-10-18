@@ -1,0 +1,5 @@
+# Se crea con: npm run crear
+tienda.db
+
+# Se crea con: npm install
+node_modules/

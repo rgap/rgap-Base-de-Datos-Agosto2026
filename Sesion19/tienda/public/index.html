@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Mi Tienda: filtros e índice de dos columnas</title>
+
+    <!-- ====================================================== -->
+    <!-- EL DISEÑO de la página                                 -->
+    <!-- ====================================================== -->
+    <style>
+      body {
+        max-width: 1100px;
+        margin: 30px auto;
+        padding: 0 16px;
+        font-family: sans-serif;
+        font-size: 20px;
+      }
+
+      h1 {
+        margin: 0 0 16px;
+        font-size: 2.4rem;
+      }
+
+      code {
+        font-size: 0.8em;
+      }
+
+      .pagina {
+        display: flex;
+        gap: 28px;
+      }
+
+      /* La columna de filtros, a la izquierda */
+      .filtros {
+        width: 260px;
+        padding: 16px;
+        background: #f1f1f1;
+        border-radius: 8px;
+      }
+
+      .filtros label {
+        display: block;
+        margin: 0 0 14px;
+        font-weight: bold;
+      }
+
+      select,
+      input,
+      button {
+        width: 100%;
+        box-sizing: border-box;
+        margin-top: 6px;
+        padding: 8px 10px;
+        font-size: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      /* Los productos, a la derecha */
+      .resultados {
+        flex: 1;
+      }
+
+      #tiempo {
+        margin: 0;
+        color: #16a34a;
+        font-size: 3.6rem;
+        font-weight: bold;
+      }
+
+      #plan {
+        margin: 4px 0 18px;
+        color: #5f5f5f;
+      }
+
+      .productos {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+      }
+
+      .producto {
+        padding: 12px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        font-size: 0.8em;
+      }
+
+      .producto strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 1.3em;
+      }
+
+      .indice {
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid #ccc;
+      }
+
+      #estado {
+        font-weight: bold;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- ====================================================== -->
+    <!-- LO QUE SE VE en la página                              -->
+    <!-- ====================================================== -->
+
+    <h1>Mi Tienda</h1>
+
+    <p>
+      <code>SELECT ... FROM producto WHERE categoria = ? AND precio BETWEEN ? AND ? ORDER BY precio LIMIT 10</code>
+    </p>
+
+    <div class="pagina">
+      <!-- Los filtros -->
+      <div class="filtros">
+        <label>
+          Categoría
+          <select id="categoria">
+            <option>Cómputo</option>
+            <option>Celulares</option>
+            <option selected>Hogar</option>
+            <option>Muebles</option>
+            <option>Juguetes</option>
+            <option>Libros</option>
+            <option>Deportes</option>
+            <option>Ropa</option>
+          </select>
+        </label>
+
+        <label>
+          Precio desde (S/)
+          <input id="minimo" type="number" value="2000" />
+        </label>
+
+        <label>
+          Precio hasta (S/)
+          <input id="maximo" type="number" value="2500" />
+        </label>
+
+        <button onclick="buscar()">Filtrar</button>
+
+        <!-- El índice de dos columnas -->
+        <div class="indice">
+          Índice <code>(categoria, precio)</code>:
+          <span id="estado"></span>
+          <button onclick="cambiarIndice('crear')">Crear índice</button>
+          <button onclick="cambiarIndice('borrar')">Borrar índice</button>
+        </div>
+      </div>
+
+      <!-- Los resultados -->
+      <div class="resultados">
+        <!-- Aquí aparece el tiempo -->
+        <p id="tiempo"></p>
+
+        <!-- Aquí aparece cómo buscó SQLite -->
+        <p id="plan"></p>
+
+        <!-- Aquí aparecen los productos -->
+        <div id="productos" class="productos"></div>
+      </div>
+    </div>
+
+    <!-- ====================================================== -->
+    <!-- LO QUE PASA al hacer clic en los botones               -->
+    <!-- ====================================================== -->
+    <script>
+      async function buscar() {
+        // 1. Se leen los filtros elegidos.
+        const categoria = document.getElementById('categoria').value;
+        const minimo = document.getElementById('minimo').value;
+        const maximo = document.getElementById('maximo').value;
+
+        // 2. Se le pide la búsqueda al servidor y se espera su respuesta.
+        const respuesta = await fetch(
+          '/buscar?categoria=' + encodeURIComponent(categoria) + '&minimo=' + minimo + '&maximo=' + maximo,
+        );
+        const resultado = await respuesta.json();
+
+        // 3. Se muestra el tiempo, con tres decimales, y cómo buscó SQLite.
+        document.getElementById('tiempo').textContent = resultado.milisegundos.toFixed(3) + ' ms';
+        document.getElementById('plan').textContent = 'Cómo buscó: ' + resultado.plan.join(' · ');
+        mostrarEstado(resultado.indice);
+
+        // 4. Se dibuja una tarjeta por cada producto.
+        const productos = document.getElementById('productos');
+        productos.innerHTML = '';
+
+        for (const producto of resultado.productos) {
+          const tarjeta = document.createElement('div');
+          tarjeta.className = 'producto';
+          tarjeta.innerHTML = producto.nombre + '<strong>S/ ' + producto.precio + '</strong>';
+          productos.appendChild(tarjeta);
+        }
+
+        if (resultado.productos.length === 0) {
+          productos.textContent = 'No hay productos con esos filtros.';
+        }
+      }
+
+      // Crea o borra el índice, y vuelve a buscar para comparar el tiempo.
+      async function cambiarIndice(accion) {
+        document.getElementById('estado').textContent = 'trabajando...';
+        await fetch('/indice/' + accion, { method: 'POST' });
+        await buscar();
+      }
+
+      function mostrarEstado(indice) {
+        document.getElementById('estado').textContent = indice ? 'creado' : 'no existe';
+      }
+
+      // Al abrir la página se muestra si el índice existe.
+      fetch('/indice')
+        .then((respuesta) => respuesta.json())
+        .then((resultado) => mostrarEstado(resultado.indice));
+    </script>
+  </body>
+</html>

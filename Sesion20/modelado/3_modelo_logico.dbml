@@ -1,0 +1,86 @@
+// @visual table=cliente x=213 y=17
+Table cliente {
+  id integer [pk, increment]
+  nombre text [not null, check: `trim(nombre) <> ''`]
+  telefono text [unique]
+}
+
+// @visual table=mascota x=471 y=-29
+Table mascota {
+  id integer [pk, increment]
+  nombre text [note: "'Opcional; COLLATE NOCASE'"]
+  especie text [not null, check: `trim(especie) <> ''`]
+  raza text
+  cliente_id integer [not null]
+  indexes {
+    (cliente_id, nombre) [unique]
+  }
+}
+
+// @visual table=servicio x=544 y=221
+Table servicio {
+  id integer [pk, increment]
+  nombre text [unique, not null, check: `trim(nombre) <> ''`, note: "'COLLATE NOCASE'"]
+  duracion integer [not null, check: `typeof(duracion) = 'integer' AND duracion > 0`, note: "'En minutos'"]
+  precio real [not null, check: `precio > 0 AND round(precio, 2) = precio`, note: "'En soles'"]
+  orden integer [not null]
+}
+
+// @visual table=empleado x=982 y=225
+Table empleado {
+  id integer [pk, increment]
+  nombre text [unique, not null, check: `trim(nombre) <> ''`, note: "'COLLATE NOCASE'"]
+  orden integer [not null]
+}
+
+// @visual table=cita x=760 y=0
+Table cita {
+  id integer [pk, increment]
+  fecha_hora text [not null]
+  estado text [not null, default: 'programada', check: `estado IN ('programada', 'completada', 'cancelada')`]
+  mascota_id integer [not null]
+  servicio_id integer [not null]
+  empleado_id integer [not null]
+  indexes {
+    (empleado_id, fecha_hora) [unique]
+  }
+}
+
+// @visual table=pago x=1109 y=-13
+Table pago {
+  id integer [pk, increment]
+  monto real [not null, note: "'En soles'"]
+  metodo text [not null, check: `metodo IN ('efectivo', 'tarjeta', 'transferencia')`]
+  cita_id integer [unique, not null]
+}
+
+// @visual table=encargado x=299 y=252
+Table encargado {
+  id integer [pk, increment]
+  usuario text [unique, not null]
+  contrasena text [not null, note: "'Hash con sal de la contraseña, nunca en claro'"]
+}
+
+// Nota: Todo cliente debe tener al menos una mascota (1..N).
+// La FK solo exige que cada mascota tenga cliente, no al revés.
+// Que todo cliente tenga al menos una mascota hay que asegurarlo con un trigger o en la aplicación.
+// Aquí lo asegura la aplicación: un cliente solo se registra al programar una cita.
+Ref: cliente.id < mascota.cliente_id
+
+// Nota: Toda mascota debe tener al menos una cita (1..N).
+// La FK solo exige que cada cita tenga mascota, no al revés.
+// Que toda mascota tenga al menos una cita hay que asegurarlo con un trigger o en la aplicación.
+// Aquí lo asegura la aplicación: una mascota solo se registra al programar una cita.
+Ref: mascota.id < cita.mascota_id
+
+// Cada cita es de exactamente un servicio.
+// Un servicio del catálogo puede no tener citas (0..N); solo así puede eliminarse (Regla 12).
+Ref: servicio.id <? cita.servicio_id
+
+// Cada cita la atiende exactamente un empleado.
+// Un empleado puede no tener citas (0..N); solo así puede eliminarse (Regla 12).
+Ref: empleado.id <? cita.empleado_id
+
+// Cada pago corresponde a exactamente una cita.
+// Una cita tiene 0..1 pago: solo se paga, una única vez, si está completada (Regla 7).
+Ref: cita.id -? pago.cita_id
