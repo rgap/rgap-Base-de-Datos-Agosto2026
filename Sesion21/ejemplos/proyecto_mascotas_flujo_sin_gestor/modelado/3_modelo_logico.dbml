@@ -1,0 +1,75 @@
+// Flujo A: el gestor todavía no está definido.
+// Este modelo lógico no usa funciones ni tipos propios de un gestor:
+// a partir de él se genera el físico para el gestor que se elija al final.
+//   npx -p @dbml/cli dbml2sql 3_modelo_logico.dbml --mysql -o 4_modelo_fisico_mysql.sql
+//   npx -p @dbml/cli dbml2sql 3_modelo_logico.dbml --mssql -o 4_modelo_fisico_sqlserver.sql
+
+Table cliente {
+  id integer [pk, increment]
+  nombre varchar(100) [not null]
+  telefono varchar(20) [unique]
+}
+
+Table mascota {
+  id integer [pk, increment]
+  nombre varchar(50) [note: 'Opcional']
+  especie varchar(30) [not null]
+  raza varchar(50)
+  cliente_id integer [not null]
+  indexes {
+    (cliente_id, nombre) [unique]
+  }
+}
+
+Table servicio {
+  id integer [pk, increment]
+  nombre varchar(100) [unique, not null]
+  duracion integer [not null, check: `duracion > 0`, note: 'En minutos']
+  precio decimal(8,2) [not null, check: `precio > 0`, note: 'En soles']
+  orden integer [not null]
+}
+
+Table empleado {
+  id integer [pk, increment]
+  nombre varchar(100) [unique, not null]
+  orden integer [not null]
+}
+
+Table cita {
+  id integer [pk, increment]
+  fecha_hora datetime [not null]
+  estado varchar(20) [not null, default: 'programada',
+    check: `estado IN ('programada', 'completada', 'cancelada')`]
+  mascota_id integer [not null]
+  servicio_id integer [not null]
+  empleado_id integer [not null]
+  indexes {
+    (empleado_id, fecha_hora) [unique]
+  }
+}
+
+Table pago {
+  id integer [pk, increment]
+  monto decimal(8,2) [not null, note: 'En soles']
+  metodo varchar(20) [not null, check: `metodo IN ('efectivo', 'tarjeta', 'transferencia')`]
+  cita_id integer [unique, not null]
+}
+
+Table encargado {
+  id integer [pk, increment]
+  usuario varchar(50) [unique, not null]
+  contrasena varchar(255) [not null, note: 'Hash con sal de la contraseña, nunca en claro']
+}
+
+// Un cliente es dueño de muchas mascotas.
+Ref: cliente.id < mascota.cliente_id
+
+// Una mascota tiene muchas citas.
+Ref: mascota.id < cita.mascota_id
+
+// Cada cita es de un servicio y la atiende un empleado.
+Ref: servicio.id < cita.servicio_id
+Ref: empleado.id < cita.empleado_id
+
+// Una cita tiene como máximo un pago (cita_id es único).
+Ref: cita.id - pago.cita_id

@@ -1,0 +1,687 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+
+\title{Dos flujos para llegar al modelo físico}
+\subtitle{Sin definir el gestor y conociendo el gestor,\\ Forward Engineering y Reverse Engineering}
+\date{Semana 11 - Sesión 21}
+\author{Rel Guzman}
+
+% Espacio en blanco para completar
+\newcommand{\bl}[1][1.9cm]{\underline{\hspace{#1}}}
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Parte nueva de un bloque de codigo que crece paso a paso
+\newcommand{\nuevo}[1]{{%
+  \setlength{\fboxsep}{1.2pt}%
+  \begingroup
+  \renewcommand{\kw}[1]{\textcolor{utpNegro}{\textbf{##1}}}%
+  \colorbox{yellow!45}{\textcolor{utpNegro}{#1}}%
+  \endgroup}}
+% Comentario dentro de un bloque de código SQL
+\newcommand{\com}[1]{\textcolor{utpGris}{-- #1}}
+% Marcas de clave primaria y clave foránea
+\newcommand{\pk}{{\scriptsize\color{utpRojo}\textbf{PK}}}
+\newcommand{\fk}{{\scriptsize\color{utpNaranja}\textbf{FK}}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre del gestor o de la forma de escribir algo
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Celda resaltada en rojo claro
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% Barra invertida de las rutas de Windows
+\newcommand{\bs}{\textbackslash{}}
+% Bloque de código sobre fondo gris
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.6em}}
+% Anatomía de una instrucción: cada pieza del código con su pregunta al lado
+\tikzset{
+  pieza/.style={fill=utpGrisClaro,font=\ttfamily\footnotesize,anchor=west,inner sep=5pt,
+    minimum height=0.62cm},
+  para/.style={font=\small,anchor=west,text=utpNegro}
+}
+\newcommand{\piezax}{7.6}
+\newcommand{\pieza}[3]{%
+  \node[pieza] at (0,#1) {#2};
+  \node[para] at (\piezax,#1) {\textcolor{utpRojo}{$\blacktriangleleft$}\ #3};}
+% Diapositiva de sección: una palabra bien grande (\seccion[0]{...} la deja sin línea roja)
+\newcommand{\seccion}[2][1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#2}};
+    \ifnum#1=1
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+    \fi
+  \end{tikzpicture}
+\end{frame}}
+% Cabecera de columna dentro de una tabla en monoespaciado
+\newcommand{\cab}[1]{\normalfont\bfseries #1}
+% Resultado de una consulta: \res{columnas}{cabecera}{filas}
+\newcommand{\res}[3]{%
+  \centering{\scriptsize\color{utpGris}resultado}\\[3pt]
+  \footnotesize\ttfamily
+  \begin{tabular}{#1}
+  \toprule
+  #2 \\
+  \midrule
+  #3
+  \bottomrule
+  \end{tabular}}
+% Columna del modelo lógico: nombre y, en gris, su tipo
+\newcommand{\col}[2]{\texttt{#1}~{\color{utpGris}#2}}
+% Comillas dobles rectas dentro de un bloque de código
+\newcommand{\dq}{\char34}
+% Comentario de DBML dentro de un bloque de código
+\newcommand{\dcom}[1]{\textcolor{utpGris}{// #1}}
+% Paso de un flujo: estilo, nombre, posición, título y archivo
+\newcommand{\cajapaso}[5]{\node[#1] (#2) at (#3) {\textbf{#4}\\[-1pt]{\scriptsize\ttfamily\color{utpRojo}#5}};}
+\begin{document}
+{\setbeamertemplate{footline}{}\maketitle}
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás elegir entre dos \textbf{flujos de modelado}: diseñar sin haber definido el gestor, con \textbf{DBML} u otra herramienta, o diseñar sabiendo el gestor desde el inicio, directamente en \textbf{SQL}. También explicarás qué hacen \textbf{Forward Engineering} y \textbf{Reverse Engineering}, y llevarás un mismo modelo lógico a \textbf{tres gestores}.
+\end{block}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión de la sesión anterior: tres niveles de detalle}
+\begin{center}
+\resizebox{.92\textwidth}{!}{%
+\begin{tikzpicture}[font=\small]
+  \tikzset{nivel/.style={caja,text width=2.6cm,minimum height=1.1cm}}
+  \node[nivel] (b) {\textbf{Modelo}\\\textbf{conceptual}};
+  \node[nivel,right=9mm of b] (c) {\textbf{Modelo}\\\textbf{lógico}};
+  \node[nivel,cajanaranja,right=9mm of c] (d) {\textbf{Modelo}\\\textbf{físico}};
+  \foreach \u/\v in {b/c,c/d} \draw[flecha] (\u)--(\v);
+  \node[font=\scriptsize,below=2mm of b,text width=3cm,align=center] (qb) {entidades, atributos\\y relaciones};
+  \node[font=\scriptsize,below=2mm of c,text width=3cm,align=center] (qc) {tablas, columnas,\\PK, FK y reglas};
+  \node[font=\scriptsize,below=2mm of d,text width=3cm,align=center] (qd) {el SQL exacto\\de un gestor};
+  \node[font=\scriptsize,text=utpRojo,below=0.8mm of qb] {¿depende del gestor? no};
+  \node[font=\scriptsize,text=utpRojo,below=0.8mm of qc] {¿depende del gestor? no};
+  \node[font=\scriptsize,text=utpRojo,below=0.8mm of qd] {¿depende del gestor? \textbf{sí}};
+\end{tikzpicture}}
+\end{center}
+\vspace{0.3cm}
+\concepto{La pregunta de hoy}{\small Solo el físico depende del gestor. Entonces, ¿\textbf{en qué momento} conviene elegirlo: al final del diseño o desde el principio?}
+\vspace{0.1cm}
+\small Seguimos con el caso de la \textbf{peluquería de mascotas}: carpeta \texttt{ejemplos/} de esta sesión, con \textbf{un proyecto por flujo}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Dos flujos: ¿cuándo se elige el gestor?}
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small]
+  \tikzset{paso/.style={caja,text width=2.3cm,minimum height=1.05cm},
+           gestor/.style={paso,cajanaranja}}
+  \cajapaso{paso}{a1}{0,0}{Conceptual}{.dbml}
+  \cajapaso{paso}{a2}{3.2,0}{Lógico}{.dbml}
+  \node[gestor] (a3) at (6.4,0) {Se elige\\el gestor};
+  \cajapaso{paso}{a4}{9.6,0}{Físico}{.sql}
+  \node[gestor] (b1) at (0,-2.1) {El gestor\\ya se conoce};
+  \cajapaso{paso}{b2}{3.2,-2.1}{Conceptual}{comentarios .sql}
+  \cajapaso{paso}{b3}{6.4,-2.1}{Lógico}{.sql}
+  \cajapaso{paso}{b4}{9.6,-2.1}{Físico}{.sql}
+  \foreach \u/\v in {a1/a2,a2/a3,a3/a4,b1/b2,b2/b3,b3/b4} \draw[flecha] (\u)--(\v);
+  \node[font=\bfseries,anchor=east] at (-1.6,0) {Flujo A};
+  \node[font=\bfseries,anchor=east] at (-1.6,-2.1) {Flujo B};
+\end{tikzpicture}}
+\end{center}
+\vspace{0.25cm}
+\begin{description}\setlength\itemsep{6pt}
+  \item[Flujo A] Todavía \textbf{no se sabe} dónde vivirá la base. Se diseña con una herramienta \textbf{neutral} y el gestor se elige al final.
+  \item[Flujo B] El gestor \textbf{ya está decidido}: por ejemplo, la empresa ya usa \textbf{MySQL}. Se diseña \textbf{directamente en SQL}.
+\end{description}
+\vspace{0.1cm}
+\small En los dos flujos existen los \textbf{tres modelos}. Lo que cambia es \textbf{en qué se escriben} y \textbf{cuándo} aparece el gestor.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Los ejemplos: un proyecto por flujo}
+\small Los dos proyectos resuelven \textbf{el mismo caso} y tienen la misma carpeta \texttt{modelado/}. Lo que cambia es \textbf{en qué} se escribe cada modelo.
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.49\textwidth}
+\centering\etiqueta{Flujo A: sin gestor}\\[-2pt]
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+ejemplos/\\
+\ind proyecto\_mascotas\_flujo\_sin\_gestor/\\
+\ind\ind modelado/\\
+\ind\ind\ind 1\_contexto.md\\
+\ind\ind\ind \nuevo{2\_modelo\_conceptual.dbml}\\
+\ind\ind\ind \nuevo{3\_modelo\_logico.dbml}\\
+\ind\ind\ind 4\_modelo\_fisico\_mysql.sql\\
+\ind\ind\ind 4\_modelo\_fisico\_sqlserver.sql\\
+\ind\ind\ind 4\_modelo\_fisico\_sqlite.sql
+\end{sqlcode}
+\column{.49\textwidth}
+\centering\etiqueta{Flujo B: con gestor}\\[-2pt]
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+ejemplos/\\
+\ind proyecto\_mascotas\_flujo\_con\_gestor/\\
+\ind\ind modelado/\\
+\ind\ind\ind 1\_contexto.md\\
+\ind\ind\ind \nuevo{2\_modelo\_conceptual.sql}\\
+\ind\ind\ind \nuevo{3\_modelo\_logico.sql}\\
+\ind\ind\ind \nuevo{4\_modelo\_fisico.sql} \com{solo MySQL}
+\end{sqlcode}
+\end{columns}
+\vspace{0.1cm}
+\begin{itemize}\setlength\itemsep{3pt}
+  \item Los números indican el \textbf{orden}: contexto, conceptual, lógico y físico.
+  \item Flujo A: un lógico neutral y \textbf{un físico por gestor}, porque el gestor aún no se decide.
+  \item Flujo B: el gestor ya es MySQL, así que hay \textbf{un solo físico}.
+\end{itemize}
+\end{frame}
+% =======================================================================
+\seccion{Flujo A}
+\begin{frame}{Flujo A: el gestor todavía no está definido}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\small\textbf{¿Cuándo pasa?}
+\vspace{0.1cm}
+\begin{itemize}\setlength\itemsep{5pt}
+  \item El cliente aún no decide si usará MySQL, SQL Server u otro gestor.
+  \item El diseño se revisa con personas que \textbf{no programan}.
+  \item El mismo diseño podría terminar en \textbf{más de un} gestor.
+\end{itemize}
+\column{.48\textwidth}
+\small\textbf{Cómo se trabaja}
+\vspace{0.1cm}
+\begin{itemize}\setlength\itemsep{5pt}
+  \item Conceptual y lógico en una herramienta \textbf{neutral}.
+  \item Al final se elige el gestor y se \textbf{genera} el SQL del físico.
+  \item Proyecto: \texttt{proyecto\_mascotas\_flujo\_sin\_gestor/}.
+\end{itemize}
+\end{columns}
+\vspace{0.35cm}
+\concepto{DBML: Database Markup Language}{\small Un lenguaje de \textbf{texto} para describir tablas y relaciones. \textbf{dbdiagram.io} lo dibuja como diagrama y lo exporta a SQL de MySQL, PostgreSQL, SQL Server u Oracle. Otras opciones: \textbf{Mermaid}, \textbf{ERDPlus} o \textbf{draw.io}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Flujo A: así se ve el conceptual en DBML}
+\begin{columns}[c,onlytextwidth]
+\column{.47\textwidth}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+\kw{Table} cliente \{\\
+\ind id integer [pk]\\
+\ind nombre varchar(255)\\
+\ind telefono varchar(255)\\
+\}\\[4pt]
+\kw{Table} mascota \{\\
+\ind id integer [pk]\\
+\ind nombre varchar(255)\\
+\ind especie varchar(255)\\
+\ind raza varchar(255)\\
+\ind cliente\_id integer [not null]\\
+\}\\[4pt]
+\dcom{@relation-meta}\\
+\dcom{sourceLabel=\dq{}es dueño de\dq}\\
+\dcom{targetLabel=\dq{}pertenece a\dq}\\
+\kw{Ref}: cliente.id < mascota.cliente\_id
+\end{sqlcode}
+\column{.49\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{7pt}
+  \item Cada \textbf{entidad} es un \texttt{Table} con sus \textbf{atributos}.
+  \item La \textbf{relación} es un \texttt{Ref}. El \texttt{<} se lee «uno a muchos».
+  \item Los \textbf{verbos} de la relación quedan en comentarios.
+  \item \texttt{varchar(255)} es solo \textbf{de relleno}: DBML exige un tipo, pero aquí todavía no se decide.
+\end{itemize}
+\vspace{0.15cm}
+\footnotesize\color{utpGris} Archivo: \texttt{2\_modelo\_conceptual.dbml}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{El mismo conceptual en Mermaid}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+\kw{erDiagram}\\
+\ind CLIENTE \ ||--|\{ MASCOTA : \dq{}es dueño de\dq\\
+\ind MASCOTA \ ||--|\{ CITA \ \ \ : \dq{}tiene\dq\\
+\ind SERVICIO ||--o\{ CITA \ \ \ : \dq{}se presta en\dq\\
+\ind EMPLEADO ||--o\{ CITA \ \ \ : \dq{}atiende\dq\\
+\ind CITA \ \ \ \ ||--o| PAGO \ \ \ : \dq{}se paga con\dq
+\end{sqlcode}
+\column{.44\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{7pt}
+  \item Solo \textbf{entidades}, \textbf{relaciones} y sus \textbf{verbos}: no pide claves ni tipos.
+  \item Los símbolos son la \textbf{pata de gallo}: \texttt{||} es «uno», \texttt{|\{} es «uno o muchos», \texttt{o\{} es «cero o muchos» y \texttt{o|} es «cero o uno».
+\end{itemize}
+\end{columns}
+\vspace{0.2cm}
+\small Se lee: \texttt{CLIENTE ||--|\{ MASCOTA} $\rightarrow$ «un cliente es dueño de \textbf{una o muchas} mascotas; cada mascota es de \textbf{un} cliente».
+\vspace{0.2cm}
+\analogia{Mermaid sirve para \textbf{conversar} el conceptual. Para el lógico conviene DBML: allí ya se escriben PK, FK y reglas que luego se convierten en SQL.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Flujo A: así se ve el lógico en DBML}
+\begin{columns}[c,onlytextwidth]
+\column{.55\textwidth}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+\kw{Table} cita \{\\
+\ind id integer [\nuevo{pk, increment}]\\
+\ind fecha\_hora \nuevo{datetime} [\nuevo{not null}]\\
+\ind estado \nuevo{varchar(20)} [not null, \nuevo{default: 'programada'},\\
+\ind\ind \nuevo{check: `estado IN ('programada',}\\
+\ind\ind \nuevo{\hspace*{4.4em}'completada', 'cancelada')`}]\\
+\ind mascota\_id \ integer [not null]\\
+\ind servicio\_id integer [not null]\\
+\ind empleado\_id integer [not null]\\
+\ind \kw{indexes} \{ \nuevo{(empleado\_id, fecha\_hora) [unique]} \}\\
+\}\\[4pt]
+\kw{Ref}: mascota.id \ < cita.mascota\_id\\
+\kw{Ref}: servicio.id < cita.servicio\_id\\
+\kw{Ref}: empleado.id < cita.empleado\_id
+\end{sqlcode}
+\column{.41\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Se agregan \textbf{tipos}, \textbf{PK}, obligatorios, valores por defecto y reglas.
+  \item Cada \texttt{Ref} se convertirá en una \textbf{FK}.
+  \item \textbf{Sin nada propio de un gestor}: tipos comunes y reglas que cualquiera entiende.
+\end{itemize}
+\vspace{0.15cm}
+\footnotesize\color{utpGris} Archivo: \texttt{3\_modelo\_logico.dbml}
+\end{columns}
+\vspace{0.2cm}
+\ojo{El lógico de la sesión anterior usaba \texttt{typeof()} y \texttt{COLLATE NOCASE}: eso es \textbf{de SQLite}. En el flujo A se deja para el físico.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Flujo A: recién al final se elige el gestor}
+\small Desde el mismo \texttt{3\_modelo\_logico.dbml} se genera el SQL de cada gestor:
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.49\textwidth}
+\centering\etiqueta{MySQL}\\[-2pt]
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+\kw{CREATE TABLE} `cliente` (\\
+\ind `id` integer \kw{PRIMARY KEY} \nuevo{AUTO\_INCREMENT},\\
+\ind `nombre` varchar(100) \kw{NOT NULL},\\
+\ind `telefono` varchar(20) \kw{UNIQUE}\\
+);
+\end{sqlcode}
+\column{.49\textwidth}
+\centering\etiqueta{SQL Server}\\[-2pt]
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+\kw{CREATE TABLE} [cliente] (\\
+\ind [id] integer \kw{PRIMARY KEY} \nuevo{IDENTITY(1, 1)},\\
+\ind [nombre] varchar(100) \kw{NOT NULL},\\
+\ind [telefono] varchar(20) \kw{UNIQUE}\\
+)\\
+\nuevo{GO}
+\end{sqlcode}
+\end{columns}
+\vspace{0.1cm}
+\begin{itemize}\setlength\itemsep{4pt}
+  \item Un \textbf{mismo lógico}, dos físicos: cambian la numeración del \texttt{id}, las comillas y los separadores.
+  \item Generados: \texttt{4\_modelo\_fisico\_mysql.sql} y \texttt{4\_modelo\_fisico\_sqlserver.sql}, en la carpeta \texttt{modelado/} del proyecto.
+\end{itemize}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Flujo A: el SQL generado se revisa}
+\small El generador traduce la sintaxis, pero \textbf{no conoce el negocio}. Antes de ejecutar el físico, se revisa:
+\vspace{0.2cm}
+\begin{itemize}\setlength\itemsep{8pt}
+  \item \textbf{Nulos en columnas únicas.} En SQL Server, \texttt{telefono UNIQUE} acepta \textbf{un solo} \texttt{NULL}: el segundo cliente sin teléfono sería rechazado. MySQL y SQLite aceptan varios.
+  \item \textbf{Mayúsculas.} Si \texttt{'Corte'} y \texttt{'corte'} deben ser el mismo servicio, depende de la \textbf{intercalación} (\textit{collation}) que use cada gestor.
+  \item \textbf{Gestores no incluidos.} \texttt{dbml2sql} no genera SQL de \textbf{SQLite}: \texttt{4\_modelo\_fisico\_sqlite.sql} se escribe a mano.
+\end{itemize}
+\vspace{0.25cm}
+\concepto{Idea clave del flujo A}{\small Conceptual y lógico \textbf{se escriben una sola vez}. Por cada gestor se genera y se revisa un físico distinto.}
+\note{SQL Server: los índices y restricciones UNIQUE tratan los NULL como iguales, por lo que solo se permite un NULL; se resuelve con un índice filtrado (WHERE telefono IS NOT NULL). Fuente: https://learn.microsoft.com/en-us/sql/relational-databases/tables/create-unique-constraints}
+\end{frame}
+% =======================================================================
+\seccion{Flujo B}
+\begin{frame}{Flujo B: el gestor se conoce desde el inicio}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\small\textbf{¿Cuándo pasa?}
+\vspace{0.1cm}
+\begin{itemize}\setlength\itemsep{5pt}
+  \item La empresa ya trabaja con \textbf{un} gestor.
+  \item La peluquería contrató un hosting que trae \textbf{MySQL}.
+  \item El equipo prefiere escribir \textbf{SQL} desde el principio.
+\end{itemize}
+\column{.48\textwidth}
+\small\textbf{Cómo se trabaja}
+\vspace{0.1cm}
+\begin{itemize}\setlength\itemsep{5pt}
+  \item Los tres modelos se escriben en archivos \texttt{.sql}.
+  \item El lógico ya se puede \textbf{ejecutar} y probar en el gestor.
+  \item Proyecto: \texttt{proyecto\_mascotas\_flujo\_con\_gestor/}.
+\end{itemize}
+\end{columns}
+\vspace{0.35cm}
+\concepto{SQL como lenguaje de modelado}{\small El diseño vive en el mismo lenguaje que crea la base. \textbf{MySQL Workbench} lo muestra como diagrama EER, ya atado a MySQL.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Flujo B: así se ve el conceptual en SQL}
+\begin{columns}[c,onlytextwidth]
+\column{.58\textwidth}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+\com{ENTIDADES Y ATRIBUTOS}\\
+\com{\ \ cliente \ : nombre, teléfono}\\
+\com{\ \ mascota \ : nombre, especie, raza}\\
+\com{\ \ cita \ \ \ \ : fecha y hora, estado}\\
+\com{\ \ \ldots}\\[4pt]
+\com{RELACIONES}\\
+\com{\ \ cliente \ 1 - N \ mascota \ es dueño de}\\
+\com{\ \ mascota \ 1 - N \ cita \ \ \ \ tiene}\\
+\com{\ \ empleado 1 - N \ cita \ \ \ \ atiende}\\
+\com{\ \ cita \ \ \ \ 1 - 1 \ pago \ \ \ \ se paga con}\\[4pt]
+\com{REGLAS DEL NEGOCIO}\\
+\com{\ \ Un empleado no atiende dos citas}\\
+\com{\ \ a la misma hora.}
+\end{sqlcode}
+\column{.38\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{7pt}
+  \item Son solo \textbf{comentarios}: el gestor no ejecuta nada.
+  \item Dicen \textbf{qué} se guarda y \textbf{cómo} se relaciona, igual que el diagrama del flujo A.
+  \item Quedan al inicio del archivo, \textbf{junto al SQL} que vendrá después.
+\end{itemize}
+\vspace{0.15cm}
+\footnotesize\color{utpGris} Archivo: \texttt{2\_modelo\_conceptual.sql}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Flujo B: así se ve el lógico en SQL}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+\kw{CREATE TABLE} servicio (\\
+\ind id INT \kw{PRIMARY KEY},\\
+\ind nombre VARCHAR(100) \kw{NOT NULL UNIQUE},\\
+\ind duracion INT \kw{NOT NULL CHECK} (duracion > 0),\\
+\ind precio DECIMAL(8,2) \kw{NOT NULL CHECK} (precio > 0),\\
+\ind orden INT \kw{NOT NULL}\\
+);\\[4pt]
+\kw{CREATE TABLE} cita (\\
+\ind id INT \kw{PRIMARY KEY},\\
+\ind fecha\_hora DATETIME \kw{NOT NULL},\\
+\ind estado VARCHAR(20) \kw{NOT NULL DEFAULT} 'programada'\\
+\ind\ind \kw{CHECK} (estado \kw{IN} ('programada', 'completada',\\
+\ind\ind \hspace*{4.6em}'cancelada')),\\
+\ind \ldots\\
+\ind \kw{FOREIGN KEY} (servicio\_id) \kw{REFERENCES} servicio(id),\\
+\ind \kw{UNIQUE} (empleado\_id, fecha\_hora)\\
+);
+\end{sqlcode}
+\column{.40\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Tablas, columnas, \textbf{PK}, \textbf{FK} y reglas, escritas como \texttt{CREATE TABLE}.
+  \item Como el gestor se conoce, ya se usan sus tipos: \texttt{INT}, \texttt{VARCHAR}, \texttt{DECIMAL}, \texttt{DATETIME}.
+  \item Se puede \textbf{ejecutar} en MySQL para probarlo.
+\end{itemize}
+\vspace{0.15cm}
+\footnotesize\color{utpGris} Archivo: \texttt{3\_modelo\_logico.sql}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Flujo B: el físico completa al lógico}
+\begin{columns}[c,onlytextwidth]
+\column{.6\textwidth}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+\nuevo{\kw{CREATE DATABASE IF NOT EXISTS} peluqueria}\\
+\ind \nuevo{\kw{CHARACTER SET} utf8mb4 \kw{COLLATE} utf8mb4\_0900\_ai\_ci;}\\[4pt]
+\kw{CREATE TABLE} \nuevo{\kw{IF NOT EXISTS}} servicio (\\
+\ind id INT \nuevo{UNSIGNED AUTO\_INCREMENT} \kw{PRIMARY KEY},\\
+\ind nombre VARCHAR(100) \kw{NOT NULL UNIQUE},\\
+\ind duracion \nuevo{SMALLINT UNSIGNED} \kw{NOT NULL CHECK} (duracion > 0),\\
+\ind precio DECIMAL(8,2) \kw{NOT NULL CHECK} (precio > 0),\\
+\ind orden INT \nuevo{UNSIGNED} \kw{NOT NULL}\\
+) \nuevo{\kw{ENGINE} = InnoDB};\\[4pt]
+\com{en cita, el estado pasa a ser un ENUM}\\
+estado \nuevo{ENUM('programada', 'completada', 'cancelada')}\\
+\ind \kw{NOT NULL DEFAULT} 'programada'
+\end{sqlcode}
+\column{.36\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{5pt}
+  \item Es el \textbf{mismo diseño}, con lo que \textbf{solo MySQL} tiene.
+  \item \texttt{AUTO\_INCREMENT}: MySQL numera el \texttt{id}.
+  \item \texttt{InnoDB}: el motor que respeta las FK.
+  \item \texttt{utf8mb4}: tildes, ñ y emojis.
+  \item \texttt{ENUM}: solo acepta los valores de la lista.
+\end{itemize}
+\vspace{0.1cm}
+\footnotesize\color{utpGris} Archivo: \texttt{4\_modelo\_fisico.sql}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Flujo B: lo que el físico agrega, probado en MySQL}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}>{\raggedright}p{3.9cm}>{\raggedright}p{4.2cm}>{\raggedright\arraybackslash}p{4.3cm}@{}}
+\toprule
+\bfseries Se intenta guardar & \bfseries Solo con el lógico & \bfseries Con el físico \\
+\midrule
+un cliente \textbf{sin indicar} su \texttt{id} & \mal{error:} \texttt{Field 'id' doesn't have a default value} & se guarda con \texttt{id = 1} \\
+una cita de la mascota \texttt{99}, que no existe, si el servidor crea las tablas con MyISAM & \mal{se guarda} & rechazada: \texttt{a foreign key constraint fails} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\begin{itemize}\setlength\itemsep{3pt}
+  \item MySQL 8 ya usa InnoDB y \texttt{utf8mb4} \textbf{por defecto}. El físico los escribe para \textbf{no depender} de cómo esté configurado el servidor.
+\end{itemize}
+\concepto{Idea clave del flujo B}{\small Los tres modelos están en SQL. El físico es el lógico \textbf{más los detalles del gestor}.}
+\note{Comprobado con MySQL 8.0.46 sobre ejemplos/proyecto_mascotas_flujo_con_gestor/modelado/3_modelo_logico.sql y 4_modelo_fisico.sql. MyISAM: se creó el lógico con SET default_storage_engine=MyISAM. Fuentes: https://dev.mysql.com/doc/refman/8.0/en/example-auto-increment.html ; https://dev.mysql.com/doc/refman/8.0/en/create-table-foreign-keys.html}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Los dos flujos, lado a lado}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}>{\raggedright\bfseries}p{2.6cm}>{\raggedright\arraybackslash}p{4.9cm}>{\raggedright\arraybackslash}p{4.9cm}@{}}
+\toprule
+& \etiqueta{Flujo A: sin gestor} & \etiqueta{Flujo B: con gestor} \\
+\midrule
+Se elige el gestor & al final, antes del físico & antes de empezar \\
+Conceptual & DBML o Mermaid & comentarios en el \texttt{.sql} \\
+Lógico & DBML con tipos comunes & \texttt{CREATE TABLE} del gestor \\
+Físico & SQL \textbf{generado} y revisado & el lógico \textbf{completado} a mano \\
+A favor & un diseño, varios gestores & se prueba desde el inicio \\
+En contra & el SQL generado puede fallar & cambiar de gestor obliga a reescribir \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\pregunta{\small Una municipalidad aún no compra el servidor y quiere aprobar el diseño. ¿Qué flujo usarías? ¿Y para agregar una tabla a la aplicación de la peluquería?}
+\end{frame}
+% =======================================================================
+\seccion[0]{Forward y Reverse}
+% Fuentes: https://dev.mysql.com/doc/workbench/en/wb-forward-engineering.html
+\begin{frame}{Forward Engineering: del modelo a la base de datos}
+\concepto{Ingeniería directa}{\small En español: \textbf{ingeniería directa} (también «ingeniería hacia adelante»). Parte de un \textbf{modelo} y genera el SQL que crea la estructura de la base. Puede exportar un script o ejecutarlo en un servidor.}
+\vspace{0.2cm}
+\begin{enumerate}\setlength\itemsep{5pt}
+  \item Definir tablas, tipos, claves y restricciones en el modelo.
+  \item Generar y revisar las instrucciones \texttt{CREATE TABLE} y los demás objetos.
+  \item Ejecutar el script para crear la estructura de la base de datos.
+\end{enumerate}
+\vspace{0.2cm}
+\enlarealidad{En el flujo A, \texttt{dbml2sql} o el botón \textit{Export} de dbdiagram.io hacen ingeniería directa. En MySQL Workbench, la opción \textit{Forward Engineer} genera el script desde su diagrama y lo ejecuta en MySQL.}
+\vspace{0.15cm}
+\small Crea las tablas \textbf{vacías}: no llena los datos de clientes o citas.
+\end{frame}
+% Fuentes: https://dev.mysql.com/doc/workbench/en/wb-reverse-engineering.html
+\begin{frame}{Reverse Engineering: de la base de datos al modelo}
+\concepto{Ingeniería inversa}{\small En español: \textbf{ingeniería inversa}. Parte de una \textbf{base de datos existente} o de su script de creación y reconstruye un modelo de su estructura.}
+\vspace{0.05cm}
+\begin{enumerate}\setlength\itemsep{2pt}
+  \item Leer las tablas, columnas, claves y restricciones existentes.
+  \item Importarlas en una herramienta de modelado.
+  \item Revisar el modelo obtenido para documentar o modificar la base.
+\end{enumerate}
+\vspace{0.15cm}
+\enlarealidad{\texttt{sql2dbml} y el \textit{Import} de dbdiagram.io convierten un script SQL en DBML. MySQL Workbench tiene \textit{Reverse Engineer}. En SQLite, \texttt{.schema} o DB Browser muestran los \texttt{CREATE TABLE} de un archivo \texttt{.db}.}
+\vspace{0.1cm}
+\ojo{Recupera solo lo que está \textbf{declarado}. Al pasar el SQL de MySQL por \texttt{sql2dbml}, la relación 1 a 1 entre cita y pago vuelve como 1 a muchos, y los verbos desaparecen.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Directa e inversa: el mismo camino en dos sentidos}
+\begin{center}
+\begin{tikzpicture}[font=\small]
+  \node[caja,text width=3.6cm,minimum height=1.5cm] (m) {\textbf{Modelo}\\{\scriptsize DBML o diagrama}};
+  \node[caja,cajanaranja,text width=3.6cm,minimum height=1.5cm,right=5.2cm of m] (b) {\textbf{Base de datos}\\{\scriptsize o su script \texttt{.sql}}};
+  \draw[flecha] ([yshift=3.5mm]m.east) -- node[above,align=center,font=\scriptsize]{\textbf{Forward Engineering}\\{\color{utpGris}ingeniería directa}} ([yshift=3.5mm]b.west);
+  \draw[flecha] ([yshift=-3.5mm]b.west) -- node[below,align=center,font=\scriptsize]{\textbf{Reverse Engineering}\\{\color{utpGris}ingeniería inversa}} ([yshift=-3.5mm]m.east);
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}>{\raggedright\bfseries}p{3.3cm}>{\raggedright\arraybackslash}p{4.3cm}>{\raggedright\arraybackslash}p{4.3cm}@{}}
+\toprule
+& \bfseries Forward & \bfseries Reverse \\
+\midrule
+Parte de & el modelo & la base o su script \\
+Produce & el script \texttt{CREATE TABLE} & el modelo o diagrama \\
+Sirve para & crear la base & documentar una base sin modelo \\
+En la práctica & generar el físico con \texttt{dbml2sql} & volver al DBML con \texttt{sql2dbml} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+% Fuentes: https://dev.mysql.com/doc/workbench/en/wb-forward-engineering.html ; https://dev.mysql.com/doc/workbench/en/wb-reverse-engineering.html
+\begin{frame}{Forward y Reverse en MySQL Workbench}
+\small En Workbench, el modelo es un \textbf{diagrama EER} (entidad-relación extendido): las tablas, columnas y relaciones dibujadas.
+\vspace{0.25cm}
+\begin{center}
+\renewcommand{\arraystretch}{1.45}
+\begin{tabular}{@{}>{\bfseries}l>{\raggedright}p{3.6cm}>{\raggedright\arraybackslash}p{5.6cm}@{}}
+\toprule
+Proceso & \bfseries Dirección & \bfseries Resultado \\
+\midrule
+Forward Engineering & Modelo EER $\rightarrow$ SQL & Genera un script \texttt{.sql} \\
+Forward Engineering & Modelo EER $\rightarrow$ BD & Crea tablas y relaciones en MySQL \\
+\midrule
+Reverse Engineering & BD $\rightarrow$ Modelo EER & Genera el diagrama de una BD existente \\
+Reverse Engineering & SQL $\rightarrow$ Modelo EER & Reconstruye el modelo desde un script \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.25cm}
+\analogia{Cada proceso tiene dos variantes: trabajar con el \textbf{archivo} \texttt{.sql} o directamente con la \textbf{base de datos} en el servidor.}
+\end{frame}
+% =======================================================================
+\seccion{Práctica}
+\begin{frame}{\ins{Práctica} Un mismo lógico, tres gestores}
+\small Partimos del lógico del flujo A: \texttt{proyecto\_mascotas\_flujo\_sin\_gestor/modelado/3\_modelo\_logico.dbml}.
+\vspace{0.3cm}
+\begin{description}\setlength\itemsep{12pt}
+  \item[\etiqueta{SQL Server}] En \textbf{SSMS}, ejecuta \texttt{4\_modelo\_fisico\_sqlserver.sql} y revisa las tablas creadas.
+  \item[\etiqueta{MySQL}] En \textbf{MySQL Workbench}, ejecuta \texttt{4\_modelo\_fisico\_mysql.sql}. Luego usa \textit{Reverse Engineer} para ver el diagrama EER.
+  \item[\etiqueta{SQLite}] Escribe el físico \textbf{a mano} a partir del lógico y ábrelo en \textbf{DB Browser for SQLite}.
+\end{description}
+\vspace{0.3cm}
+\pregunta{\small ¿Qué cambió entre los tres scripts y qué se mantuvo igual?}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Por qué esto es pasar del lógico al físico?}
+\begin{columns}[T,onlytextwidth]
+\column{.47\textwidth}
+\small\textbf{Lo que no cambió en los tres}
+\vspace{0.1cm}
+\begin{itemize}\setlength\itemsep{5pt}
+  \item Las mismas tablas y columnas.
+  \item Las mismas PK, FK y reglas.
+  \item Es decir, \textbf{el modelo lógico}.
+\end{itemize}
+\column{.49\textwidth}
+\small\textbf{Lo que sí cambió}
+\vspace{0.1cm}
+\begin{itemize}\setlength\itemsep{5pt}
+  \item Cómo se numera el \texttt{id}.
+  \item Qué tipo guarda fechas y dinero.
+  \item Cómo trata los \texttt{NULL} un \texttt{UNIQUE}, o si revisa las FK.
+  \item Es decir, \textbf{el modelo físico}.
+\end{itemize}
+\end{columns}
+\vspace{0.35cm}
+\concepto{Del lógico al físico}{\small Pasar del lógico al físico es \textbf{tomar las decisiones de un gestor concreto} sin cambiar el diseño. Cada diferencia que encontraste es una de esas decisiones.}
+\vspace{0.1cm}
+\small Por eso el flujo A genera un físico distinto por gestor, y en el flujo B el físico se escribe ya para uno solo.
+\end{frame}
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+\begin{frame}{Cierre: lo de hoy en una tabla}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.45}
+\begin{tabular}{>{\raggedright\bfseries}p{4.2cm}>{\raggedright\arraybackslash}p{8.6cm}}
+\toprule
+& \bfseries En una frase \\
+\midrule
+Flujo A: sin gestor & Conceptual y lógico neutrales; el físico se genera al final. \\
+Flujo B: con gestor & Los tres modelos en SQL; el físico completa al lógico. \\
+DBML y Mermaid & Texto que se dibuja como diagrama del conceptual y el lógico. \\
+Forward Engineering & Ingeniería directa: del modelo al script que crea la base. \\
+Reverse Engineering & Ingeniería inversa: de la base existente al modelo. \\
+Del lógico al físico & El mismo diseño, con las decisiones de un gestor concreto. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.25cm}
+\small Elegir el gestor antes o después \textbf{no cambia los tres modelos}: cambia \textbf{en qué} se escriben.
+\end{frame}
+
+\begin{frame}{Referencias}
+\footnotesize
+\begin{itemize}\setlength\itemsep{8pt}
+\item Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración}. Cengage Learning.
+\item Holistics. \href{https://dbml.dbdiagram.io/docs/}{\textit{DBML: Database Markup Language}} y \href{https://dbml.dbdiagram.io/cli/}{\textit{DBML CLI}}.
+\item Mermaid. \href{https://mermaid.js.org/syntax/entityRelationshipDiagram.html}{\textit{Entity Relationship Diagrams}}.
+\item Oracle. MySQL Workbench Manual: \href{https://dev.mysql.com/doc/workbench/en/wb-forward-engineering.html}{\textit{Forward Engineering}} y \href{https://dev.mysql.com/doc/workbench/en/wb-reverse-engineering.html}{\textit{Reverse Engineering}}.
+\item Microsoft Learn. \href{https://learn.microsoft.com/en-us/sql/relational-databases/tables/create-unique-constraints}{\textit{Create unique constraints}}.
+\item Oracle. MySQL Reference Manual: \href{https://dev.mysql.com/doc/refman/8.0/en/example-auto-increment.html}{\textit{Using AUTO\_INCREMENT}} y \href{https://dev.mysql.com/doc/refman/8.0/en/create-table-foreign-keys.html}{\textit{FOREIGN KEY Constraints}}.
+\end{itemize}
+\end{frame}
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}

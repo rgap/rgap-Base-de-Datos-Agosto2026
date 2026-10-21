@@ -4,7 +4,7 @@
 \input{header.tex}
 
 \title{Del modelo conceptual al modelo físico}
-\subtitle{Orden de SELECT, modelos de datos y\\ Forward Engineering y Reverse Engineering}
+\subtitle{Orden de SELECT y modelos de datos}
 \date{Semana 10 - Sesión 20}
 \author{Rel Guzman}
 
@@ -87,7 +87,7 @@
 {\setbeamertemplate{footline}{}\maketitle}
 \begin{frame}[c]
 \begin{block}{Logro de la sesión}
-Al finalizar, podrás explicar el \textbf{orden lógico de un SELECT}, distinguir los modelos \textbf{conceptual, lógico y físico}, y reconocer cómo \textbf{Forward Engineering} y \textbf{Reverse Engineering} relacionan el diseño con la base de datos. También compararás el modelo físico en \textbf{SQL Server, MySQL y SQLite}.
+Al finalizar, podrás explicar el \textbf{orden lógico de un SELECT} y distinguir los modelos \textbf{conceptual, lógico y físico} de una base de datos.
 \end{block}
 \end{frame}
 \begin{frame}{Revisión de la sesión anterior: orden de SELECT}
@@ -304,101 +304,6 @@ Físico & el SQL exacto que crea la base & \texttt{CREATE TABLE cita (\ldots);} 
 \vspace{0.1cm}
 \small En el curso: conceptual y lógico en \textbf{DBML} (dbdiagram), físico en un archivo \texttt{.sql}.
 \end{frame}
-% =======================================================================
-\seccion{Modelo físico}
-\begin{frame}{Modelo físico: el SQL que crea la base de datos}
-\begin{columns}[c,onlytextwidth]
-\column{.58\textwidth}
-\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
-\scriptsize
-\kw{CREATE TABLE} cita (\\
-\ind id \nuevo{INTEGER \kw{PRIMARY KEY}},\\
-\ind fecha\_hora TEXT \kw{NOT NULL},\\
-\ind estado TEXT \kw{NOT NULL} \nuevo{\kw{DEFAULT} 'programada'}\\
-\ind\ind \nuevo{\kw{CHECK} (estado \kw{IN} ('programada', 'completada',}\\
-\ind\ind \nuevo{\hspace*{4.6em}'cancelada'))},\\
-\ind mascota\_id \ INTEGER \kw{NOT NULL},\\
-\ind servicio\_id INTEGER \kw{NOT NULL},\\
-\ind empleado\_id INTEGER \kw{NOT NULL},\\
-\ind \nuevo{\kw{FOREIGN KEY} (mascota\_id) \kw{REFERENCES} mascota(id)},\\
-\ind \com{\ldots{} y lo mismo para servicio y empleado}\\
-\ind \com{un empleado no atiende dos citas a la misma hora}\\
-\ind \nuevo{\kw{UNIQUE} (empleado\_id, fecha\_hora)}\\
-);
-\end{sqlcode}
-\column{.38\textwidth}
-\small
-\begin{itemize}\setlength\itemsep{7pt}
-  \item Es el archivo \texttt{4\_modelo\_fisico.sql}.
-  \item Está escrito para \textbf{un gestor}: aquí, SQLite.
-  \item Aquí las reglas se vuelven \textbf{de verdad}: la base de datos \textbf{rechaza} lo que no las cumple.
-\end{itemize}
-\vspace{0.2cm}
-\enlarealidad{Con este archivo, cualquiera crea la misma base de datos \textbf{vacía} en su computadora.}
-\end{columns}
-\end{frame}
-
-% Fuentes: https://dev.mysql.com/doc/workbench/en/wb-forward-engineering.html
-\begin{frame}{Forward Engineering: del modelo a la base de datos}
-\concepto{Ingeniería directa}{\small Parte de un \textbf{modelo definido para un gestor} y genera el SQL que crea su estructura. Puede exportar un script o ejecutarlo en un servidor.}
-\vspace{0.2cm}
-\begin{enumerate}\setlength\itemsep{5pt}
-  \item Definir tablas, tipos, claves y restricciones en el modelo.
-  \item Generar y revisar las instrucciones \texttt{CREATE TABLE} y los demás objetos.
-  \item Ejecutar el script para crear la estructura de la base de datos.
-\end{enumerate}
-\vspace{0.2cm}
-\enlarealidad{En MySQL Workbench, el modelo de la peluquería permite generar un script para MySQL. Al ejecutarlo se crean tablas como \texttt{cliente}, \texttt{mascota} y \texttt{cita}.}
-\vspace{0.15cm}
-\small Generar las tablas \textbf{no llena automáticamente los datos} de clientes o citas.
-\end{frame}
-% Fuentes: https://dev.mysql.com/doc/workbench/en/wb-reverse-engineering.html
-\begin{frame}{Reverse Engineering: de la base de datos al modelo}
-\concepto{Ingeniería inversa}{\small Parte de una \textbf{base de datos existente} o de su script de creación y reconstruye un modelo de su estructura.}
-\vspace{0.2cm}
-\begin{enumerate}\setlength\itemsep{5pt}
-  \item Leer las tablas, columnas, claves y restricciones existentes.
-  \item Importar esa estructura en una herramienta de modelado.
-  \item Revisar el modelo obtenido para documentar o modificar la base.
-\end{enumerate}
-\vspace{0.2cm}
-\enlarealidad{Si recibimos la base MySQL de la peluquería sin su modelo, Workbench puede importar el esquema y mostrar las relaciones declaradas con claves foráneas.}
-\vspace{0.15cm}
-\ojo{Recupera lo que está definido en la base. Las reglas que solo conoce la aplicación y el significado del negocio requieren revisión humana.}
-\end{frame}
-\begin{frame}{MySQL, SQL Server y SQLite: resumen}
-\small
-\begin{description}\setlength\itemsep{16pt}
-  \item[MySQL] Gestor relacional que funciona como \textbf{servidor}. \textbf{InnoDB} es su motor de almacenamiento predeterminado: admite transacciones y claves foráneas. \textbf{MySQL Workbench} permite administrar bases y trabajar con modelos.
-  \item[SQL Server] Gestor relacional de \textbf{Microsoft}, también con servidor. Usa \textbf{Transact-SQL (T-SQL)}. \textbf{SSMS} es una herramienta para conectarse, ejecutar consultas y administrar las bases.
-  \item[SQLite] Motor integrado en la propia aplicación, \textbf{sin un servidor separado}. Guarda la base en un archivo local. \textbf{DB Browser for SQLite} permite abrirla y trabajar con sus tablas.
-\end{description}
-\vspace{0.3cm}
-\analogia{El gestor ejecuta SQL y administra los datos. Workbench, SSMS y DB Browser son programas que permiten trabajar con esos gestores.}
-\end{frame}
-\begin{frame}{Los tres gestores, lado a lado}
-\begin{center}
-\small
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{@{}>{\raggedright\bfseries}p{2.9cm}>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{3.2cm}>{\raggedright\arraybackslash}p{3.2cm}@{}}
-\toprule
-& \etiqueta{SQL Server} & \etiqueta{MySQL} & \etiqueta{SQLite} \\
-\midrule
-¿Hay servidor? & sí & sí & \textbf{no} \\
-Programa para usarlo & SSMS & MySQL Workbench & DB Browser for SQLite \\
-Su SQL se llama & Transact-SQL & SQL de MySQL & SQL de SQLite \\
-Dónde se guarda & \texttt{.mdf} y \texttt{.ldf} & carpeta de datos; \texttt{.ibd} por tabla* & un archivo, p. ej.\ \texttt{.db} \\
-Numerar solo el \texttt{id} & \texttt{IDENTITY(1,1)} & \texttt{AUTO\_INCREMENT} & \texttt{INTEGER PRIMARY KEY} \\
-Las 5 primeras filas & \texttt{SELECT TOP 5 \ldots} & \texttt{\ldots{} LIMIT 5} & \texttt{\ldots{} LIMIT 5} \\
-\bottomrule
-\end{tabular}
-\end{center}
-\vspace{0.05cm}
-{\scriptsize\color{utpGris} *MySQL: InnoDB con un archivo por tabla. SQLite puede crear archivos auxiliares.\\
-Las 5 primeras filas requieren \texttt{ORDER BY} para definir un orden predecible.\par}
-\vspace{0.15cm}
-\small El modelo conceptual y el lógico de la peluquería \textbf{no cambian}. Para cada gestor solo se reescribe el \textbf{físico}.
-\end{frame}
 \begin{frame}[plain]
   \begin{tikzpicture}[remember picture,overlay]
     \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
@@ -423,15 +328,11 @@ Orden de \texttt{SELECT} & El orden escrito difiere del orden lógico. \\
 Modelo conceptual & Entidades, atributos y relaciones del negocio. \\
 Modelo lógico & Tablas, columnas, claves y restricciones. \\
 Modelo físico & Tipos y SQL concretos para el gestor elegido. \\
-Forward Engineering & Genera la estructura de la base a partir del modelo. \\
-Reverse Engineering & Reconstruye un modelo a partir de una estructura existente. \\
-Gestores & SQL Server y MySQL usan servidor. SQLite se integra en la aplicación. \\
-
 \bottomrule
 \end{tabular}
 \end{center}
 \vspace{0.25cm}
-\small El conceptual y el lógico de la peluquería \textbf{se mantienen}. Adaptamos el \textbf{físico} a cada gestor.
+\small Cada modelo \textbf{completa} al anterior. Solo el \textbf{físico} depende del gestor.
 \end{frame}
 
 \begin{frame}{Referencias}
@@ -439,10 +340,6 @@ Gestores & SQL Server y MySQL usan servidor. SQLite se integra en la aplicación
 \begin{itemize}\setlength\itemsep{10pt}
 \item Coronel, C., Morris, S., \& Rob, P. (2011). \textit{Bases de datos: diseño, implementación y administración}. Cengage Learning.
 \item Microsoft Learn. \href{https://learn.microsoft.com/en-us/sql/t-sql/queries/select-transact-sql}{\textit{SELECT (Transact-SQL): orden lógico de procesamiento}}.
-\item Oracle. MySQL Workbench Manual: \href{https://dev.mysql.com/doc/workbench/en/wb-forward-engineering.html}{\textit{Forward Engineering}} y \href{https://dev.mysql.com/doc/workbench/en/wb-reverse-engineering.html}{\textit{Reverse Engineering}}.
-\item Oracle. MySQL Reference Manual: \href{https://dev.mysql.com/doc/refman/8.4/en/innodb-file-per-table-tablespaces.html}{\textit{File-Per-Table Tablespaces}}.
-\item Microsoft Learn. \href{https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-files-and-filegroups}{\textit{Database Files and Filegroups}}.
-\item SQLite. \href{https://www.sqlite.org/whentouse.html}{\textit{Appropriate Uses For SQLite}} y \href{https://www.sqlite.org/autoinc.html}{\textit{Autoincrement}}.
 \end{itemize}
 \end{frame}
 % Cierre UTP
