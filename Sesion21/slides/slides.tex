@@ -334,7 +334,7 @@ ejemplos/\\
 \vspace{0.1cm}
 \begin{itemize}\setlength\itemsep{4pt}
   \item Un \textbf{mismo lógico}, dos físicos: cambian la numeración del \texttt{id}, las comillas y los separadores.
-  \item Generados: \texttt{4\_modelo\_fisico\_mysql.sql} y \texttt{4\_modelo\_fisico\_sqlserver.sql}, en la carpeta \texttt{modelado/} del proyecto.
+  \item Lo generado se \textbf{revisa} y se completa con los \textbf{datos iniciales}: así quedan \texttt{4\_modelo\_fisico\_mysql.sql} y \texttt{4\_modelo\_fisico\_sqlserver.sql}.
 \end{itemize}
 \end{frame}
 % ---------------------------------------------------------------------
@@ -342,7 +342,7 @@ ejemplos/\\
 \small El generador traduce la sintaxis, pero \textbf{no conoce el negocio}. Antes de ejecutar el físico, se revisa:
 \vspace{0.2cm}
 \begin{itemize}\setlength\itemsep{8pt}
-  \item \textbf{Nulos en columnas únicas.} En SQL Server, \texttt{telefono UNIQUE} acepta \textbf{un solo} \texttt{NULL}: el segundo cliente sin teléfono sería rechazado. MySQL y SQLite aceptan varios.
+  \item \textbf{Nulos en columnas únicas.} En SQL Server, \texttt{telefono UNIQUE} acepta \textbf{un solo} \texttt{NULL}: el segundo cliente sin teléfono sería rechazado. Por eso ese físico usa un \textbf{índice filtrado} (\texttt{WHERE telefono IS NOT NULL}).
   \item \textbf{Mayúsculas.} Si \texttt{'Corte'} y \texttt{'corte'} deben ser el mismo servicio, depende de la \textbf{intercalación} (\textit{collation}) que use cada gestor.
   \item \textbf{Gestores no incluidos.} \texttt{dbml2sql} no genera SQL de \textbf{SQLite}: \texttt{4\_modelo\_fisico\_sqlite.sql} se escribe a mano.
 \end{itemize}
