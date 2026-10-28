@@ -2,6 +2,7 @@
 \documentclass[aspectratio=169,10pt,c]{beamer}
 
 \input{header.tex}
+\usetikzlibrary{shapes.multipart}
 
 \title{Dos flujos para llegar al modelo físico}
 \subtitle{Sin definir el gestor y conociendo el gestor,\\ Forward Engineering y Reverse Engineering}
@@ -89,6 +90,27 @@
 \newcommand{\dcom}[1]{\textcolor{utpGris}{// #1}}
 % Paso de un flujo: estilo, nombre, posición, título y archivo
 \newcommand{\cajapaso}[5]{\node[#1] (#2) at (#3) {\textbf{#4}\\[-1pt]{\scriptsize\ttfamily\color{utpRojo}#5}};}
+% Entidad de un diagrama conceptual: nombre, posición y atributos
+\newcommand{\ent}[4]{\node[ent] (#1) at (#2) {\textbf{\small #1}\\[-1pt]\rule{1.6cm}{0.4pt}\\#3#4};}
+% Diagrama al estilo de MySQL Workbench: tabla, columnas y relaciones
+\definecolor{wbAzul}{HTML}{9BC1DC}
+\newcommand{\wbpk}[1]{\tikz[baseline=-0.6ex]\fill[yellow!75!orange] (0,0) circle (1.1pt);~#1}
+\newcommand{\wbcol}[1]{\tikz[baseline=-0.6ex]\draw[cyan!60!black,thin] (-1.6pt,0)--(0,1.6pt)--(1.6pt,0)--(0,-1.6pt)--cycle;~#1}
+\newcommand{\wbfk}[1]{\tikz[baseline=-0.6ex]\draw[red!60!black,thin] (-1.6pt,0)--(0,1.6pt)--(1.6pt,0)--(0,-1.6pt)--cycle;~#1}
+\newcommand{\wbtabla}[3]{%
+  \node[anchor=north west,draw=utpGrisMedio,rounded corners=2pt,rectangle split,rectangle split parts=2,
+    rectangle split part fill={wbAzul,white},text width=1.55cm,align=left,inner sep=2.5pt,font=\tiny] (#1) at (#2)
+    {\scriptsize\textbf{#1}\nodepart{two}#3};}
+\newcommand{\wbrel}[4]{\draw[thick,dashed] #1 -- node[#4=3pt,font=\tiny\itshape,inner sep=1pt]{#3} #2;}
+% Extremos pata de gallo: el ángulo apunta desde la línea hacia la tabla
+\newcommand{\finuno}[2]{\begin{scope}[shift={#1},rotate=#2]
+  \draw[thick] (-1.6mm,-1.4mm)--(-1.6mm,1.4mm) (-3mm,-1.4mm)--(-3mm,1.4mm);\end{scope}}
+\newcommand{\finunomuchos}[2]{\begin{scope}[shift={#1},rotate=#2]
+  \draw[thick] (0,1.5mm)--(-2.6mm,0)--(0,-1.5mm) (-3.6mm,-1.4mm)--(-3.6mm,1.4mm);\end{scope}}
+\newcommand{\finceromuchos}[2]{\begin{scope}[shift={#1},rotate=#2]
+  \draw[thick] (0,1.5mm)--(-2.6mm,0)--(0,-1.5mm); \draw[thick,fill=white] (-4mm,0) circle (1.1mm);\end{scope}}
+\newcommand{\fincerouno}[2]{\begin{scope}[shift={#1},rotate=#2]
+  \draw[thick] (-1.6mm,-1.4mm)--(-1.6mm,1.4mm); \draw[thick,fill=white] (-3.6mm,0) circle (1.1mm);\end{scope}}
 \begin{document}
 {\setbeamertemplate{footline}{}\maketitle}
 \begin{frame}[c]
@@ -131,7 +153,7 @@ Al finalizar, podrás elegir entre dos \textbf{flujos de modelado}: diseñar sin
   \node[gestor] (a3) at (6.4,0) {Se elige\\el gestor};
   \cajapaso{paso}{a4}{9.6,0}{Físico}{.sql}
   \node[gestor] (b1) at (0,-2.1) {El gestor\\ya se conoce};
-  \cajapaso{paso}{b2}{3.2,-2.1}{Conceptual}{comentarios .sql}
+  \cajapaso{paso}{b2}{3.2,-2.1}{Conceptual}{.sql o diagrama}
   \cajapaso{paso}{b3}{6.4,-2.1}{Lógico}{.sql}
   \cajapaso{paso}{b4}{9.6,-2.1}{Físico}{.sql}
   \foreach \u/\v in {a1/a2,a2/a3,a3/a4,b1/b2,b2/b3,b3/b4} \draw[flecha] (\u)--(\v);
@@ -174,7 +196,9 @@ ejemplos/\\
 \ind proyecto\_mascotas\_flujo\_con\_gestor/\\
 \ind\ind modelado/\\
 \ind\ind\ind 1\_contexto.md\\
-\ind\ind\ind \nuevo{2\_modelo\_conceptual.sql}\\
+\ind\ind\ind \nuevo{2\_modelo\_conceptual\_comentarios.sql}\\
+\ind\ind\ind \nuevo{2\_modelo\_conceptual\_tablas.sql}\\
+\ind\ind\ind \nuevo{2\_modelo\_conceptual.mwb}\\
 \ind\ind\ind \nuevo{3\_modelo\_logico.sql}\\
 \ind\ind\ind \nuevo{4\_modelo\_fisico.sql} \com{solo MySQL}
 \end{sqlcode}
@@ -375,7 +399,26 @@ ejemplos/\\
 \concepto{SQL como lenguaje de modelado}{\small El diseño vive en el mismo lenguaje que crea la base. \textbf{MySQL Workbench} lo muestra como diagrama EER, ya atado a MySQL.}
 \end{frame}
 % ---------------------------------------------------------------------
-\begin{frame}{Flujo B: así se ve el conceptual en SQL}
+\begin{frame}{Flujo B: tres formas de escribir el conceptual}
+\small El conceptual dice \textbf{qué se guarda} y \textbf{cómo se relaciona}. En el flujo B se puede escribir de tres maneras:
+\vspace{0.3cm}
+\begin{center}
+\renewcommand{\arraystretch}{1.45}
+\begin{tabular}{@{}>{\bfseries}l>{\raggedright}p{3.9cm}>{\raggedright\arraybackslash}p{6.2cm}@{}}
+\toprule
+& \bfseries Cómo se ve & \bfseries Archivo \\
+\midrule
+Alternativa 1 & solo comentarios en SQL & \texttt{2\_modelo\_conceptual\_comentarios.sql} \\
+Alternativa 2 & tablas y columnas, sin reglas & \texttt{2\_modelo\_conceptual\_tablas.sql} \\
+Alternativa 3 & diagrama EER en MySQL Workbench, sin tipos & \texttt{2\_modelo\_conceptual.mwb} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\concepto{Lo que tienen en común}{\small Ninguna define \textbf{PK}, \textbf{FK} ni reglas. Eso se decide en el \textbf{lógico}. Se elige la que el equipo entienda mejor.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Conceptual, alternativa 1: solo comentarios}
 \begin{columns}[c,onlytextwidth]
 \column{.58\textwidth}
 \begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
@@ -398,12 +441,77 @@ ejemplos/\\
 \small
 \begin{itemize}\setlength\itemsep{7pt}
   \item Son solo \textbf{comentarios}: el gestor no ejecuta nada.
-  \item Dicen \textbf{qué} se guarda y \textbf{cómo} se relaciona, igual que el diagrama del flujo A.
-  \item Quedan al inicio del archivo, \textbf{junto al SQL} que vendrá después.
+  \item Se lee como una \textbf{lista}: entidades, relaciones con su verbo y reglas.
+  \item Lo más rápido para empezar, pero no se ve como diagrama.
 \end{itemize}
 \vspace{0.15cm}
-\footnotesize\color{utpGris} Archivo: \texttt{2\_modelo\_conceptual.sql}
+\footnotesize\color{utpGris} Archivo: \texttt{2\_modelo\_conceptual\_comentarios.sql}
 \end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Conceptual, alternativa 2: tablas y columnas, sin reglas}
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+\kw{CREATE TABLE} cliente (\\
+\ind id INT,\\
+\ind nombre VARCHAR(100),\\
+\ind telefono VARCHAR(100)\\
+);\\[4pt]
+\kw{CREATE TABLE} mascota (\\
+\ind id INT,\\
+\ind nombre VARCHAR(100),\\
+\ind especie VARCHAR(100),\\
+\ind raza VARCHAR(100),\\
+\ind cliente\_id INT \ \com{es dueño de}\\
+);\\
+\com{\ldots{} y lo mismo para las demás}
+\end{sqlcode}
+\column{.44\textwidth}
+\small
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Solo \textbf{tablas}, \textbf{columnas} y dos tipos provisionales: \texttt{INT} y \texttt{VARCHAR}.
+  \item Sin \texttt{PRIMARY KEY}, \texttt{FOREIGN KEY}, \texttt{NOT NULL} ni \texttt{UNIQUE}.
+  \item \texttt{cliente\_id} solo \textbf{anuncia} la relación; todavía no la exige.
+  \item Ya se puede ejecutar en MySQL para ver las tablas.
+\end{itemize}
+\vspace{0.15cm}
+\footnotesize\color{utpGris} Archivo: \texttt{2\_modelo\_conceptual\_tablas.sql}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Conceptual, alternativa 3: diagrama en Workbench}
+\begin{center}
+\begin{tikzpicture}[font=\scriptsize]
+  \wbtabla{cliente}{0,0}{\wbpk{id}\\\wbcol{nombre}\\\wbcol{telefono}}
+  \wbtabla{mascota}{3.7,0}{\wbpk{id}\\\wbcol{nombre}\\\wbcol{especie}\\\wbcol{raza}\\\wbfk{cliente\_id}}
+  \wbtabla{cita}{7.4,0}{\wbpk{id}\\\wbcol{fecha\_hora}\\\wbcol{estado}\\\wbfk{mascota\_id}\\\wbfk{servicio\_id}\\\wbfk{empleado\_id}}
+  \wbtabla{pago}{11.1,0}{\wbpk{id}\\\wbcol{monto}\\\wbcol{metodo}\\\wbfk{cita\_id}}
+  \wbtabla{encargado}{0,-3.5}{\wbpk{id}\\\wbcol{usuario}\\\wbcol{contrasena}}
+  \wbtabla{servicio}{5.6,-3.5}{\wbpk{id}\\\wbcol{nombre}\\\wbcol{duracion}\\\wbcol{precio}\\\wbcol{orden}}
+  \wbtabla{empleado}{9.2,-3.5}{\wbpk{id}\\\wbcol{nombre}\\\wbcol{orden}}
+  % relaciones: | uno, < muchos, o cero
+  \wbrel{(cliente.east|-0,-0.55)}{(mascota.west|-0,-0.55)}{es dueño de}{above}
+  \finuno{(cliente.east|-0,-0.55)}{180}\finunomuchos{(mascota.west|-0,-0.55)}{0}
+  \wbrel{(mascota.east|-0,-0.55)}{(cita.west|-0,-0.55)}{tiene}{above}
+  \finuno{(mascota.east|-0,-0.55)}{180}\finunomuchos{(cita.west|-0,-0.55)}{0}
+  \wbrel{(cita.east|-0,-0.55)}{(pago.west|-0,-0.55)}{se paga con}{above}
+  \finuno{(cita.east|-0,-0.55)}{180}\fincerouno{(pago.west|-0,-0.55)}{0}
+  \wbrel{(7.8,0|-servicio.north)}{(7.8,0|-cita.south)}{se presta en}{left}
+  \finuno{(7.8,0|-servicio.north)}{-90}\finceromuchos{(7.8,0|-cita.south)}{90}
+  \wbrel{(9.4,0|-empleado.north)}{(9.4,0|-cita.south)}{atiende}{right}
+  \finuno{(9.4,0|-empleado.north)}{-90}\finceromuchos{(9.4,0|-cita.south)}{90}
+\end{tikzpicture}
+\end{center}
+\vspace{-0.1cm}
+\small
+\begin{itemize}\setlength\itemsep{2pt}
+  \item Diagrama \textbf{EER} de \textbf{MySQL Workbench}, hecho a partir de \texttt{2\_modelo\_conceptual\_tablas.sql}.
+  \item Tipos ocultos: \textit{Model Options} $\rightarrow$ desmarcar \textit{Show Column Types}. Cada línea lleva su \textbf{verbo}.
+\end{itemize}
+\vspace{0.05cm}
+\footnotesize\color{utpGris} Archivo: \texttt{2\_modelo\_conceptual.mwb}
 \end{frame}
 % ---------------------------------------------------------------------
 \begin{frame}{Flujo B: así se ve el lógico en SQL}
@@ -503,7 +611,7 @@ una cita de la mascota \texttt{99}, que no existe, si el servidor crea las tabla
 & \etiqueta{Flujo A: sin gestor} & \etiqueta{Flujo B: con gestor} \\
 \midrule
 Se elige el gestor & al final, antes del físico & antes de empezar \\
-Conceptual & DBML o Mermaid & comentarios en el \texttt{.sql} \\
+Conceptual & DBML o Mermaid & comentarios, tablas sin reglas o diagrama \\
 Lógico & DBML con tipos comunes & \texttt{CREATE TABLE} del gestor \\
 Físico & SQL \textbf{generado} y revisado & el lógico \textbf{completado} a mano \\
 A favor & un diseño, varios gestores & se prueba desde el inicio \\

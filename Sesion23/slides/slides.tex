@@ -1,0 +1,779 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+\usepackage{colortbl}
+
+\title{Subconsultas}
+\subtitle{Consultas dentro de consultas,\\ con un repaso de servicios, clientes y conexión}
+\date{Semana 12 - Sesión 23}
+\author{Rel Guzman}
+
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Comentario dentro de un bloque de código SQL
+\newcommand{\com}[1]{\textcolor{utpGris}{-- #1}}
+% Texto que escribe el usuario en la terminal
+\newcommand{\tu}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre del gestor o del cliente
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Número de paso
+\newcommand{\npieza}[1]{\tikz[baseline=-0.6ex]{\node[circle,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner sep=1.6pt,minimum size=4.2mm] {#1};}}
+% Celda resaltada en rojo claro
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% La subconsulta, resaltada en amarillo dentro de un bloque de código
+\newcommand{\dentro}[1]{{\setlength{\fboxsep}{1.5pt}\colorbox{yellow!45}{#1}}}
+% Fila de una tabla que cumple la condición
+\newcommand{\fila}{\rowcolor{yellow!45}}
+% Marcas de sí y no al lado de una fila
+\newcommand{\si}{$\checkmark$}
+\newcommand{\no}{\textcolor{utpRojo}{$\times$}}
+% Barra invertida de las rutas de Windows
+\newcommand{\bs}{\textbackslash{}}
+% Bloque de código sobre fondo gris
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.6em}}
+% Anatomía de una instrucción: cada pieza del código con su pregunta al lado
+\tikzset{
+  pieza/.style={fill=utpGrisClaro,font=\ttfamily\footnotesize,anchor=west,inner sep=5pt,
+    minimum height=0.62cm},
+  para/.style={font=\small,anchor=west,text=utpNegro}
+}
+\newcommand{\piezax}{7.6}
+\newcommand{\pieza}[3]{%
+  \node[pieza] at (0,#1) {#2};
+  \node[para] at (\piezax,#1) {\textcolor{utpRojo}{$\blacktriangleleft$}\ #3};}
+% Diapositiva de sección: una palabra bien grande (\seccion[0]{...} la deja sin línea roja)
+\newcommand{\seccion}[2][1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#2}};
+    \ifnum#1=1
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+    \fi
+  \end{tikzpicture}
+\end{frame}}
+% Cabecera de columna dentro de una tabla en monoespaciado
+\newcommand{\cab}[1]{\normalfont\bfseries #1}
+% Resultado de una consulta: \res{columnas}{cabecera}{filas}
+\newcommand{\res}[3]{%
+  \centering{\scriptsize\color{utpGris}resultado}\\[3pt]
+  \footnotesize\ttfamily
+  \begin{tabular}{#1}
+  \toprule
+  #2 \\
+  \midrule
+  #3
+  \bottomrule
+  \end{tabular}}
+% Tabla pequeña con su nombre arriba: \mini{nombre}{columnas}{cabecera}{filas}
+\newcommand{\mini}[4]{%
+  \begin{tabular}{@{}c@{}}
+  \tbl{#1}\\[3pt]
+  {\scriptsize\ttfamily
+  \begin{tabular}{#2}
+  \toprule
+  #3 \\
+  \midrule
+  #4
+  \bottomrule
+  \end{tabular}}
+  \end{tabular}}
+% Forma de lo que devuelve una consulta: celdas con borde
+\newcommand{\forma}[2]{{\ttfamily\footnotesize\renewcommand{\arraystretch}{1.25}%
+  \begin{tabular}{#1}\hline #2\end{tabular}}}
+% Tabla servicio de la peluquería, con dos filas que se pueden resaltar
+\newcommand{\tablaservicio}[2]{%
+  \mini{servicio}{rlr}{\cab{id} & \cab{nombre} & \cab{precio}}{%
+  1 & Baño e higiene & 35.00 \\
+  #1 2 & Corte de pelo & 55.00 \\
+  3 & Corte de uñas & 15.00 \\
+  #2 4 & Baño completo con corte & 80.00 \\}}
+% Mensaje de ida (cliente a servidor) y de vuelta en un diagrama de secuencia
+\newcommand{\ida}[2]{\draw[flecha] (0,#1)--node[above,font=\tiny,inner sep=1.5pt]{#2}(6.3,#1);}
+\newcommand{\vuelta}[2]{\draw[flecha,draw=utpRojo] (6.3,#1)--node[above,font=\tiny,inner sep=1.5pt]{#2}(0,#1);}
+% Captura de pantalla con números encima: \captura{ancho}{archivo}{marcadores}
+% Dentro de los marcadores, (0,0) es la esquina inferior izquierda y (1,1) la superior derecha.
+\newcommand{\captura}[3]{%
+  \begin{tikzpicture}
+    \node[anchor=south west,inner sep=0pt,draw=utpGrisMedio] (img) at (0,0) {\includegraphics[width=#1]{#2}};
+    \begin{scope}[x={(img.south east)},y={(img.north west)}]
+      \foreach \px/\py/\n in #3 \node[pin] at (\px,\py) {\n};
+    \end{scope}
+  \end{tikzpicture}}
+% Explicación de un campo numerado de una captura
+\newcommand{\explica}[3]{\par\noindent\npieza{#1}\ \textbf{#2}\par\vspace{2pt}{\leftskip=6.2mm #3\par}\vspace{10pt}}
+% Estilos de los diagramas de esta sesión
+\tikzset{
+  num/.style={circle,fill=utpRojo,text=white,font=\bfseries\tiny,inner sep=1.2pt,minimum size=3.6mm},
+  vida/.style={utpGrisMedio,thick,dashed},
+  pin/.style={circle,fill=utpRojo,text=white,font=\bfseries\scriptsize,inner sep=1pt,
+    minimum size=4.4mm,draw=white,thick},
+  codigo/.style={font=\ttfamily\footnotesize,inner sep=3pt},
+  sub/.style={codigo,draw=utpRojo,very thick,fill=yellow!45,rounded corners=2pt}
+}
+\begin{document}
+{\setbeamertemplate{footline}{}\maketitle}
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás \textbf{conectarte} a un gestor sabiendo qué datos necesitas y escribir \textbf{subconsultas}: una consulta dentro de otra, para responder preguntas que se resuelven en \textbf{dos pasos}.
+\end{block}
+\end{frame}
+% =======================================================================
+% Revisión de la sesión anterior
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión de la sesión anterior: el gestor es un servicio}
+\begin{columns}[c,onlytextwidth]
+\column{.47\textwidth}
+\small El gestor es un programa que \textbf{no ves}. Funciona como \textbf{servicio}:
+\vspace{0.2cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item no tiene ventana,
+  \item trabaja en \textbf{segundo plano},
+  \item arranca solo al encender Windows,
+  \item y se queda \textbf{esperando pedidos}.
+\end{itemize}
+\vspace{0.3cm}
+\small Los ves con \textbf{Windows + R} $\rightarrow$ \texttt{services.msc}.
+\column{.5\textwidth}
+\centering
+\begin{tikzpicture}[font=\scriptsize]
+  \node[caja,text width=1.9cm] (wb) at (0,0) {MySQL\\Workbench};
+  \node[caja,text width=1.9cm] (ss) at (2.6,0) {SSMS};
+  \node[caja,cajanaranja,text width=1.9cm] (my) at (0,-2.3) {\texttt{\textbf{mysqld.exe}}\\{\tiny servicio \texttt{MySQL80}}};
+  \node[caja,cajanaranja,text width=1.9cm] (sq) at (2.6,-2.3) {\texttt{\textbf{sqlservr.exe}}\\{\tiny servicio \texttt{SQL Server}}};
+  \draw[flechavuelta] (wb)--(my); \draw[flechavuelta] (ss)--(sq);
+  \draw[utpGrisMedio,thick,dashed] (-1.5,-1.15)--(4.1,-1.15);
+  \node[anchor=south west,font=\scriptsize\bfseries] at (-1.5,0.5) {Clientes: piden};
+  \node[anchor=north west,font=\scriptsize\bfseries,text=utpRojo] at (-1.5,-2.95) {Servicios: atienden};
+\end{tikzpicture}
+\end{columns}
+\vspace{0.3cm}
+\concepto{Servicio}{\small Un programa sin ventana que arranca con Windows y siempre está listo para atender. Si el servicio está apagado, \textbf{nadie} puede conectarse.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión: los clientes}
+\concepto{Cliente}{\small \textbf{Cualquier programa} que se conecta al gestor para enviarle consultas y recibir resultados. Puede tener ventana (Workbench), ser una terminal (\texttt{mysql}) o no tener ventana (una app web, un programa en Node).}
+\small Cada gestor tiene su cliente:
+\begin{center}
+\begin{tikzpicture}[font=\scriptsize]
+  \foreach \i/\c/\g in {0/SSMS/SQL Server, 1/MySQL Workbench/MySQL,
+      2/DB Browser for SQLite/SQLite, 3/pgAdmin/PostgreSQL} {
+    \node[caja,text width=2.5cm] (c\i) at (3.3*\i,0) {\textbf{\c}};
+    \node[caja,cajanaranja,text width=2.5cm] (g\i) at (3.3*\i,-1.2) {\g};
+    \draw[flecha] (c\i)--(g\i);
+  }
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\small Hay otros que sirven para \textbf{varios} gestores o para \textbf{dibujar} el modelo:\\[5pt]
+\etiqueta{DataGrip} \etiqueta{DBeaver} \etiqueta{Luna Modeler} \etiqueta{Visual Paradigm} \etiqueta{HeidiSQL} {\footnotesize \ldots entre otros.}
+\vspace{0.05cm}
+\ojo{Si cierras el cliente, los datos \textbf{no} se borran: siguen en el gestor.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Los cinco datos de una conexión}
+\small ¿Qué necesitas para conectarte? Cinco datos:
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{@{}>{\bfseries}l>{\raggedright}p{5.0cm}>{\raggedright\arraybackslash}p{3.6cm}@{}}
+\toprule
+Dato & \bfseries Pregunta & \bfseries En clase \\
+\midrule
+Host & ¿en qué computadora? & \texttt{localhost} \\
+Puerto & ¿a qué programa? & \texttt{3306} \\
+Usuario & ¿quién eres? & \texttt{root} \\
+Contraseña & ¿cómo lo demuestras? & la de la instalación \\
+Base de datos & ¿con cuál empiezas? \textit{(opcional)} & \texttt{peluqueria} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\concepto{Idea clave}{\small Todos los clientes piden \textbf{estos cinco datos}. Solo cambia dónde se escriben.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Los cinco datos en SQL Server con Windows}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{@{}>{\bfseries}l>{\raggedright}p{3.0cm}c>{\raggedright\arraybackslash}p{7.2cm}@{}}
+\toprule
+Dato & \etiqueta{MySQL} & & \etiqueta{SQL Server con autenticación de Windows} \\
+\midrule
+Host & \texttt{localhost} & $\rightarrow$ & \textbf{Server Name}: \texttt{localhost} o \texttt{localhost\bs SQLEXPRESS} \\
+Puerto & \texttt{3306} & $\rightarrow$ & no se escribe: usa \texttt{1433} solo \\
+Usuario & \texttt{root} & $\rightarrow$ & \mal{tu usuario de Windows}: se llena solo \\
+Contraseña & la de la instalación & $\rightarrow$ & \mal{no se pide} \\
+Base de datos & \texttt{peluqueria} & $\rightarrow$ & \textbf{Database Name}, o luego \texttt{USE peluqueria;} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.2cm}
+\concepto{Autenticación de Windows}{\small Windows ya comprobó quién eres cuando iniciaste sesión en la laptop. SQL Server \textbf{confía} en eso: por eso no pide contraseña.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Los cinco datos en SQLite}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{@{}>{\bfseries}l>{\raggedright}p{3.0cm}c>{\raggedright\arraybackslash}p{7.2cm}@{}}
+\toprule
+Dato & \etiqueta{MySQL} & & \etiqueta{SQLite} \\
+\midrule
+Host & \texttt{localhost} & $\rightarrow$ & \mal{no hay}: el archivo está en tu computadora \\
+Puerto & \texttt{3306} & $\rightarrow$ & \mal{no hay}: no hay servidor esperando \\
+Usuario & \texttt{root} & $\rightarrow$ & \mal{no hay} \\
+Contraseña & la de la instalación & $\rightarrow$ & \mal{no hay} \\
+Base de datos & \texttt{peluqueria} & $\rightarrow$ & \textbf{el archivo}: \texttt{peluqueria.db} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{DB Browser for SQLite}\\[6pt]
+\small \textit{Abrir base de datos} $\rightarrow$ eliges \texttt{peluqueria.db}
+\column{.48\textwidth}
+\centering\etiqueta{Terminal}
+\begin{sqlcode}[.8\textwidth]
+\tu{sqlite3 peluqueria.db}
+\end{sqlcode}
+\end{columns}
+\vspace{0.1cm}
+\concepto{Idea clave}{\small En SQLite, conectarse es \textbf{abrir un archivo}. Solo necesitas un dato: \textbf{dónde está}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Qué pasa al conectarse?}
+\begin{center}
+\begin{tikzpicture}[font=\scriptsize]
+  \node[caja,text width=2cm] (c) at (0,0) {\textbf{Cliente}\\{\tiny Workbench}};
+  \node[caja,cajanaranja,text width=2.3cm] (s) at (6.3,0) {\textbf{Servidor}\\{\tiny MySQL en localhost:3306}};
+  \draw[vida] (c.south)--(0,-3.9); \draw[vida] (s.south)--(6.3,-3.9);
+  \ida{-0.95}{1. llega a localhost, puerto 3306}
+  \vuelta{-1.5}{2. «¿quién eres?»}
+  \ida{-2.05}{3. usuario y contraseña}
+  \vuelta{-2.6}{4. «aceptado»: conexión abierta}
+  \ida{-3.15}{5. consultas \ldots}
+  \vuelta{-3.7}{6. \ldots{} y resultados}
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\small Si falla el paso 1, el problema es el host o el puerto. Si falla el 4, el usuario o la contraseña.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Desde la terminal}
+\small La \textbf{terminal} es una ventana para escribir órdenes (PowerShell o cmd).
+\vspace{0.3cm}
+\begin{center}
+\renewcommand{\piezax}{3.5}
+\begin{tikzpicture}
+  \pieza{0}{mysql}{el programa cliente}
+  \pieza{-0.68}{-h localhost}{host}
+  \pieza{-1.36}{-P 3306}{puerto}
+  \pieza{-2.04}{-u root}{usuario}
+  \pieza{-2.72}{-p}{pide la contraseña}
+  \pieza{-3.4}{peluqueria}{base de datos}
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\begin{sqlcode}[.7\textwidth]
+\tu{mysql -h localhost -P 3306 -u root -p peluqueria}
+\end{sqlcode}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Desde MySQL Workbench}
+\begin{columns}[c,onlytextwidth]
+\column{.58\textwidth}
+\centering
+\captura{\textwidth}{workbench-nueva-conexion.png}{{0.39/0.706/1, 0.61/0.706/2, 0.60/0.632/3}}
+\column{.38\textwidth}
+\explica{1}{Hostname}{el host: \texttt{127.0.0.1} es localhost}
+\explica{2}{Port}{el puerto: \texttt{3306}}
+\explica{3}{Username}{el usuario: \texttt{root}}
+\vspace{0.2cm}
+\small Luego \textbf{OK}. La contraseña se pide al conectar.
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Desde SSMS (SQL Server)}
+\begin{columns}[c,onlytextwidth]
+\column{.38\textwidth}
+\centering
+\captura{4.6cm}{ssms-connect.png}{{0.80/0.546/1, 0.80/0.506/2, 0.80/0.468/3}}
+\column{.58\textwidth}
+\explica{1}{Server Name}{el host: el nombre de tu computadora}
+\explica{2}{Authentication}{\textit{Windows Authentication}: entras con tu cuenta de Windows}
+\explica{3}{User Name}{el usuario; con Windows Authentication se llena solo}
+\vspace{0.2cm}
+\small Luego \textbf{Connect}. SQL Server no pide puerto: lo resuelve solo.
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Desde un programa}
+\concepto{Cadena de conexión}{\small Los cinco datos escritos en \textbf{una sola línea}. Así se conectan las aplicaciones.}
+\vspace{0.3cm}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\ttfamily,inner sep=1pt}]
+  \node (a) {mysql://};
+  \node[anchor=west,text=utpRojo] (b) at (a.east) {root};
+  \node[anchor=west] (c1) at (b.east) {:};
+  \node[anchor=west,text=utpNaranja] (c) at (c1.east) {clave};
+  \node[anchor=west] (d1) at (c.east) {@};
+  \node[anchor=west,text=utpRojo] (d) at (d1.east) {localhost};
+  \node[anchor=west] (e1) at (d.east) {:};
+  \node[anchor=west,text=utpNaranja] (e) at (e1.east) {3306};
+  \node[anchor=west] (f1) at (e.east) {/};
+  \node[anchor=west,text=utpRojo] (f) at (f1.east) {peluqueria};
+  \foreach \n/\t in {b/usuario,c/contraseña,d/host,e/puerto,f/base}
+    \node[below=7pt of \n,font=\scriptsize\sffamily] {\t};
+\end{tikzpicture}
+\end{center}
+\vspace{0.4cm}
+\small Ejemplo en Node.js: \texttt{ejemplos/conexion\_al\_gestor/3\_cliente\_node/}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Cuando no conecta}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{@{}>{\raggedright}p{6.4cm}>{\raggedright\arraybackslash}p{4.6cm}@{}}
+\toprule
+\bfseries Mensaje & \bfseries Qué revisar \\
+\midrule
+\texttt{ERROR 2003: Can't connect to MySQL server on 'localhost:3306'} & ¿el servicio está encendido? ¿host y puerto? \\
+\texttt{ERROR 1045: Access denied for user 'root'@'localhost'} & usuario y contraseña \\
+\texttt{ERROR 1049: Unknown database 'peluqueria'} & ¿existe la base? \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\concepto{¿Está encendido el servicio?}{\small \textbf{Windows + R} $\rightarrow$ \texttt{services.msc} $\rightarrow$ \texttt{MySQL80}. Debe decir \textbf{En ejecución}; si no, clic derecho $\rightarrow$ \textit{Iniciar}.}
+\end{frame}
+% =======================================================================
+\seccion{Subconsultas}
+\begin{frame}{Una pregunta que necesita otra pregunta}
+\begin{center}
+\begin{tikzpicture}
+  \node[caja,cajanaranja,font=\large,inner sep=9pt] {¿Qué servicios cuestan \textbf{más que el promedio}?};
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\begin{columns}[c,onlytextwidth]
+\column{.42\textwidth}
+\centering
+\tablaservicio{}{}
+\column{.55\textwidth}
+\small Para responderla, primero necesitas \textbf{otro dato}:
+\vspace{0.3cm}
+\begin{center}
+\begin{tikzpicture}[font=\small]
+  \node[caja,text width=2.3cm] (p1) at (0,0) {\npieza{1}\\¿cuál es el promedio?};
+  \node[caja,text width=2.3cm] (p2) at (3.6,0) {\npieza{2}\\¿quiénes lo superan?};
+  \draw[flecha] (p1)--node[above,font=\scriptsize\bfseries,text=utpRojo]{46.25}(p2);
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\small La respuesta de \npieza{1} se usa en \npieza{2}.
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Paso a paso: con dos consultas}
+\begin{columns}[T,onlytextwidth]
+\column{.49\textwidth}
+\npieza{1}\ \small ¿Cuál es el promedio?
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\kw{SELECT AVG}(precio) \kw{FROM} servicio;
+\end{sqlcode}
+\vspace{-0.1cm}
+\res{r}{\cab{AVG(precio)}}{46.25 \\}
+\column{.49\textwidth}
+\npieza{2}\ \small ¿Qué servicios cuestan más?
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\kw{SELECT} nombre, precio \kw{FROM} servicio\\
+\kw{WHERE} precio > \mal{46.25};
+\end{sqlcode}
+\vspace{-0.1cm}
+\res{lr}{\cab{nombre} & \cab{precio}}{Corte de pelo & 55.00 \\ Baño completo con corte & 80.00 \\}
+\end{columns}
+\vspace{0.3cm}
+\ojo{Funciona, pero copiaste \texttt{46.25} \textbf{a mano}. Si mañana cambia un precio, ese número queda viejo.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{En una sola: la subconsulta}
+\small En lugar de escribir el número, escribe \textbf{la consulta que lo calcula}:
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[codigo,anchor=west] (a) at (0,0) {\kw{WHERE} precio >};
+  \node[codigo,anchor=west,draw=utpRojo,thick,fill=utpRojo!18] (n) at ([xshift=2pt]a.east) {46.25};
+  \node[codigo,anchor=west] (b) at (0,-1.5) {\kw{WHERE} precio >};
+  \node[sub,anchor=west] (s) at ([xshift=2pt]b.east) {(\kw{SELECT AVG}(precio) \kw{FROM} servicio)};
+  \draw[flecha] (n.south)--node[right,font=\scriptsize]{se reemplaza por}(n.south|-s.north);
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\begin{sqlcode}[.62\textwidth]
+\kw{SELECT} nombre, precio\\
+\kw{FROM} servicio\\
+\kw{WHERE} precio > \dentro{(\kw{SELECT AVG}(precio) \kw{FROM} servicio)};
+\end{sqlcode}
+\vspace{-0.1cm}
+\concepto{Subconsulta}{\small Una consulta escrita \textbf{dentro de otra}, entre \textbf{paréntesis}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Como en matemáticas: primero el paréntesis}
+\begin{center}
+\begin{tikzpicture}[font=\small]
+  \tikzset{etapa/.style={caja,minimum height=0.9cm},
+    paso/.style={flecha},
+    lbl/.style={above,font=\scriptsize,text=utpGris,align=center}}
+  % Matemáticas
+  \node[font=\small\bfseries,anchor=east] at (-0.4,0) {Matemáticas};
+  \node[etapa,text width=2.3cm] (m1) at (1.4,0) {$2 \times \colorbox{yellow!45}{$(3 + 4)$}$};
+  \node[etapa,text width=1.8cm] (m2) at (5.7,0) {$2 \times 7$};
+  \node[etapa,cajaverde,text width=2.1cm] (m3) at (10.0,0) {$14$};
+  \draw[paso] (m1)--node[lbl]{primero el\\paréntesis}(m2);
+  \draw[paso] (m2)--node[lbl]{luego lo\\de afuera}(m3);
+  % SQL
+  \node[font=\small\bfseries,anchor=east] at (-0.4,-1.8) {SQL};
+  \node[etapa,text width=2.9cm,font=\ttfamily\scriptsize] (s1) at (1.4,-1.8)
+    {precio >\\\dentro{(\kw{SELECT AVG}(precio)}\\\dentro{\kw{FROM} servicio)}};
+  \node[etapa,text width=1.8cm,font=\ttfamily\scriptsize] (s2) at (5.7,-1.8) {precio > 46.25};
+  \node[etapa,cajaverde,text width=2.1cm,font=\scriptsize] (s3) at (10.0,-1.8) {Corte de pelo\\Baño completo\ldots};
+  \draw[paso] (s1)--node[lbl]{primero la\\de adentro}(s2);
+  \draw[paso] (s2)--node[lbl]{luego la\\de afuera}(s3);
+\end{tikzpicture}
+\end{center}
+\vspace{0.4cm}
+\analogia{El gestor resuelve \textbf{primero} la consulta de adentro, \textbf{reemplaza} el paréntesis por su resultado y \textbf{después} ejecuta la de afuera.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Una consulta dentro de otra}
+\begin{center}
+\begin{tikzpicture}
+  \node[codigo,anchor=west] (o1) at (0,0) {\kw{SELECT} nombre, precio \kw{FROM} servicio};
+  \node[codigo,anchor=west] (o2) at (0,-0.75) {\kw{WHERE} precio >};
+  \node[sub,anchor=west,inner sep=6pt] (in) at ([xshift=3pt]o2.east) {(\kw{SELECT AVG}(precio) \kw{FROM} servicio)};
+  \node[font=\small\bfseries,text=utpRojo,anchor=north] (lin) at ([yshift=-4pt]in.south) {subconsulta (la de adentro)};
+  \node[draw=utpNegro,very thick,rounded corners=4pt,inner sep=12pt,fit=(o1)(o2)(in)(lin)] (out) {};
+  \node[num,minimum size=5mm,font=\bfseries\scriptsize] at (in.north east) {1};
+  \node[num,minimum size=5mm,font=\bfseries\scriptsize] at (out.north west) {2};
+  \node[font=\small\bfseries,anchor=south west] at ([xshift=8pt,yshift=2pt]out.north west) {consulta principal (la de afuera)};
+\end{tikzpicture}
+\end{center}
+\vspace{0.4cm}
+\begin{itemize}\setlength\itemsep{8pt}
+  \item \npieza{1} La \textbf{subconsulta} se resuelve primero y entrega un resultado: \texttt{46.25}.
+  \item \npieza{2} La \textbf{consulta principal} usa ese resultado como si lo hubieras escrito tú.
+\end{itemize}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Qué devuelve la de adentro?}
+\small Lo primero es mirar la \textbf{forma} de su resultado. Eso decide cómo se usa.
+\vspace{0.3cm}
+\begin{columns}[T,onlytextwidth]
+\column{.31\textwidth}
+\centering
+{\large\bfseries Un valor}\\[8pt]
+\forma{|c|}{\cellcolor{yellow!45}46.25 \\ \hline}\\[8pt]
+\footnotesize una fila, una columna\\[10pt]
+\etiqueta{= \ > \ < }\\[6pt]
+\scriptsize se compara
+\column{.31\textwidth}
+\centering
+{\large\bfseries Una lista}\\[8pt]
+\forma{|c|}{\cellcolor{yellow!45}1 \\ \hline \cellcolor{yellow!45}2 \\ \hline}\\[8pt]
+\footnotesize una columna, varias filas\\[10pt]
+\etiqueta{IN \ NOT IN}\\[6pt]
+\scriptsize se busca dentro
+\column{.31\textwidth}
+\centering
+{\large\bfseries Una tabla}\\[8pt]
+\forma{|c|c|}{\cellcolor{yellow!45}1 & \cellcolor{yellow!45}3 \\ \hline \cellcolor{yellow!45}2 & \cellcolor{yellow!45}2 \\ \hline}\\[8pt]
+\footnotesize varias columnas y filas\\[10pt]
+\etiqueta{FROM}\\[6pt]
+\scriptsize se usa como tabla
+\end{columns}
+\vspace{0.5cm}
+\small Veamos un ejemplo de cada una.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Un valor: el servicio más caro}
+\begin{columns}[c,onlytextwidth]
+\column{.42\textwidth}
+\centering
+\tablaservicio{}{\fila}
+\column{.55\textwidth}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\kw{SELECT} nombre, precio\\
+\kw{FROM} servicio\\
+\kw{WHERE} precio = \dentro{(\kw{SELECT MAX}(precio) \kw{FROM} servicio)};
+\end{sqlcode}
+\vspace{0.1cm}
+\begin{center}
+\begin{tikzpicture}[font=\scriptsize]
+  \node[caja,text width=2.4cm] (a) at (0,0) {\npieza{1} la de adentro\\devuelve \textbf{80.00}};
+  \node[caja,text width=2.4cm] (b) at (3.4,0) {\npieza{2} la de afuera busca\\\texttt{precio = 80.00}};
+  \draw[flecha] (a)--(b);
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\res{lr}{\cab{nombre} & \cab{precio}}{Baño completo con corte & 80.00 \\}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Un valor de otra tabla: las mascotas de Lucía}
+\small En \tbl{mascota} no está el nombre del dueño, solo su \texttt{cliente\_id}. \textbf{No sabes} el id de Lucía: que lo busque la subconsulta.
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}
+  \node (cl) at (0,0) {\mini{cliente}{rl}{\cab{id} & \cab{nombre}}{%
+    \fila 1 & Lucía Ramos \\
+    2 & Pedro Salas \\
+    3 & Rosa Medina \\}};
+  \node (ma) at (7,0) {\mini{mascota}{llr}{\cab{nombre} & \cab{especie} & \cab{cliente\_id}}{%
+    \fila Firulais & perro & 1 \\
+    \fila Michi & gato & 1 \\
+    Rocky & perro & 2 \\
+    Luna & gato & 3 \\}};
+  \draw[flecha] (cl.east)--node[above,font=\small\bfseries]{\npieza{1} id = 1}node[below,font=\scriptsize]{\npieza{2} busca el 1}(ma.west);
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\begin{sqlcode}[.84\textwidth]
+\kw{SELECT} nombre, especie \kw{FROM} mascota\\
+\kw{WHERE} cliente\_id = \dentro{(\kw{SELECT} id \kw{FROM} cliente \kw{WHERE} nombre = 'Lucía Ramos')};
+\end{sqlcode}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Una lista: ¿qué empleados tienen citas?}
+\small \texttt{IN} ya lo conoces: \texttt{WHERE id IN (1, 2)}. Ahora la lista la escribe \textbf{una consulta}.
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}
+  \node (ci) at (0,0) {\mini{cita}{rr}{\cab{id} & \cab{empleado\_id}}{%
+    1 & 1 \\ 2 & 2 \\ 3 & 1 \\ 4 & 2 \\ 5 & 1 \\}};
+  \node (li) at (3.6,0) {\forma{|c|}{\cellcolor{yellow!45}1 \\ \hline \cellcolor{yellow!45}2 \\ \hline}};
+  \node[font=\scriptsize\bfseries,above=2pt of li] {la lista};
+  \node (em) at (7.6,0) {\mini{empleado}{rll}{\cab{id} & \cab{nombre} & }{%
+    \fila 1 & Ana Torres & \si \\
+    \fila 2 & Bruno Díaz & \si \\
+    3 & Carla Núñez & \no \\}};
+  \draw[flecha] (ci.east)--node[above,font=\scriptsize]{\npieza{1}}(li.west);
+  \draw[flecha] (li.east)--node[above,font=\scriptsize]{\npieza{2}}node[below,font=\scriptsize]{¿está?}(em.west);
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\begin{sqlcode}[.62\textwidth]
+\kw{SELECT} nombre \kw{FROM} empleado\\
+\kw{WHERE} id \kw{IN} \dentro{(\kw{SELECT} empleado\_id \kw{FROM} cita)};
+\end{sqlcode}
+\vspace{-0.1cm}
+\centering\small Resultado: \textbf{Ana Torres} y \textbf{Bruno Díaz}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{NOT IN}: lo que no está en la lista}
+\small La misma lista, pero ahora buscas a quien \textbf{no} aparece en ella.
+\vspace{0.2cm}
+\begin{sqlcode}[.62\textwidth]
+\kw{SELECT} nombre \kw{FROM} empleado\\
+\kw{WHERE} id \kw{NOT IN} \dentro{(\kw{SELECT} empleado\_id \kw{FROM} cita)};
+\end{sqlcode}
+\vspace{0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.48\textwidth}
+\centering
+\mini{empleado}{rll}{\cab{id} & \cab{nombre} & }{%
+    1 & Ana Torres & \no \\
+    2 & Bruno Díaz & \no \\
+    \fila 3 & Carla Núñez & \si \\}
+\column{.48\textwidth}
+\res{l}{\cab{nombre}}{Carla Núñez \\}
+\\[8pt]\centering\scriptsize la única que todavía \textbf{no tiene citas}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Ojo: el signo \texttt{=} espera un solo valor}
+\begin{sqlcode}[.8\textwidth]
+\kw{SELECT} nombre \kw{FROM} empleado\\
+\kw{WHERE} id \mal{=} \dentro{(\kw{SELECT} empleado\_id \kw{FROM} cita)};\\[4pt]
+\color{utpRojo}ERROR 1242 (21000): Subquery returns more than 1 row
+\end{sqlcode}
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}[font=\small]
+  \node (l) {\forma{|c|}{1 \\ \hline 2 \\ \hline 1 \\ \hline}};
+  \node[right=0.6cm of l,font=\Large\ttfamily] (q) {= ?};
+  \node[right=0.6cm of q,text width=6cm] {¿Con cuál de todos compara? El gestor no puede elegir y se detiene.};
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\concepto{Regla}{\small Si la de adentro devuelve \textbf{un valor}, usa \texttt{=}, \texttt{>}, \texttt{<}. Si devuelve \textbf{una lista}, usa \texttt{IN}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Una tabla: ¿cuántas citas tiene el que más tiene?}
+\small \texttt{MAX(COUNT(*))} \textbf{no se puede} escribir. Primero cuentas; luego buscas el máximo.
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}
+  \node (ci) at (0,0) {\mini{cita}{rr}{\cab{id} & \cab{empleado\_id}}{%
+    1 & 1 \\ 2 & 2 \\ 3 & 1 \\ 4 & 2 \\ 5 & 1 \\}};
+  \node[draw=utpRojo,very thick,dashed,rounded corners=3pt,fill=yellow!20,inner sep=6pt] (co) at (4.6,0)
+    {\mini{conteo}{rr}{\cab{empleado\_id} & \cab{total}}{1 & 3 \\ 2 & 2 \\}};
+  \node[font=\scriptsize,text=utpRojo,below=2pt of co] {tabla temporal};
+  \node[caja,cajaverde,font=\large\bfseries,minimum width=1.2cm] (r) at (8.6,0) {3};
+  \draw[flecha] (ci.east)--node[above,font=\scriptsize]{\npieza{1} contar}(co.west);
+  \draw[flecha] (co.east)--node[above,font=\scriptsize]{\npieza{2} \texttt{MAX}}(r.west);
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\begin{sqlcode}[.62\textwidth]
+\kw{SELECT MAX}(total)\\
+\kw{FROM} \dentro{(\kw{SELECT} empleado\_id, \kw{COUNT}(*) \kw{AS} total}\\
+\ind\ind\dentro{\kw{FROM} cita \kw{GROUP BY} empleado\_id)} \kw{AS} conteo;
+\end{sqlcode}
+\vspace{-0.3cm}
+\ojo{En \texttt{FROM}, la subconsulta \textbf{necesita un nombre} (\texttt{AS conteo}). Sin él: \texttt{ERROR 1248: Every derived table must have its own alias}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Dónde puede ir una subconsulta?}
+\begin{center}
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{@{}>{\bfseries}l>{\raggedright}p{3.4cm}>{\raggedright\arraybackslash}p{7.0cm}@{}}
+\toprule
+Dónde & \bfseries Qué devuelve & \bfseries Ejemplo \\
+\midrule
+WHERE & un valor & \footnotesize\ttfamily \kw{WHERE} precio > \dentro{(\kw{SELECT AVG}(precio) \ldots)} \\
+WHERE & una lista & \footnotesize\ttfamily \kw{WHERE} id \kw{IN} \dentro{(\kw{SELECT} empleado\_id \ldots)} \\
+FROM & una tabla & \footnotesize\ttfamily \kw{FROM} \dentro{(\kw{SELECT} \ldots)} \kw{AS} conteo \\
+SELECT & un valor & \footnotesize\ttfamily \kw{SELECT} nombre, \dentro{(\kw{SELECT AVG}(precio) \ldots)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\small En \texttt{SELECT}, el valor aparece como \textbf{una columna más}, repetido en cada fila:
+\begin{sqlcode}[.8\textwidth]
+\kw{SELECT} nombre, precio, \dentro{(\kw{SELECT AVG}(precio) \kw{FROM} servicio)} \kw{AS} promedio \kw{FROM} servicio;
+\end{sqlcode}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Subconsulta o \texttt{JOIN}?}
+\small Muchas preguntas se pueden responder de las dos formas:
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.49\textwidth}
+\centering\etiqueta{Con subconsulta}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\kw{SELECT} nombre \kw{FROM} empleado\\
+\kw{WHERE} id \kw{IN} (\kw{SELECT} empleado\_id\\
+\ind\ind\ind\ind\kw{FROM} cita);
+\end{sqlcode}
+\column{.49\textwidth}
+\centering\etiqueta{Con JOIN}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\kw{SELECT DISTINCT} e.nombre\\
+\kw{FROM} empleado e\\
+\kw{JOIN} cita c \kw{ON} c.empleado\_id = e.id;
+\end{sqlcode}
+\end{columns}
+\vspace{0.1cm}
+\centering\small Las dos dan \textbf{Ana Torres} y \textbf{Bruno Díaz}. Sin \texttt{DISTINCT}, el \texttt{JOIN} repite a Ana tres veces.
+\vspace{0.3cm}
+\raggedright
+\begin{itemize}\setlength\itemsep{6pt}
+  \item La \textbf{subconsulta} se lee casi como la pregunta: «empleados cuyo id está en las citas».
+  \item El \textbf{JOIN} conviene cuando quieres ver columnas de \textbf{las dos} tablas.
+\end{itemize}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Receta para escribir una subconsulta}
+\begin{center}
+\begin{tikzpicture}[font=\small]
+  \tikzset{p/.style={caja,text width=3.8cm,minimum height=2.1cm}}
+  \node[p] (a) at (0,0) {\npieza{1}\\[3pt]Escribe la consulta \textbf{de adentro} y ejecútala \textbf{sola}.};
+  \node[p] (b) at (4.8,0) {\npieza{2}\\[3pt]Mira qué devuelve:\\ ¿un \textbf{valor}, una\\ \textbf{lista} o una \textbf{tabla}?};
+  \node[p,cajanaranja] (c) at (9.6,0) {\npieza{3}\\[3pt]Ponla \textbf{entre paréntesis} donde iría ese resultado.};
+  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c);
+\end{tikzpicture}
+\end{center}
+\vspace{0.4cm}
+\analogia{Si la de adentro funciona sola y devuelve lo que esperas, la consulta completa casi siempre funciona.}
+\end{frame}
+% =======================================================================
+\begin{frame}{\ins{Práctica} Subconsultas en la peluquería}
+\small Usa \texttt{ejemplos/subconsultas/3\_practica.sql}. Para cada una, sigue la receta.
+\vspace{0.2cm}
+\begin{enumerate}\setlength\itemsep{7pt}
+  \item ¿Qué servicios cuestan \textbf{menos} que el promedio?
+  \item ¿Cuál es el servicio \textbf{más barato}?
+  \item ¿Qué mascotas son de \textbf{Rosa Medina}?
+  \item ¿Qué clientes tienen al menos un \textbf{perro}?
+  \item \textbf{Reto:} ¿qué citas todavía \textbf{no tienen pago}?
+\end{enumerate}
+\vspace{0.2cm}
+\pregunta{\small En cada una: ¿la de adentro devuelve un valor o una lista? ¿Usaste \texttt{=} o \texttt{IN}?}
+\end{frame}
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+\begin{frame}{Cierre}
+\begin{center}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{>{\raggedright\bfseries}p{3.4cm}>{\raggedright\arraybackslash}p{8.4cm}}
+\toprule
+Servicio & Programa sin ventana que arranca con Windows: \texttt{mysqld.exe}, \texttt{sqlservr.exe}. \\
+Cliente & Cualquier programa que se conecta al gestor: SSMS, Workbench, la terminal, una app. \\
+Conectarse & Host, puerto, usuario, contraseña y base. \\
+Subconsulta & Una consulta dentro de otra, entre paréntesis. Se resuelve \textbf{primero}. \\
+Un valor & Se compara con \texttt{=}, \texttt{>}, \texttt{<}. \\
+Una lista & Se usa con \texttt{IN} o \texttt{NOT IN}. \\
+Una tabla & Va en \texttt{FROM} y lleva nombre (\texttt{AS}). \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Referencias}
+\footnotesize
+\begin{itemize}\setlength\itemsep{8pt}
+\item Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2014). \textit{Fundamentos de bases de datos} (6.ª ed.). McGraw-Hill.
+\item Oracle. MySQL Reference Manual: \href{https://dev.mysql.com/doc/refman/8.0/en/connecting.html}{\textit{Connecting to the MySQL Server}} y \href{https://dev.mysql.com/doc/refman/8.0/en/subqueries.html}{\textit{Subqueries}}.
+\item Microsoft Learn. \href{https://learn.microsoft.com/en-us/sql/ssms/quickstarts/ssms-connect-query-sql-server}{\textit{Connect to and query a SQL Server instance (SSMS)}}.
+\end{itemize}
+\end{frame}
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}

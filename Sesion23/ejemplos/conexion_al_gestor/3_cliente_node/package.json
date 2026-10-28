@@ -1,0 +1,11 @@
+{
+  "name": "cliente-node-mysql",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "conectar": "node conectar.js"
+  },
+  "dependencies": {
+    "mysql2": "^3.24.6"
+  }
+}

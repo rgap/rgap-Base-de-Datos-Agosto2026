@@ -1,6 +1,6 @@
 -- Flujo B: el gestor se conoce desde el inicio (MySQL).
--- Modelo conceptual: todavía no hay código. Se escribe como comentarios al
--- inicio del archivo SQL para dejar claro qué se va a guardar.
+-- Modelo conceptual, alternativa 1: solo comentarios.
+-- Todavía no hay código: se describe qué se va a guardar y cómo se relaciona.
 
 -- ENTIDADES Y ATRIBUTOS
 --   cliente   : nombre, teléfono

@@ -1,0 +1,490 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+
+\input{header.tex}
+\usetikzlibrary{decorations.pathreplacing}
+
+\title{¿Qué hay dentro de un gestor?}
+\subtitle{Sus piezas, cliente y servidor}
+\date{Semana 11 - Sesión 22}
+\author{Rel Guzman}
+
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Comentario dentro de un bloque de código SQL
+\newcommand{\com}[1]{\textcolor{utpGris}{-- #1}}
+% Texto que escribe el usuario en la terminal
+\newcommand{\tu}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre del gestor o del cliente
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Número de pieza del gestor
+\newcommand{\npieza}[1]{\tikz[baseline=-0.6ex]{\node[circle,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner sep=1.6pt,minimum size=4.2mm] {#1};}}
+% Celda resaltada en rojo claro
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% Barra invertida de las rutas de Windows
+\newcommand{\bs}{\textbackslash{}}
+% Bloque de código sobre fondo gris
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.6em}}
+% Anatomía de una instrucción: cada pieza del código con su pregunta al lado
+\tikzset{
+  pieza/.style={fill=utpGrisClaro,font=\ttfamily\footnotesize,anchor=west,inner sep=5pt,
+    minimum height=0.62cm},
+  para/.style={font=\small,anchor=west,text=utpNegro}
+}
+\newcommand{\piezax}{7.6}
+\newcommand{\pieza}[3]{%
+  \node[pieza] at (0,#1) {#2};
+  \node[para] at (\piezax,#1) {\textcolor{utpRojo}{$\blacktriangleleft$}\ #3};}
+% Diapositiva de sección: una palabra bien grande (\seccion[0]{...} la deja sin línea roja)
+\newcommand{\seccion}[2][1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#2}};
+    \ifnum#1=1
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+    \fi
+  \end{tikzpicture}
+\end{frame}}
+% Cabecera de columna dentro de una tabla en monoespaciado
+\newcommand{\cab}[1]{\normalfont\bfseries #1}
+% Resultado de una consulta: \res{columnas}{cabecera}{filas}
+\newcommand{\res}[3]{%
+  \centering{\scriptsize\color{utpGris}resultado}\\[3pt]
+  \footnotesize\ttfamily
+  \begin{tabular}{#1}
+  \toprule
+  #2 \\
+  \midrule
+  #3
+  \bottomrule
+  \end{tabular}}
+% Campo de un formulario dibujado: etiqueta y valor
+\newcommand{\campo}[3]{%
+  \node[anchor=east,font=\scriptsize] at (2.5,#1) {#2};
+  \node[anchor=west,draw=utpGrisMedio,fill=white,font=\scriptsize\ttfamily,minimum width=3.6cm,
+    minimum height=0.46cm,inner xsep=4pt] at (2.65,#1) {#3};}
+% Mensaje de ida (cliente a servidor) y de vuelta en un diagrama de secuencia
+\newcommand{\ida}[2]{\draw[flecha] (0,#1)--node[above,font=\tiny,inner sep=1.5pt]{#2}(6.3,#1);}
+\newcommand{\vuelta}[2]{\draw[flecha,draw=utpRojo] (6.3,#1)--node[above,font=\tiny,inner sep=1.5pt]{#2}(0,#1);}
+% Captura de pantalla con números encima: \captura{ancho}{archivo}{marcadores}
+% Dentro de los marcadores, (0,0) es la esquina inferior izquierda y (1,1) la superior derecha.
+\newcommand{\captura}[3]{%
+  \begin{tikzpicture}
+    \node[anchor=south west,inner sep=0pt,draw=utpGrisMedio] (img) at (0,0) {\includegraphics[width=#1]{#2}};
+    \begin{scope}[x={(img.south east)},y={(img.north west)}]
+      \foreach \px/\py/\n in #3 \node[pin] at (\px,\py) {\n};
+    \end{scope}
+  \end{tikzpicture}}
+\newcommand{\marcaswb}{0.70/0.895/1, 0.66/0.84/2, 0.39/0.706/3, 0.61/0.706/4, 0.60/0.632/5,
+  0.463/0.56/6, 0.60/0.481/7, 0.25/0.778/8, 0.63/0.037/9, 0.283/0.037/10}
+\newcommand{\marcasssms}{0.30/0.903/1, 0.58/0.597/2, 0.80/0.546/3, 0.80/0.506/4, 0.80/0.468/5,
+  0.80/0.355/6, 0.80/0.316/7, 0.72/0.278/8, 0.80/0.241/9, 0.78/0.199/10, 0.80/0.13/11, 0.27/0.037/12}
+% Explicación de un campo numerado de una captura
+\newcommand{\explica}[3]{\par\noindent\npieza{#1}\ \textbf{#2}\par\vspace{2pt}{\leftskip=6.2mm #3\par}\vspace{10pt}}
+% Estilos de los diagramas de esta sesión
+\tikzset{
+  comp/.style={caja,font=\scriptsize,text width=2.0cm,minimum height=0.8cm,inner sep=3pt},
+  grupo/.style={draw=utpGrisMedio,dashed,rounded corners=3pt,inner sep=6pt},
+  num/.style={circle,fill=utpRojo,text=white,font=\bfseries\tiny,inner sep=1.2pt,minimum size=3.6mm},
+  compu/.style={draw=utpNegro,very thick,rounded corners=4pt,inner sep=8pt},
+  vida/.style={utpGrisMedio,thick,dashed},
+  pin/.style={circle,fill=utpRojo,text=white,font=\bfseries\scriptsize,inner sep=1pt,
+    minimum size=4.4mm,draw=white,thick}
+}
+\begin{document}
+{\setbeamertemplate{footline}{}\maketitle}
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás explicar \textbf{qué piezas tiene un gestor} por dentro, distinguir \textbf{cliente} y \textbf{servidor}, y reconocer en qué se diferencia \textbf{SQLite}, un gestor sin servidor.
+\end{block}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión de la sesión anterior}
+\small Ejecutaste el modelo físico en SSMS, MySQL Workbench y DB Browser for SQLite.
+\vspace{0.4cm}
+\begin{center}
+\begin{tikzpicture}[font=\small]
+  \node[caja,text width=3.3cm,minimum height=1.3cm] (a) {\textbf{Tú}\\{\scriptsize escribes \texttt{CREATE TABLE}\\y presionas \textit{Ejecutar}}};
+  \node[caja,cajanaranja,text width=3.3cm,minimum height=1.3cm,right=1.5cm of a] (b) {\Huge\bfseries ?};
+  \node[caja,text width=3.3cm,minimum height=1.3cm,right=1.5cm of b] (c) {\textbf{La tabla existe}\\{\scriptsize y mañana sigue ahí}};
+  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c);
+\end{tikzpicture}
+\end{center}
+\vspace{0.4cm}
+\concepto{La pregunta de hoy}{\small ¿Qué pasa en el signo de interrogación?}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Programa, proceso y servicio}
+\begin{description}\setlength\itemsep{10pt}
+  \item[Programa] Un archivo con instrucciones. Ejemplos: \texttt{mysqld.exe} (MySQL) y \texttt{sqlservr.exe} (SQL Server).
+  \item[Proceso] Un programa \textbf{mientras está funcionando}.
+  \item[Servicio] Un proceso que funciona \textbf{sin ventana} y arranca solo al encender Windows.
+\end{description}
+\vspace{0.3cm}
+\small Los servicios se ven en Windows con \textbf{Windows + R} $\rightarrow$ \texttt{services.msc}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Memoria y disco}
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{@{}>{\bfseries}l>{\raggedright}p{4.2cm}>{\raggedright\arraybackslash}p{4.2cm}@{}}
+\toprule
+& \bfseries Memoria (RAM) & \bfseries Disco \\
+\midrule
+Velocidad & muy rápida & lenta \\
+Tamaño & pequeña & grande \\
+Al apagar & \mal{se borra} & se conserva \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\concepto{Por qué importa}{\small Un gestor trabaja en \textbf{memoria} para ser rápido y guarda en \textbf{disco} para no perder nada.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Base de datos y gestor}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+\begin{description}\setlength\itemsep{10pt}
+  \item[Base de datos] Los datos organizados en tablas. Ejemplo: \texttt{peluqueria}.
+  \item[Gestor] El \textbf{programa} que guarda las bases de datos y responde pedidos sobre ellas. También se le dice \textbf{SGBD}.
+\end{description}
+\vspace{0.2cm}
+\small Ejemplos: MySQL, SQL Server, PostgreSQL, SQLite.
+\column{.4\textwidth}
+\centering
+\begin{tikzpicture}[font=\small]
+  \tikzset{bd/.style={cylinder,shape border rotate=90,aspect=0.22,draw=utpNegro,thick,
+    fill=utpGrisClaro,minimum width=1.55cm,minimum height=1.0cm,font=\scriptsize\ttfamily}}
+  \node[bd] (b1) at (0,0) {peluqueria};
+  \node[bd] (b2) at (1.85,0) {tienda};
+  \node[bd] (b3) at (0.92,-1.45) {colegio};
+  \node[draw=utpRojo,very thick,rounded corners=4pt,inner sep=9pt,fit=(b1)(b2)(b3),
+    label={[font=\small\bfseries]above:Gestor: MySQL}] {};
+\end{tikzpicture}
+\\[3pt]{\scriptsize Un gestor guarda \textbf{muchas} bases.}
+\end{columns}
+\end{frame}
+% =======================================================================
+\seccion{Por dentro}
+\begin{frame}{Las piezas de un gestor}
+\small Lo que le llega al gestor es una \textbf{consulta}: un pedido escrito en SQL.
+\vspace{0.1cm}
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\scriptsize]
+  \node[caja,cajanaranja,text width=1.7cm] (q) at (0,0) {\textbf{Consulta}};
+  \node[comp] (c1) at (3,0) {Gestor de\\conexiones};
+  \node[comp] (an) at (6,1.15) {Analizador};
+  \node[comp] (op) at (6,0) {Optimizador};
+  \node[comp] (ej) at (6,-1.15) {Ejecutor};
+  \node[comp] (tr) at (9.1,0.6) {Gestor de\\transacciones};
+  \node[comp] (mi) at (9.1,-0.6) {Memoria\\intermedia};
+  \node[comp,cajaverde] (lg) at (12.6,1.15) {Registro (log)};
+  \node[comp,cajaverde] (ct) at (12.6,0) {Catálogo};
+  \node[comp,cajaverde] (ar) at (12.6,-1.15) {Archivos de datos};
+  \node[grupo,fit=(an)(op)(ej)] (gp) {};
+  \node[font=\scriptsize\bfseries,above=1pt of gp] (lp) {Procesador de consultas};
+  \node[grupo,fit=(tr)(mi)] (gm) {};
+  \node[font=\scriptsize\bfseries,above=1pt of gm,align=center] (lm) {Motor de\\almacenamiento};
+  \node[grupo,fit=(lg)(ct)(ar)] (gd) {};
+  \node[font=\scriptsize\bfseries,above=1pt of gd] (ld) {Disco};
+  \node[draw=utpRojo,very thick,rounded corners=4pt,inner sep=7pt,fit=(c1)(gp)(lp)(gm)(lm)] (srv) {};
+  \node[font=\scriptsize\bfseries,text=utpRojo,below=2pt of srv] {El gestor (en memoria)};
+  \draw[flecha] (q)--(c1);
+  \draw[flecha] (c1)--(gp.west|-c1);
+  \draw[flecha] (an)--(op); \draw[flecha] (op)--(ej);
+  \draw[flecha] (gp.east|-0,0)--(gm.west|-0,0);
+  \draw[flecha] (gm.east|-0,0)--(gd.west|-0,0);
+  \node[num] at (c1.north west) {1};
+  \node[num] at (gp.north west) {2};
+  \node[num] at (gm.north west) {3};
+  \node[num] at (mi.north west) {4};
+  \node[num] at (tr.north west) {5};
+  \node[num] at (lg.north west) {6};
+  \node[num] at (ct.north west) {7};
+  \node[num] at (ar.north west) {8};
+\end{tikzpicture}}
+\end{center}
+\vspace{0.1cm}
+\small Vamos pieza por pieza.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\npieza{1} Gestor de conexiones}
+\concepto{Conexión}{\small Un canal abierto entre quien pide y el gestor. Por él viajan las consultas y las respuestas.}
+\vspace{0.2cm}
+\begin{itemize}\setlength\itemsep{8pt}
+  \item \textbf{Autenticación}: comprueba \textbf{quién eres} (usuario y contraseña).
+  \item \textbf{Autorización}: revisa \textbf{qué puedes hacer} (ver, agregar, borrar\ldots).
+\end{itemize}
+\vspace{0.2cm}
+\ojo{El usuario del gestor \textbf{no es} tu usuario de Windows. En MySQL, el administrador se llama \texttt{root}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\npieza{2} Procesador de consultas}
+\begin{center}
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small]
+  \tikzset{paso/.style={caja,text width=2.9cm,minimum height=1.4cm}}
+  \node[caja,cajanaranja,text width=2.8cm,font=\scriptsize\ttfamily] (q) at (0,0) {SELECT nombre FROM servicio WHERE id = 2;};
+  \node[paso] (a) at (3.8,0) {\textbf{Analizador}\\{\scriptsize ¿está bien escrita?\\¿existe la tabla?}};
+  \node[paso] (o) at (7.6,0) {\textbf{Optimizador}\\{\scriptsize ¿cuál es el camino más rápido?}};
+  \node[paso] (e) at (11.4,0) {\textbf{Ejecutor}\\{\scriptsize sigue el camino y arma el resultado}};
+  \draw[flecha] (q)--(a); \draw[flecha] (a)--(o); \draw[flecha] (o)--(e);
+\end{tikzpicture}}
+\end{center}
+\vspace{0.2cm}
+\small Si el analizador encuentra un error, se detiene ahí:
+\begin{sqlcode}[.8\textwidth]
+\scriptsize
+\kw{SELECT} nombre \kw{FROM} \mal{servicios};\\
+\color{utpRojo}ERROR 1146 (42S02): Table 'peluqueria.servicios' doesn't exist
+\end{sqlcode}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\npieza{2} El optimizador y los índices}
+\concepto{Índice}{\small Una lista ordenada para encontrar filas rápido, como el índice de un libro. La PK y los UNIQUE ya tienen uno.}
+\vspace{0.1cm}
+\small \texttt{EXPLAIN} muestra el camino que eligió el optimizador:
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.49\textwidth}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+\kw{EXPLAIN SELECT} * \kw{FROM} servicio \kw{WHERE} id = 2;
+\end{sqlcode}
+\vspace{-0.15cm}
+\res{ll}{\cab{type} & \cab{key}}{const & PRIMARY \\}
+\\[4pt]\centering\scriptsize usa el índice: va \textbf{directo}
+\column{.49\textwidth}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+\kw{EXPLAIN SELECT} * \kw{FROM} servicio \kw{WHERE} precio > 40;
+\end{sqlcode}
+\vspace{-0.15cm}
+\res{ll}{\cab{type} & \cab{key}}{\mal{ALL} & NULL \\}
+\\[4pt]\centering\scriptsize sin índice: revisa \textbf{todas} las filas
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\npieza{3}\,\npieza{4} Motor de almacenamiento y memoria intermedia}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\concepto{Motor de almacenamiento}{\small Guarda las filas en el disco y las vuelve a leer. En MySQL es \textbf{InnoDB}: el \texttt{ENGINE = InnoDB} de la sesión anterior.}
+\column{.48\textwidth}
+\concepto{Memoria intermedia}{\small Una parte de la RAM donde el gestor deja lo que leyó del disco. Si lo vuelve a necesitar, no va al disco.}
+\end{columns}
+\vspace{0.3cm}
+\begin{itemize}\setlength\itemsep{6pt}
+  \item Por eso la segunda vez una consulta suele ser \textbf{más rápida}.
+  \item Por eso un gestor usa \textbf{mucha RAM}: es a propósito.
+\end{itemize}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\npieza{3}\,\npieza{4} ¿Cómo se llaman en cada gestor?}
+\begin{center}
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{@{}>{\bfseries}l>{\raggedright}p{3.2cm}>{\raggedright\arraybackslash}p{3.4cm}@{}}
+\toprule
+Gestor & \bfseries Motor & \bfseries Memoria intermedia \\
+\midrule
+MySQL & InnoDB & \textit{buffer pool} \\
+SQL Server & incluido & \textit{buffer pool} \\
+PostgreSQL & incluido & \textit{shared buffers} \\
+SQLite & incluido & \textit{page cache} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\small Mismo trabajo, otro nombre.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\npieza{5} Gestor de transacciones}
+\concepto{Transacción}{\small Un grupo de cambios que ocurren \textbf{todos o ninguno}.}
+\vspace{0.05cm}
+\begin{sqlcode}[.7\textwidth]
+\scriptsize
+\kw{START TRANSACTION};\\
+\kw{INSERT INTO} pago (monto, metodo, cita\_id) \kw{VALUES} (55.00, 'efectivo', 1);\\
+\kw{UPDATE} cita \kw{SET} estado = 'completada' \kw{WHERE} id = 1;\\
+\kw{COMMIT}; \ \com{confirma. ROLLBACK deshace}
+\end{sqlcode}
+\vspace{-0.1cm}
+\concepto{Bloqueo}{\small Si dos personas cambian la misma fila a la vez, el gestor hace \textbf{esperar} a la segunda hasta que la primera termine.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\npieza{6} Registro de recuperación}
+\concepto{Registro (\textit{log})}{\small Un archivo donde el gestor \textbf{anota cada cambio} antes de darlo por hecho.}
+\vspace{0.2cm}
+\begin{center}
+\resizebox{.9\textwidth}{!}{%
+\begin{tikzpicture}[font=\scriptsize]
+  \tikzset{p/.style={caja,text width=2.45cm,minimum height=1.05cm,font=\scriptsize}}
+  \node[p] (a) at (0,0) {\textbf{1.} cambia en \textbf{memoria}};
+  \node[p,cajanaranja] (b) at (3.3,0) {\textbf{2.} lo anota en el \textbf{registro}};
+  \node[p] (c) at (6.6,0) {\textbf{3.} responde «listo»};
+  \node[p,cajaverde] (d) at (9.9,0) {\textbf{4.} más tarde, lo guarda en su \textbf{archivo}};
+  \foreach \u/\v in {a/b,b/c,c/d} \draw[flecha] (\u)--(\v);
+\end{tikzpicture}}
+\end{center}
+\vspace{0.3cm}
+\small Si se va la luz antes del paso 4, al encender el gestor lee el registro y \textbf{recupera} los cambios.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\npieza{7}\,\npieza{8} Catálogo y archivos de datos}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\concepto{Catálogo}{\small La lista de todo lo que hay: bases, tablas, columnas y usuarios. Son \textbf{datos sobre los datos}.}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+\kw{SHOW TABLES};\\
+\kw{DESCRIBE} servicio;
+\end{sqlcode}
+\column{.48\textwidth}
+\concepto{Archivos de datos}{\small Donde terminan guardadas las tablas. Cada tabla es un archivo \texttt{.ibd}.}
+\begin{sqlcode}[\dimexpr\textwidth-2\fboxsep\relax]
+\scriptsize
+\kw{SELECT} @@datadir;\\
+\com{C:\bs ProgramData\bs MySQL\bs \ldots\bs Data\bs}
+\end{sqlcode}
+\end{columns}
+\vspace{0.1cm}
+\ojo{Nunca copies ni borres esos archivos a mano: solo el gestor sabe leerlos.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Las ocho piezas en una tabla}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}c>{\raggedright\bfseries}p{4.3cm}>{\raggedright\arraybackslash}p{6.8cm}@{}}
+\toprule
+& Pieza & \bfseries Para qué sirve \\
+\midrule
+\npieza{1} & Gestor de conexiones & deja entrar solo a quien corresponde \\
+\npieza{2} & Procesador de consultas & entiende el SQL y busca el camino más rápido \\
+\npieza{3} & Motor de almacenamiento & guarda y lee las filas \\
+\npieza{4} & Memoria intermedia & evita ir al disco cada vez \\
+\npieza{5} & Gestor de transacciones & todo o nada; uno a la vez \\
+\npieza{6} & Registro & no perder nada si se va la luz \\
+\npieza{7} & Catálogo & saber qué existe \\
+\npieza{8} & Archivos de datos & guardar todo en el disco \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+% =======================================================================
+\seccion[0]{Cliente y servidor}
+\begin{frame}{Cliente y servidor}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\concepto{Servidor}{\small El programa que \textbf{espera pedidos} y los atiende. El gestor es un servidor.}
+\column{.48\textwidth}
+\concepto{Cliente}{\small El programa que \textbf{envía pedidos} al servidor y muestra las respuestas.}
+\end{columns}
+\vspace{0.3cm}
+\begin{center}
+\begin{tikzpicture}[font=\scriptsize]
+  \node[caja,text width=2.5cm] (c1) at (0,1.1) {Terminal};
+  \node[caja,text width=2.5cm] (c2) at (0,0) {MySQL Workbench};
+  \node[caja,text width=2.5cm] (c3) at (0,-1.1) {App de la peluquería};
+  \node[caja,cajanaranja,text width=2.2cm,minimum height=1.3cm] (s) at (4.6,0) {\textbf{Servidor}\\MySQL};
+  \foreach \c in {c1,c2,c3} \draw[flechavuelta] (\c.east)--(s.west);
+  \node[font=\scriptsize\bfseries,above=1mm of c1] {Clientes};
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\small Muchos clientes, un servidor. Solo el servidor toca los datos.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Quién es quién?}
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{@{}>{\bfseries}l>{\raggedright}p{3.9cm}>{\raggedright\arraybackslash}p{4.6cm}@{}}
+\toprule
+Gestor & \bfseries Servidor & \bfseries Clientes \\
+\midrule
+MySQL & \texttt{mysqld.exe}\\{\footnotesize servicio \texttt{MySQL80}} & terminal, MySQL Workbench \\
+SQL Server & \texttt{sqlservr.exe}\\{\footnotesize servicio \texttt{SQL Server (\ldots)}} & SSMS \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\concepto{Workbench y SSMS no son la base de datos}{\small Son \textbf{clientes}. Si cierras Workbench, los datos siguen en el servidor. Si apagas el servicio, ningún cliente puede entrar.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{SQLite: un gestor sin servidor}
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{@{}>{\raggedright\bfseries}p{3.4cm}>{\raggedright}p{4.0cm}>{\raggedright\arraybackslash}p{3.6cm}@{}}
+\toprule
+& \etiqueta{MySQL, SQL Server} & \etiqueta{SQLite} \\
+\midrule
+¿Hay servidor? & sí & no \\
+¿Dónde está la base? & en el servidor & en un archivo \texttt{.db} \\
+¿Cómo se entra? & conectándose & abriendo el archivo \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.3cm}
+\small Por eso DB Browser for SQLite no pide usuario ni contraseña. La próxima sesión veremos cómo conectarse a un gestor \textbf{con servidor}.
+\end{frame}
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+\begin{frame}{Cierre}
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{>{\raggedright\bfseries}p{3.4cm}>{\raggedright\arraybackslash}p{8.4cm}}
+\toprule
+Gestor & El programa que guarda las bases de datos. \\
+Servidor & El programa que atiende; ahí están los datos. \\
+Cliente & El programa que pide: terminal, Workbench, SSMS. \\
+Piezas & Conexiones, consultas, almacenamiento, memoria, transacciones, registro, catálogo y archivos. \\
+SQLite & Un gestor sin servidor: la base es un archivo. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Referencias}
+\footnotesize
+\begin{itemize}\setlength\itemsep{8pt}
+\item Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2014). \textit{Fundamentos de bases de datos} (6.ª ed.). McGraw-Hill.
+\item Oracle. MySQL Reference Manual: \href{https://dev.mysql.com/doc/refman/8.0/en/innodb-buffer-pool.html}{\textit{Buffer Pool}} y \href{https://dev.mysql.com/doc/refman/8.0/en/innodb-redo-log.html}{\textit{Redo Log}}.
+\item SQLite. \href{https://www.sqlite.org/serverless.html}{\textit{SQLite Is Serverless}}.
+\end{itemize}
+\end{frame}
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}
