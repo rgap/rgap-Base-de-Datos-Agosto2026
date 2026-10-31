@@ -21,7 +21,7 @@ WHERE precio > (SELECT AVG(precio) FROM servicio);
 -- Baño completo con corte  80.00
 
 -- ---------------------------------------------------------------
--- 2. La subconsulta devuelve UN VALOR: se compara con =, >, <
+-- 2. En WHERE, devuelve UN VALOR: se compara con =, >, <
 -- ---------------------------------------------------------------
 
 -- El servicio más caro.
@@ -30,20 +30,22 @@ FROM servicio
 WHERE precio = (SELECT MAX(precio) FROM servicio);
 -- Baño completo con corte  80.00
 
--- Las mascotas de Lucía: no sabemos su id, lo busca la subconsulta.
-SELECT id FROM cliente WHERE nombre = 'Lucía Ramos';      -- 1
-SELECT nombre, especie
-FROM mascota
-WHERE cliente_id = (SELECT id FROM cliente WHERE nombre = 'Lucía Ramos');
--- Firulais  perro
--- Michi     gato
+-- Las citas de Ana Torres: no sabemos su id, lo busca la subconsulta.
+SELECT id FROM empleado WHERE nombre = 'Ana Torres';      -- 1
+SELECT id, fecha_hora
+FROM cita
+WHERE empleado_id = (SELECT id FROM empleado WHERE nombre = 'Ana Torres');
+-- 1  2026-09-08 10:00:00
+-- 3  2026-09-22 09:00:00
+-- 4  2026-10-06 10:00:00
+-- 6  2026-10-20 09:00:00
 
 -- ---------------------------------------------------------------
--- 3. La subconsulta devuelve UNA LISTA: se usa con IN o NOT IN
+-- 3. Con IN, devuelve UNA LISTA: se usa con IN o NOT IN
 -- ---------------------------------------------------------------
 
 -- La lista que devuelve la de adentro.
-SELECT empleado_id FROM cita;                             -- tres veces 1 y dos veces 2
+SELECT empleado_id FROM cita;                             -- 1, 1, 1, 1, 2, 2, 2
 
 -- Empleados que tienen al menos una cita.
 SELECT nombre
@@ -63,7 +65,7 @@ WHERE id NOT IN (SELECT empleado_id FROM cita);
 -- ERROR 1242 (21000): Subquery returns more than 1 row
 
 -- ---------------------------------------------------------------
--- 4. La subconsulta devuelve UNA TABLA: va en FROM
+-- 4. En FROM, devuelve UNA TABLA
 -- ---------------------------------------------------------------
 
 -- ¿Cuántas citas tiene el empleado con más citas?
@@ -73,8 +75,8 @@ WHERE id NOT IN (SELECT empleado_id FROM cita);
 SELECT empleado_id, COUNT(*) AS total
 FROM cita
 GROUP BY empleado_id;
--- 1  3
--- 2  2
+-- 1  4
+-- 2  3
 
 -- Paso 2: usar ese resultado como si fuera una tabla.
 -- En FROM la subconsulta necesita un nombre (AS conteo).
@@ -82,25 +84,75 @@ SELECT MAX(total)
 FROM (SELECT empleado_id, COUNT(*) AS total
       FROM cita
       GROUP BY empleado_id) AS conteo;
--- 3
+-- 4
 
 -- Sin nombre falla:
 -- SELECT MAX(total) FROM (SELECT empleado_id, COUNT(*) AS total FROM cita GROUP BY empleado_id);
 -- ERROR 1248 (42000): Every derived table must have its own alias
 
 -- ---------------------------------------------------------------
--- 5. La subconsulta en SELECT: una columna más
+-- 5. En SELECT: una columna más
 -- ---------------------------------------------------------------
 
--- Cada servicio junto al precio promedio.
-SELECT nombre, precio, (SELECT AVG(precio) FROM servicio) AS promedio
+-- Cada servicio junto al promedio y a cuánto se aleja de él.
+SELECT nombre,
+       precio,
+       (SELECT AVG(precio) FROM servicio) AS promedio,
+       precio - (SELECT AVG(precio) FROM servicio) AS diferencia
 FROM servicio;
+-- Baño e higiene           35.00  46.250000  -11.250000
+-- Corte de pelo            55.00  46.250000    8.750000
+-- Corte de uñas            15.00  46.250000  -31.250000
+-- Baño completo con corte  80.00  46.250000   33.750000
+
+-- La de adentro puede mirar la fila de afuera: se ejecuta una vez por empleado.
+SELECT e.nombre,
+       (SELECT COUNT(*) FROM cita c WHERE c.empleado_id = e.id) AS citas
+FROM empleado e;
+-- Ana Torres   4
+-- Bruno Díaz   3
+-- Carla Núñez  0
 
 -- ---------------------------------------------------------------
--- 6. La misma pregunta con JOIN
+-- 6. EXISTS y NOT EXISTS: ¿hay al menos una fila?
 -- ---------------------------------------------------------------
 
--- Empleados con citas. Sin DISTINCT, Ana sale tres veces.
+-- Empleados que tienen al menos una cita.
+-- SELECT 1 porque aquí no importa qué columna se traiga: solo si hay fila o no.
+SELECT e.nombre
+FROM empleado e
+WHERE EXISTS (SELECT 1 FROM cita c WHERE c.empleado_id = e.id);
+-- Ana Torres
+-- Bruno Díaz
+
+-- Empleados sin citas.
+SELECT e.nombre
+FROM empleado e
+WHERE NOT EXISTS (SELECT 1 FROM cita c WHERE c.empleado_id = e.id);
+-- Carla Núñez
+
+-- Citas ya atendidas que todavía no se cobraron.
+SELECT c.id, c.fecha_hora
+FROM cita c
+WHERE c.estado = 'completada'
+  AND NOT EXISTS (SELECT 1 FROM pago p WHERE p.cita_id = c.id);
+-- 6  2026-10-20 09:00:00
+
+-- ---------------------------------------------------------------
+-- 7. La trampa de NOT IN con NULL
+-- ---------------------------------------------------------------
+
+SELECT nombre FROM empleado WHERE id NOT IN (1, 2);        -- Carla Núñez
+SELECT nombre FROM empleado WHERE id NOT IN (1, 2, NULL);  -- ninguna fila
+-- ¿3 es distinto de NULL? El gestor no lo sabe, así que no devuelve la fila.
+-- Lo mismo pasa si la subconsulta trae una columna que admite NULL, como cliente.telefono.
+-- NOT EXISTS no tiene este problema.
+
+-- ---------------------------------------------------------------
+-- 8. La misma pregunta con JOIN
+-- ---------------------------------------------------------------
+
+-- Empleados con citas. Sin DISTINCT, Ana sale cuatro veces.
 SELECT DISTINCT e.nombre
 FROM empleado e
 JOIN cita c ON c.empleado_id = e.id;
