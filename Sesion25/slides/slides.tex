@@ -1,0 +1,982 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+% Sin atajos de babel: así las comillas " del código se ven tal cual.
+\PassOptionsToPackage{es-noshorthands}{babel}
+
+\input{header.tex}
+\usepackage{colortbl}
+
+\title{Funciones de ventana y programación SQL}
+\subtitle{\texttt{OVER}, funciones definidas por el usuario, variables e \texttt{IF}}
+\date{Semana 13 - Sesión 25}
+\author{Rel Guzman}
+
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Comentario dentro de un bloque de código
+\newcommand{\com}[1]{\textcolor{utpGrisMedio}{#1}}
+% Texto de apoyo en gris
+\newcommand{\gris}[1]{\textcolor{utpGris}{#1}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre de un operador o de un gestor
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Número de paso
+\newcommand{\npieza}[1]{\tikz[baseline=-0.6ex]{\node[circle,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner sep=1.6pt,minimum size=4.2mm] {#1};}}
+% Celda o texto resaltado en rojo claro
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% Lo importante, resaltado en amarillo dentro de un bloque de código
+\newcommand{\dentro}[1]{{\setlength{\fboxsep}{1.5pt}\colorbox{yellow!45}{#1}}}
+% Fila de una tabla resaltada
+\newcommand{\fila}{\rowcolor{yellow!45}}
+\newcommand{\filagris}{\rowcolor{utpGrisClaro}}
+% Marcas de sí y no
+\newcommand{\si}{$\checkmark$}
+\newcommand{\no}{\textcolor{utpRojo}{$\times$}}
+% Bloques de código sobre fondo gris: normal, chico y mínimo
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+\newenvironment{sqlchico}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\scriptsize\vspace{5pt}\raggedright}
+  {\vspace{5pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+\newenvironment{sqlmini}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\fontsize{7}{8.3}\selectfont\vspace{4pt}\raggedright}
+  {\vspace{4pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Ancho de una columna menos el borde del bloque de código
+\newcommand{\col}{\dimexpr\textwidth-2\fboxsep\relax}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.2em}}
+% Mensaje de error dentro de un bloque de código
+\newcommand{\err}[1]{\textcolor{utpRojo}{#1}}
+% Anatomía de una instrucción: cada pieza del código con su pregunta al lado
+\tikzset{
+  pieza/.style={fill=utpGrisClaro,font=\ttfamily\footnotesize,anchor=west,inner sep=5pt,
+    minimum height=0.62cm},
+  para/.style={font=\small,anchor=west,text=utpNegro}
+}
+\newcommand{\piezax}{7.6}
+\newcommand{\pieza}[3]{%
+  \node[pieza] at (0,#1) {#2};
+  \node[para] at (\piezax,#1) {\textcolor{utpRojo}{$\blacktriangleleft$}\ #3};}
+% Diapositiva de sección: una palabra bien grande
+\newcommand{\seccion}[2][1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#2}};
+    \ifnum#1=1
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+    \fi
+  \end{tikzpicture}
+\end{frame}}
+% Cabecera de columna dentro de una tabla en monoespaciado
+\newcommand{\cab}[1]{\normalfont\bfseries #1}
+% Resultado de una consulta: \res{columnas}{cabecera}{filas}
+\newcommand{\res}[3]{%
+  \centering{\scriptsize\color{utpGris}resultado}\\[3pt]
+  \footnotesize\ttfamily
+  \begin{tabular}{#1}
+  \toprule
+  #2 \\
+  \midrule
+  #3
+  \bottomrule
+  \end{tabular}}
+% Lo mismo, cuando debajo sigue más contenido del frame
+\newcommand{\resg}[3]{{\res{#1}{#2}{#3}\par}}
+% Tabla pequeña con su nombre arriba: \mini{nombre}{columnas}{cabecera}{filas}
+\newcommand{\mini}[4]{%
+  \begin{tabular}{@{}c@{}}
+  \tbl{#1}\\[3pt]
+  {\scriptsize\ttfamily
+  \begin{tabular}{#2}
+  \toprule
+  #3 \\
+  \midrule
+  #4
+  \bottomrule
+  \end{tabular}}
+  \end{tabular}}
+% Una tabla con título gris, alineada arriba: \tabla{título}{columnas}{cabecera}{filas}
+\newcommand{\tabla}[4]{%
+  \begin{tabular}[t]{@{}c@{}}
+  {\scriptsize\color{utpGris}#1}\\[3pt]
+  {\footnotesize\ttfamily
+  \begin{tabular}[t]{#2}
+  \toprule
+  #3 \\
+  \midrule
+  #4
+  \bottomrule
+  \end{tabular}}
+  \end{tabular}}
+% La pregunta del frame, en una caja naranja centrada
+\newcommand{\preg}[1]{{\centering\tikz\node[caja,cajanaranja,font=\normalsize,inner sep=6pt]{#1};\par}\vspace{4pt}}
+% Forma de lo que devuelve una consulta: celdas con borde
+\newcommand{\forma}[2]{{\ttfamily\footnotesize\renewcommand{\arraystretch}{1.25}%
+  \begin{tabular}{#1}\hline #2\end{tabular}}}
+% Estilos de los diagramas de esta sesión
+\tikzset{
+  codigo/.style={font=\ttfamily\footnotesize,inner sep=3pt},
+  sub/.style={codigo,draw=utpRojo,very thick,fill=yellow!45,rounded corners=2pt},
+  decision/.style={diamond,aspect=2.6,draw=utpRojo,very thick,fill=utpRojo!7,
+    font=\scriptsize,align=center,inner sep=1.5pt},
+  paso/.style={caja,font=\scriptsize,minimum height=.6cm,inner sep=4pt}
+}
+\begin{document}
+{\setbeamertemplate{footline}{}\maketitle}
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás hacer cálculos sobre grupos de filas \textbf{sin juntarlas}, con \textbf{funciones de ventana}, y crear \textbf{tus propias funciones} con \textbf{variables} e \textbf{IF}, en MySQL y SQL Server.
+\end{block}
+\end{frame}
+% =======================================================================
+% Revisión de la sesión anterior
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión: la tabla y lo que queremos}
+\preg{¿Qué servicios se pidieron en \textbf{septiembre} y \textbf{también} en \textbf{octubre}?}
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}
+  \node (t) at (0,0) {\mini{cita}{rlr}{\cab{id} & \cab{fecha\_hora} & \cab{servicio\_id}}{%
+\fila 1 & 2026-09-08 10:00:00 & 1 \\ \fila 2 & 2026-09-15 11:00:00 & 2 \\ \fila 3 & 2026-09-22 09:00:00 & 3 \\
+\filagris 4 & 2026-10-06 10:00:00 & 2 \\ \filagris 5 & 2026-10-13 11:00:00 & 1 \\ \filagris 6 & 2026-10-20 09:00:00 & 2 \\}};
+  \node (s) at (5.2,0.75) {\forma{|c|c|c|}{\cellcolor{yellow!45}1 & \cellcolor{yellow!45}2 & \cellcolor{yellow!45}3 \\ \hline}};
+  \node (o) at (5.2,-0.75) {\forma{|c|c|c|}{\cellcolor{utpGrisClaro}2 & \cellcolor{utpGrisClaro}1 & \cellcolor{utpGrisClaro}2 \\ \hline}};
+  \node[font=\scriptsize\bfseries,above=1pt of s] {servicios de septiembre};
+  \node[font=\scriptsize\bfseries,below=1pt of o] {servicios de octubre};
+  \node[caja,cajanaranja,align=left,font=\small] (q) at (10,0) {\textbf{1} Baño e higiene\\[3pt]\textbf{2} Corte de pelo};
+  \node[font=\scriptsize\bfseries,above=1pt of q] {lo que queremos};
+  \draw[flecha] (t.east) -- (s.west);
+  \draw[flecha] (t.east) -- (o.west);
+  \draw[flecha] (s.east) -- (q.west);
+  \draw[flecha] (o.east) -- (q.west);
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\concepto{Lo que buscamos}{\small Los servicios que están en \textbf{las dos} listas: el \textbf{1} y el \textbf{2}. El \textbf{3} (Corte de uñas) no, porque solo se pidió en septiembre.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión: ahora con \texttt{INTERSECT}}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+\begin{sqlcode}[\col]
+\kw{SELECT} servicio\_id \kw{FROM} cita\\
+\kw{WHERE} \kw{MONTH}(fecha\_hora) = 9\\
+\dentro{\kw{INTERSECT}}\\
+\kw{SELECT} servicio\_id \kw{FROM} cita\\
+\kw{WHERE} \kw{MONTH}(fecha\_hora) = 10\\
+\kw{ORDER BY} servicio\_id;
+\end{sqlcode}
+\column{.4\textwidth}
+\centering
+\begin{tikzpicture}
+  \node (s) at (0,0) {\scalebox{.9}{\forma{|c|}{\cellcolor{yellow!45}1 \\ \hline \cellcolor{yellow!45}2 \\ \hline 3 \\ \hline}}};
+  \node (o) at (1.6,0) {\scalebox{.9}{\forma{|c|}{\cellcolor{yellow!45}2 \\ \hline \cellcolor{yellow!45}1 \\ \hline \cellcolor{yellow!45}2 \\ \hline}}};
+  \node[font=\scriptsize\bfseries,above=1pt of s] {septiembre};
+  \node[font=\scriptsize\bfseries,above=1pt of o] {octubre};
+  \node (r) at (3.4,0) {\tabla{resultado}{r}{\cab{servicio\_id}}{1 \\ 2 \\}};
+  \draw[flecha] (o.east)--(r.west);
+\end{tikzpicture}
+\end{columns}
+\vspace{0.2cm}
+\small El servicio \textbf{1} (Baño e higiene) y el \textbf{2} (Corte de pelo) están en las dos listas. El \textbf{3} (Corte de uñas) solo se pidió en septiembre.
+\vspace{0.2cm}
+\concepto{\texttt{INTERSECT}}{\small Cada \texttt{SELECT} arma \textbf{una lista}: la de septiembre y la de octubre. \texttt{INTERSECT} deja solo lo que está \textbf{en las dos}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión: ¿y con \texttt{JOIN}?}
+\centering\etiqueta{JOIN de cita consigo misma}
+\begin{sqlcode}[.7\textwidth]
+\kw{SELECT} \dentro{\kw{DISTINCT}} c1.servicio\_id\\
+\kw{FROM} cita c1\\
+\kw{JOIN} cita c2 \kw{ON} c2.servicio\_id = c1.servicio\_id\\
+\kw{WHERE} \kw{MONTH}(c1.fecha\_hora) = 9\\
+\ind\kw{AND} \kw{MONTH}(c2.fecha\_hora) = 10\\
+\kw{ORDER BY} c1.servicio\_id;
+\end{sqlcode}
+\vspace{0.2cm}
+\begin{columns}[c,onlytextwidth]
+\column{.35\textwidth}
+\res{r}{\cab{servicio\_id}}{1 \\ 2 \\}
+\column{.6\textwidth}
+\raggedright\small \textbf{Sí sale}, pero hay que unir \tbl{cita} consigo misma, con dos alias, y quitar los repetidos con \texttt{DISTINCT}: sin él, el 2 sale dos veces.
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión: una pregunta que necesita subconsulta}
+\renewcommand{\arraystretch}{0.82}
+\preg{¿Qué pagos están \textbf{por encima del promedio}?}
+\begin{columns}[T,onlytextwidth]
+\column{.47\textwidth}
+\centering\etiqueta{Así no se puede}
+\begin{sqlcode}[\col]
+\kw{SELECT} id, monto \kw{FROM} pago\\
+\kw{WHERE} monto > \mal{\kw{AVG}(monto)};\\[4pt]
+\err{ERROR 1111 (HY000):}\\
+\err{Invalid use of group function}
+\end{sqlcode}
+\small \texttt{WHERE} revisa \textbf{una fila a la vez}, pero el promedio necesita \textbf{todas} las filas.
+\column{.5\textwidth}
+\centering\etiqueta{Con subconsulta}
+\begin{sqlcode}[\col]
+\kw{SELECT} id, monto, metodo \kw{FROM} pago\\
+\kw{WHERE} monto > \dentro{(\kw{SELECT AVG}(monto) \kw{FROM} pago)}\\
+\kw{ORDER BY} id;
+\end{sqlcode}
+\vspace{-0.1cm}
+\res{rrl}{\cab{id} & \cab{monto} & \cab{metodo}}{2 & 55.00 & tarjeta \\ 4 & 55.00 & efectivo \\ 8 & 55.00 & transferencia \\}
+\end{columns}
+\concepto{¿Por qué una subconsulta?}{\small La de adentro calcula \textbf{primero} el promedio (\texttt{37.500000}) y después cada fila se compara con ese número.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 1} La peluquería en MySQL y SQL Server}
+\small En cada gestor ejecuta \textbf{dos scripts, en orden}. Están en \texttt{ejemplos/practicas/}.
+\vspace{0.2cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.35}
+\setlength\tabcolsep{4pt}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\bfseries Gestor & \bfseries 1. Modelo físico (tablas) & \bfseries 2. Registros (datos) \\
+\midrule
+MySQL (Workbench) & \texttt{mysql/practica\_1\_modelo\_fisico.sql} & \texttt{mysql/practica\_1\_registros.sql} \\
+SQL Server (SSMS) & \texttt{sqlserver/practica\_1\_modelo\_fisico.sql} & \texttt{sqlserver/practica\_1\_registros.sql} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\small El primero crea la base \texttt{peluqueria} y sus tablas. El segundo carga los servicios, empleados, clientes, mascotas, citas y pagos.\par
+\vspace{0.2cm}
+\small Comprueba en cada gestor: \colorbox{utpGrisClaro}{\ttfamily\footnotesize\kw{SELECT COUNT}(*) \kw{FROM} cita;} debe dar \textbf{10}.
+\vspace{0.2cm}
+\ojo{El script de registros \textbf{borra} todos los datos de la base y los vuelve a cargar. Así todos vemos los mismos resultados.}
+\end{frame}
+% =======================================================================
+\seccion{Funciones de ventana}
+\begin{frame}{¿Para qué sirve el promedio de los pagos?}
+\renewcommand{\arraystretch}{0.82}
+\preg{¿Cuánto deja, en promedio, cada visita a la peluquería?}
+\vspace{0.2cm}
+\begin{columns}[c,onlytextwidth]
+\column{.33\textwidth}
+\begin{sqlcode}[\col]
+\kw{SELECT AVG}(monto) \kw{AS} promedio\\
+\kw{FROM} pago;
+\end{sqlcode}
+\column{.65\textwidth}
+\centering
+\begin{tikzpicture}
+  \node (t) {\tabla{tabla pago}{rrlr}{\cab{id} & \cab{monto} & \cab{metodo} & \cab{cita\_id}}{1 & 35.00 & efectivo & 1 \\ 2 & 55.00 & tarjeta & 2 \\ 3 & 15.00 & efectivo & 3 \\ 4 & 55.00 & efectivo & 4 \\ 5 & 35.00 & tarjeta & 5 \\ 6 & 15.00 & efectivo & 8 \\ 7 & 35.00 & tarjeta & 9 \\ 8 & 55.00 & transferencia & 10 \\}};
+  \node[right=1cm of t] (r) {\tabla{resultado}{r}{\cab{promedio}}{37.500000 \\}};
+  \draw[->,very thick,utpRojo] (t.east) -- node[above,font=\scriptsize\ttfamily,text=utpNegro]{AVG} (r.west);
+\end{tikzpicture}
+\end{columns}
+\vspace{0.2cm}
+\ojo{\texttt{AVG} \textbf{junta} las 8 filas en una. Tengo el promedio, pero ya no veo cada pago.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Quiero cada pago y, al lado, el promedio}
+\small Así se vería el reporte que queremos:
+\vspace{0.1cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[draw=utpGris,rounded corners=3pt,fill=white,inner sep=10pt] {%
+    \begin{tabular}{@{}c@{}}
+    {\bfseries\normalsize Reporte de pagos}\\[2pt]
+    {\scriptsize\color{utpGris}Peluquería canina}\\[8pt]
+    \footnotesize\renewcommand{\arraystretch}{1.05}
+    \begin{tabular}{crrl}
+    \rowcolor{utpNegro}\color{white}\bfseries Pago & \color{white}\bfseries Monto & \color{white}\bfseries Promedio & \\
+    \rowcolor{white}1 & S/ 35.00 & S/ 37.50 & \\
+    \fila 2 & S/ 55.00 & S/ 37.50 & \textcolor{utpRojo}{\scriptsize$\blacktriangle$ más que el promedio} \\
+    \rowcolor{white}3 & S/ 15.00 & S/ 37.50 & \\
+    \fila 4 & S/ 55.00 & S/ 37.50 & \textcolor{utpRojo}{\scriptsize$\blacktriangle$ más que el promedio} \\
+    \rowcolor{white}5 & S/ 35.00 & S/ 37.50 & \\
+    \rowcolor{white}6 & S/ 15.00 & S/ 37.50 & \\
+    \rowcolor{white}7 & S/ 35.00 & S/ 37.50 & \\
+    \fila 8 & S/ 55.00 & S/ 37.50 & \textcolor{utpRojo}{\scriptsize$\blacktriangle$ más que el promedio} \\
+    \end{tabular}
+    \end{tabular}};
+\end{tikzpicture}
+\end{center}
+\vspace{-0.1cm}
+\concepto{Lo que buscamos}{\small Una fila \textbf{por cada pago}, y en todas el \textbf{mismo promedio}, para comparar de un vistazo.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Quiero cada pago y, al lado, el promedio}
+\small Para comparar, lo primero que se nos ocurre es pedir las columnas y el promedio juntos:
+\begin{sqlcode}[.8\textwidth]
+\kw{SELECT} \mal{id}, \mal{monto}, \kw{AVG}(monto) \kw{AS} promedio\\
+\kw{FROM} pago;\\[5pt]
+\scriptsize\err{-- MySQL: ERROR 1140: In aggregated query without GROUP BY, expression \#1}\\
+\scriptsize\err{-- \ \ of SELECT list contains nonaggregated column 'peluqueria.pago.id'\ldots}\\
+\scriptsize\err{-- SQL Server: Msg 8120: Column 'pago.id' is invalid in the select list because}\\
+\scriptsize\err{-- \ \ it is not contained in either an aggregate function or the GROUP BY clause.}
+\end{sqlcode}
+\vspace{-0.2cm}
+\begin{center}
+\begin{tikzpicture}
+  \node (a) {\forma{|r|r|r|r|r|r|r|r|}{1 & 2 & 3 & 4 & 5 & 6 & 7 & 8\\ \hline}};
+  \node[below=1pt of a,font=\scriptsize] {\texttt{id}: 8 valores};
+  \node[right=2.2cm of a] (b) {\forma{|r|}{37.500000\\ \hline}};
+  \node[below=1pt of b,font=\scriptsize] {\texttt{AVG}: 1 valor};
+  \node[font=\Large\bfseries,text=utpRojo] at ($(a)!.5!(b)$) {?};
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\concepto{Por qué falla}{\small \texttt{AVG} deja \textbf{una sola fila}, pero \texttt{id} y \texttt{monto} tienen \textbf{ocho} valores: el gestor no sabe cuál poner. Necesito el promedio \textbf{sin juntar} las filas.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{OVER}: el promedio en cada fila}
+\renewcommand{\arraystretch}{0.82}
+\begin{sqlcode}[.75\textwidth]
+\kw{SELECT} id, monto, \dentro{\kw{AVG}(monto) \kw{OVER} ()} \kw{AS} promedio\\
+\kw{FROM} pago\\
+\kw{ORDER BY} id;
+\end{sqlcode}
+\vspace{-0.15cm}
+{\centering\small\textit{Se lee:} «Muestra el \texttt{id} y el \texttt{monto} de cada pago y, al lado, el \textbf{promedio} de \texttt{monto} calculado sobre \textbf{todas las filas}, sin juntarlas».\par}
+\vspace{0.05cm}
+\begin{columns}[c,onlytextwidth]
+\column{.48\textwidth}
+\centering
+\res{rrr}{\cab{id} & \cab{monto} & \cab{promedio}}{1 & 35.00 & 37.500000 \\ \fila 2 & 55.00 & 37.500000 \\ 3 & 15.00 & 37.500000 \\ \fila 4 & 55.00 & 37.500000 \\ 5 & 35.00 & 37.500000 \\ 6 & 15.00 & 37.500000 \\ 7 & 35.00 & 37.500000 \\ \fila 8 & 55.00 & 37.500000 \\}
+\column{.5\textwidth}
+\raggedright\small
+\texttt{OVER ()} dice \textbf{sobre qué filas} se calcula: con los paréntesis vacíos, sobre \textbf{las 8}.\\[6pt]
+El resultado, 37.5, se escribe en \textbf{cada fila}. Así se ve que los pagos 2, 4 y 8 (cortes de pelo) están \textbf{por encima del promedio}.
+\end{columns}
+\vspace{0.05cm}
+\concepto{Función de ventana}{\small Calcula sobre un grupo de filas, \textbf{la ventana}, y deja cada fila en su lugar. Se reconoce por \texttt{OVER}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Las piezas de una función de ventana}
+\small La consulta anterior, pieza por pieza:
+\vspace{0.3cm}
+\begin{center}
+\renewcommand{\piezax}{4.2}
+\begin{tikzpicture}
+  \pieza{0}{\kw{AVG}(monto)}{¿qué calculas? \gris{\texttt{AVG}, \texttt{SUM}, \texttt{COUNT}\ldots}}
+  \pieza{-0.75}{\kw{OVER} ()}{sin juntar las filas, sobre \textbf{toda la tabla}}
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\concepto{Se lee}{\small «El promedio de \texttt{monto}, calculado sobre todas las filas, escrito en cada fila».}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Las piezas de una función de ventana: dos piezas más}
+\small Dentro de los paréntesis de \texttt{OVER} puedes agregar dos piezas, las dos opcionales:
+\vspace{0.3cm}
+\begin{center}
+\renewcommand{\piezax}{6.4}
+\begin{tikzpicture}
+  \pieza{0}{\kw{SUM}(monto)}{¿qué calculas?}
+  \pieza{-0.75}{\kw{OVER} (}{sin juntar las filas}
+  \pieza{-1.5}{\ind\dentro{\kw{PARTITION BY} metodo}}{¿por grupos? \gris{un cálculo por cada método de pago}}
+  \pieza{-2.25}{\ind\dentro{\kw{ORDER BY} id}}{¿en qué orden? \gris{va sumando lo anterior}}
+  \pieza{-3}{)}{se cierra el paréntesis}
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\begin{columns}[c,onlytextwidth]
+\column{.32\textwidth}
+\centering\texttt{OVER ()}\\[3pt]\footnotesize toda la tabla
+\column{.32\textwidth}
+\centering\texttt{OVER (PARTITION BY \ldots)}\\[3pt]\footnotesize cada grupo por separado
+\column{.32\textwidth}
+\centering\texttt{OVER (ORDER BY \ldots)}\\[3pt]\footnotesize fila por fila, sumando lo anterior
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{PARTITION BY}: un cálculo por grupo}
+\renewcommand{\arraystretch}{0.82}
+\small ¿Cuánto trabajo tiene cada empleado? Cada cita y, al lado, cuántas citas tiene \textbf{su} empleado.\par
+\vspace{0.3cm}
+\begin{columns}[c,onlytextwidth]
+\column{.55\textwidth}
+\begin{sqlcode}[\col]
+\kw{SELECT} id, empleado\_id,\\
+\ind\kw{COUNT}(*) \kw{OVER} (\dentro{\kw{PARTITION BY} empleado\_id})\\
+\ind\ind\kw{AS} citas\_del\_empleado\\
+\kw{FROM} cita\\
+\kw{ORDER BY} empleado\_id, id;
+\end{sqlcode}
+\vspace{0.1cm}
+\centering\colorbox{yellow!45}{\strut\footnotesize empleado 1: 6 citas}\quad\colorbox{utpGrisClaro}{\strut\footnotesize empleado 2: 4 citas}
+\column{.42\textwidth}
+\res{rrr}{\cab{id} & \cab{empleado\_id} & \cab{citas\_del\_empleado}}{%
+    \fila 1 & 1 & 6 \\ \fila 3 & 1 & 6 \\ \fila 4 & 1 & 6 \\ \fila 6 & 1 & 6 \\ \fila 8 & 1 & 6 \\ \fila 10 & 1 & 6 \\
+    \filagris 2 & 2 & 4 \\ \filagris 5 & 2 & 4 \\ \filagris 7 & 2 & 4 \\ \filagris 9 & 2 & 4 \\}
+\end{columns}
+\vspace{0.3cm}
+\concepto{\texttt{PARTITION BY}}{\small Separa las filas en grupos, como \texttt{GROUP BY}, pero \textbf{sin juntarlas}. \texttt{COUNT} cuenta dentro de cada grupo y escribe el resultado en todas sus filas.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{ORDER BY} dentro de \texttt{OVER}: el total acumulado}
+\renewcommand{\arraystretch}{0.9}
+\small ¿Cuánto llevamos cobrado \textbf{hoy} (4 de noviembre) después de cada pago? La fecha está en \tbl{cita}.\par
+\begin{sqlcode}[.66\textwidth]
+\kw{SELECT} c.fecha\_hora, p.monto,\\
+\ind\kw{SUM}(p.monto) \kw{OVER} (\dentro{\kw{ORDER BY} c.fecha\_hora}) \kw{AS} acumulado\\
+\kw{FROM} pago p \kw{JOIN} cita c \kw{ON} c.id = p.cita\_id\\
+\kw{WHERE} \kw{CAST}(c.fecha\_hora \kw{AS DATE}) = '2026-11-04'\\
+\kw{ORDER BY} c.fecha\_hora;
+\end{sqlcode}
+\vspace{-0.2cm}
+\begin{center}
+\tabla{resultado}{lrr}{\cab{fecha\_hora} & \cab{monto} & \cab{acumulado}}{2026-11-04 09:00:00 & 15.00 & 15.00 \\ 2026-11-04 10:00:00 & 35.00 & 50.00 \\ 2026-11-04 11:00:00 & 55.00 & 105.00 \\}
+\qquad
+\tabla{cómo se calcula}{l}{\cab{lo anterior + este pago}}{15 \\ 15 + 35 \\ 50 + 55 \\}
+\par\vspace{2pt}{\scriptsize\color{utpGris}SQL Server muestra la fecha como \texttt{2026-11-04 09:00:00.0000000}.}
+\end{center}
+\vspace{-0.15cm}
+\concepto{Idea clave}{\small Con \texttt{ORDER BY}, la ventana de cada fila va \textbf{desde el primer pago del día hasta ella}. Al final del día, la caja tiene \textbf{105} soles.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Numerar: \texttt{ROW\_NUMBER}}
+\renewcommand{\arraystretch}{0.74}
+\preg{Ordena los pagos del más alto al más bajo y \textbf{numéralos}.}
+\begin{sqlcode}[.8\textwidth]
+\kw{SELECT} id, monto,\\
+\ind\dentro{\kw{ROW\_NUMBER}()} \kw{OVER} (\kw{ORDER BY} monto \kw{DESC}, id) \kw{AS} puesto\\
+\kw{FROM} pago \kw{ORDER BY} puesto;
+\end{sqlcode}
+\vspace{-0.15cm}
+\begin{columns}[c,onlytextwidth]
+\column{.4\textwidth}
+\res{rrr}{\cab{id} & \cab{monto} & \cab{puesto}}{\fila 2 & 55.00 & 1 \\ \fila 4 & 55.00 & 2 \\ \fila 8 & 55.00 & 3 \\ 1 & 35.00 & 4 \\ 5 & 35.00 & 5 \\ 7 & 35.00 & 6 \\ 3 & 15.00 & 7 \\ 6 & 15.00 & 8 \\}
+\column{.57\textwidth}
+\raggedright\small Los pagos 2, 4 y 8 \textbf{empatan} en 55, pero cada uno recibe \textbf{su propio número}: 1, 2 y 3.\\[6pt] El \texttt{id} al final del \texttt{ORDER BY} decide quién va primero en un empate. Sin él, MySQL y SQL Server los numeran distinto.
+\end{columns}
+\vspace{0.05cm}
+\concepto{\texttt{ROW\_NUMBER}}{\small Numera 1, 2, 3, 4, 5\ldots{} \textbf{sin repetir}, aunque haya empates.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Rankear con empates: \texttt{RANK}}
+\renewcommand{\arraystretch}{0.74}
+\preg{Del más alto al más bajo, ¿en qué \textbf{puesto} queda cada pago?}
+\begin{sqlcode}[.8\textwidth]
+\kw{SELECT} id, monto,\\
+\ind\dentro{\kw{RANK}()} \kw{OVER} (\kw{ORDER BY} monto \kw{DESC}) \kw{AS} puesto\\
+\kw{FROM} pago \kw{ORDER BY} puesto, id;
+\end{sqlcode}
+\vspace{-0.15cm}
+\begin{columns}[c,onlytextwidth]
+\column{.4\textwidth}
+\res{rrr}{\cab{id} & \cab{monto} & \cab{puesto}}{2 & 55.00 & 1 \\ 4 & 55.00 & 1 \\ 8 & 55.00 & 1 \\ 1 & 35.00 & \mal{4} \\ 5 & 35.00 & \mal{4} \\ 7 & 35.00 & \mal{4} \\ 3 & 15.00 & 7 \\ 6 & 15.00 & 7 \\}
+\column{.57\textwidth}
+\raggedright\small Los tres de 55 comparten el puesto \textbf{1}.\\[6pt] El siguiente es el \textbf{4}, no el 2: hay tres pagos delante. Los puestos 2 y 3 \textbf{se saltan}.
+\end{columns}
+\vspace{0.05cm}
+\concepto{\texttt{RANK}}{\small Los empatados \textbf{comparten puesto} y después \textbf{salta}: 1, 1, 1, 4, 4, 4, 7, 7.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Rankear sin saltos: \texttt{DENSE\_RANK}}
+\renewcommand{\arraystretch}{0.74}
+\preg{Del más alto al más bajo, ¿en qué \textbf{puesto} queda cada pago?}
+\begin{sqlcode}[.8\textwidth]
+\kw{SELECT} id, monto,\\
+\ind\dentro{\kw{DENSE\_RANK}()} \kw{OVER} (\kw{ORDER BY} monto \kw{DESC}) \kw{AS} puesto\\
+\kw{FROM} pago \kw{ORDER BY} puesto, id;
+\end{sqlcode}
+\vspace{-0.15cm}
+\begin{columns}[c,onlytextwidth]
+\column{.4\textwidth}
+\res{rrr}{\cab{id} & \cab{monto} & \cab{puesto}}{2 & 55.00 & 1 \\ 4 & 55.00 & 1 \\ 8 & 55.00 & 1 \\ 1 & 35.00 & \mal{2} \\ 5 & 35.00 & \mal{2} \\ 7 & 35.00 & \mal{2} \\ 3 & 15.00 & \mal{3} \\ 6 & 15.00 & \mal{3} \\}
+\column{.57\textwidth}
+\raggedright\small Es la misma consulta, cambiando \texttt{RANK} por \texttt{DENSE\_RANK}.\\[6pt] Los tres de 55 siguen en el puesto \textbf{1}, pero los de 35 ahora quedan en el \textbf{2}, no en el 4, y los de 15 en el \textbf{3}: \textbf{no se salta} ningún número.
+\end{columns}
+\vspace{0.05cm}
+\concepto{\texttt{DENSE\_RANK}}{\small Los empatados \textbf{comparten puesto} y el siguiente \textbf{no salta}: 1, 1, 1, 2, 2, 2, 3, 3.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{El pago anterior: \texttt{LAG}}
+\renewcommand{\arraystretch}{0.74}
+\preg{Junto a cada pago, ¿de cuánto fue el pago \textbf{anterior}?}
+\begin{sqlcode}[.8\textwidth]
+\kw{SELECT} id, monto,\\
+\ind\dentro{\kw{LAG}(monto)} \kw{OVER} (\kw{ORDER BY} id) \kw{AS} anterior\\
+\kw{FROM} pago \kw{ORDER BY} id;
+\end{sqlcode}
+\vspace{-0.15cm}
+\begin{columns}[c,onlytextwidth]
+\column{.4\textwidth}
+\res{rrr}{\cab{id} & \cab{monto} & \cab{anterior}}{1 & \cellcolor{yellow!45}35.00 & \cellcolor{utpRojo!18}NULL \\ 2 & 55.00 & \cellcolor{yellow!45}35.00 \\ 3 & 15.00 & 55.00 \\ 4 & 55.00 & 15.00 \\ 5 & 35.00 & 55.00 \\ 6 & 15.00 & 35.00 \\ 7 & 35.00 & 15.00 \\ 8 & 55.00 & 35.00 \\}
+\column{.57\textwidth}
+\raggedright\small \texttt{LAG} trae el monto de la fila de \textbf{arriba}: el 35 del pago 1 aparece al lado del pago 2.\\[6pt] El pago 1 no tiene anterior: sale \texttt{NULL}.\\[6pt] Sirve para comparar: el pago 3 (15) fue menor que el 2 (55).
+\end{columns}
+\vspace{0.05cm}
+\concepto{\texttt{LAG}}{\small Trae un valor de la fila \textbf{anterior}, según el orden que se pone en \texttt{OVER}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{El pago siguiente: \texttt{LEAD}}
+\renewcommand{\arraystretch}{0.74}
+\preg{Junto a cada pago, ¿de cuánto fue el pago \textbf{siguiente}?}
+\begin{sqlcode}[.8\textwidth]
+\kw{SELECT} id, monto,\\
+\ind\dentro{\kw{LEAD}(monto)} \kw{OVER} (\kw{ORDER BY} id) \kw{AS} siguiente\\
+\kw{FROM} pago \kw{ORDER BY} id;
+\end{sqlcode}
+\vspace{-0.15cm}
+\begin{columns}[c,onlytextwidth]
+\column{.4\textwidth}
+\res{rrr}{\cab{id} & \cab{monto} & \cab{siguiente}}{1 & 35.00 & \cellcolor{yellow!45}55.00 \\ 2 & \cellcolor{yellow!45}55.00 & 15.00 \\ 3 & 15.00 & 55.00 \\ 4 & 55.00 & 35.00 \\ 5 & 35.00 & 15.00 \\ 6 & 15.00 & 35.00 \\ 7 & 35.00 & 55.00 \\ 8 & 55.00 & \cellcolor{utpRojo!18}NULL \\}
+\column{.57\textwidth}
+\raggedright\small Es la misma consulta, cambiando \texttt{LAG} por \texttt{LEAD}.\\[6pt] \texttt{LEAD} trae el monto de la fila de \textbf{abajo}: el 55 del pago 2 aparece al lado del pago 1.\\[6pt] El pago 8 es el último: no tiene siguiente y sale \texttt{NULL}.
+\end{columns}
+\vspace{0.05cm}
+\concepto{\texttt{LEAD}}{\small Trae un valor de la fila \textbf{siguiente}. Es lo contrario de \texttt{LAG}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 2} Funciones de ventana en MySQL y SQL Server}
+\small Abre y ejecuta \texttt{practica\_2\_ventana.sql}. Está en \texttt{ejemplos/practicas/}:
+\vspace{0.1cm}
+\begin{enumerate}\setlength\itemsep{3pt}
+  \item \textbf{MySQL:} \texttt{mysql/practica\_2\_ventana.sql} en Workbench.
+  \item \textbf{SQL Server:} \texttt{sqlserver/practica\_2\_ventana.sql} en SSMS.
+\end{enumerate}
+\vspace{0.1cm}
+\vspace{0.1cm}
+\small ¿Cuánto llevamos cobrado \textbf{hoy} después de cada pago?\par
+\begin{columns}[c,onlytextwidth]
+\column{.52\textwidth}
+\begin{sqlchico}[\col]
+\kw{SELECT} c.fecha\_hora, p.monto,\\
+\ind\kw{SUM}(p.monto) \kw{OVER} (\kw{ORDER BY} c.fecha\_hora)\\
+\ind\ind\kw{AS} acumulado\\
+\kw{FROM} pago p \kw{JOIN} cita c \kw{ON} c.id = p.cita\_id\\
+\kw{WHERE} \kw{CAST}(c.fecha\_hora \kw{AS DATE}) = '2026-11-04'\\
+\kw{ORDER BY} c.fecha\_hora;
+\end{sqlchico}
+\column{.45\textwidth}
+\res{lrr}{\cab{fecha\_hora} & \cab{monto} & \cab{acumulado}}{2026-11-04 09:00:00 & 15.00 & 15.00 \\ 2026-11-04 10:00:00 & 35.00 & 50.00 \\ 2026-11-04 11:00:00 & 55.00 & 105.00 \\}
+\par\vspace{3pt}{\centering\normalfont\scriptsize\color{utpGris}SQL Server: \texttt{2026-11-04 09:00:00.0000000}.\par}
+\end{columns}
+\vspace{0.2cm}
+\concepto{Idea clave}{\small Las funciones de ventana se escriben \textbf{igual en los dos} gestores y dan los mismos valores; solo cambia cómo se muestra la fecha.}
+\end{frame}
+% =======================================================================
+\seccion{Funciones definidas por el usuario}
+\begin{frame}{Caso de estudio: sistema de cupones de descuento}
+\begin{columns}[T,onlytextwidth]
+\column{.47\textwidth}
+\small Una tienda en línea lanza \textbf{códigos de descuento}.
+\vspace{0.2cm}
+\begin{itemize}\setlength\itemsep{2pt}
+  \item El \textbf{responsable de promociones} registra los cupones y los activa o desactiva.
+  \item El \textbf{cliente} escribe el código al pagar.
+  \item Un cupón descuenta un \textbf{porcentaje} o un \textbf{monto fijo} en soles.
+  \item Tiene fecha de inicio y, si se quiere, fecha de fin.
+\end{itemize}
+\column{.5\textwidth}
+\centering
+\begin{tikzpicture}
+  \tikzset{panel/.style={draw=utpNegro,very thick,fill=white,minimum width=6.4cm,minimum height=3.3cm,anchor=north}}
+  \node[panel] (p) at (0,0) {};
+  \node[anchor=north,fill=utpNegro,text=white,minimum width=6.4cm,minimum height=.55cm,font=\footnotesize\bfseries]
+    (b) at (p.north) {Tienda: pagar mi compra};
+  \node[anchor=north west,font=\small] at ([xshift=4mm,yshift=-3mm]b.south west) {Total de la compra};
+  \node[anchor=north east,font=\small\bfseries] at ([xshift=-4mm,yshift=-3mm]b.south east) {S/ 120.00};
+  \node[anchor=north west,font=\small] at ([xshift=4mm,yshift=-10mm]b.south west) {Cupón};
+  \node[anchor=north east,draw=utpGrisMedio,font=\ttfamily\small,minimum width=2.8cm,inner sep=3pt]
+    at ([xshift=-4mm,yshift=-9.4mm]b.south east) {BIENVENIDA10};
+  \draw[utpGrisMedio] ([xshift=4mm,yshift=-17mm]b.south west) -- ([xshift=-4mm,yshift=-17mm]b.south east);
+  \node[anchor=north west,font=\small\bfseries] at ([xshift=4mm,yshift=-19mm]b.south west) {A pagar};
+  \node[anchor=north east,font=\small\bfseries,text=utpRojo] at ([xshift=-4mm,yshift=-19mm]b.south east) {S/ ?};
+\end{tikzpicture}
+\end{columns}
+\vspace{0cm}
+\begin{center}
+\mini{cupon}{rllrlll}{\cab{id} & \cab{codigo} & \cab{tipo\_descuento} & \cab{valor\_descuento} & \cab{estado} & \cab{vigente\_desde} & \cab{vigente\_hasta}}{%
+1 & BIENVENIDA10 & porcentaje & 10.00 & activo & 2026-01-01 & NULL \\
+2 & NOVIEMBRE20 & monto\_fijo & 20.00 & activo & 2026-11-01 & 2026-12-01 \\
+3 & VERANO15 & porcentaje & 15.00 & activo & 2026-01-01 & 2026-04-01 \\
+4 & NAVIDAD25 & porcentaje & 25.00 & activo & 2026-12-15 & 2026-12-26 \\
+5 & PRUEBA50 & monto\_fijo & 50.00 & inactivo & 2026-10-01 & NULL \\}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Dos sistemas, una misma base de datos}
+\small El caso tiene \textbf{dos programas distintos} que trabajan con la \textbf{misma base} \texttt{cupones}:
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}
+  \tikzset{sis/.style={caja,align=center,minimum width=3.8cm,minimum height=1.7cm,font=\small},
+           bd/.style={cylinder,shape border rotate=90,aspect=0.25,draw=utpRojo!75,very thick,fill=utpRojo!7,
+                      minimum width=2.6cm,minimum height=1.7cm,align=center,font=\small}}
+  \node[sis] (panel) at (-3.6,0) {\textbf{Panel de cupones}\\[3pt]\footnotesize el responsable de\\[-1pt]\footnotesize promociones crea, activa\\[-1pt]\footnotesize y desactiva cupones};
+  \node[sis] (tienda) at (3.6,0) {\textbf{Tienda en línea}\\[3pt]\footnotesize el cliente escribe el\\[-1pt]\footnotesize código y la tienda\\[-1pt]\footnotesize calcula cuánto paga};
+  \node[bd] (bd) at (0,-2.4) {\textbf{base de datos}\\[1pt]\texttt{cupones}};
+  \node[font=\scriptsize\bfseries,text=utpGris,above=3pt of panel] {sistema 1};
+  \node[font=\scriptsize\bfseries,text=utpGris,above=3pt of tienda] {sistema 2};
+  \draw[flecha] (panel.south) -- node[midway,left,font=\small\bfseries,xshift=-4pt,yshift=-4pt]{guarda cupones} (bd.west);
+  \draw[flecha] (tienda.south) -- node[midway,right,font=\small\bfseries,xshift=4pt,yshift=-4pt]{consulta cupones} (bd.east);
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\concepto{Idea clave}{\small Cada sistema funciona \textbf{por su cuenta}: uno \textbf{guarda} los cupones y el otro los \textbf{usa}. Lo único que comparten es la base.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{La pregunta del caso: ¿cuánto paga el cliente?}
+\small Una compra de \textbf{S/ 120}. El cálculo depende del tipo de cupón:
+\vspace{0.15cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\bfseries Cupón & \bfseries Tipo & \bfseries Cálculo & \bfseries Paga \\
+\midrule
+\texttt{BIENVENIDA10} & porcentaje: 10 & $120 - 120 \times 10 / 100$ & \textbf{S/ 108.00} \\
+\texttt{NOVIEMBRE20} & monto fijo: 20 & $120 - 20$ & \textbf{S/ 100.00} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\small ¿Dónde se escribe ese cálculo? Lo necesitan \textbf{los dos sistemas}: el panel, para mostrar cuánto quedaría una compra, y la tienda, para cobrar.
+\vspace{0.15cm}
+\begin{columns}[c,onlytextwidth]
+\column{.48\textwidth}
+\centering
+\begin{tikzpicture}
+  \foreach \t/\y in {Panel de cupones/0, Tienda en línea/-0.8}
+    \node[paso,minimum width=3.1cm] at (0,\y) {\t\ \ \mal{fórmula}};
+\end{tikzpicture}\\[4pt]
+\footnotesize Cada sistema con \textbf{su} fórmula: si una está mal, el panel muestra un precio y la tienda cobra otro.
+\column{.48\textwidth}
+\centering
+\begin{tikzpicture}
+  \foreach \t/\y/\i in {Panel de cupones/0/1, Tienda en línea/-0.8/2}
+    \node[paso,minimum width=2.6cm] (a\i) at (0,\y) {\t};
+  \node[caja,cajanaranja,font=\scriptsize,align=center] (f) at (3.6,-0.4) {base de datos\\[2pt]\texttt{precio\_final()}};
+  \foreach \i in {1,2} \draw[flecha] (a\i.east) -- (f.west);
+\end{tikzpicture}\\[4pt]
+\footnotesize La fórmula se escribe \textbf{una vez}, en la base, y todos la usan.
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Ya usas funciones: ahora creas las tuyas}
+\small Una función \textbf{recibe} datos, hace un cálculo y \textbf{devuelve} un valor. Ya conoces las que trae el gestor:
+\vspace{0.3cm}
+\begin{center}
+\begin{tikzpicture}
+  \tikzset{e/.style={codigo,anchor=east},s/.style={codigo,anchor=west,font=\ttfamily\footnotesize\bfseries},
+    f/.style={caja,minimum width=3.4cm,font=\ttfamily\small}}
+  \node[e] (e1) at (0,0) {107.956, 2};
+  \node[f] (f1) at (2.6,0) {ROUND};
+  \node[s] (s1) at (5.2,0) {107.96};
+  \node[e] (e2) at (0,-1) {'bienvenida10'};
+  \node[f] (f2) at (2.6,-1) {UPPER};
+  \node[s] (s2) at (5.2,-1) {BIENVENIDA10};
+  \node[e] (e3) at (0,-2.2) {120, 10};
+  \node[f,cajanaranja] (f3) at (2.6,-2.2) {aplicar\_porcentaje};
+  \node[s] (s3) at (5.2,-2.2) {108.00};
+  \foreach \i in {1,2,3} {\draw[flecha] (e\i)--(f\i); \draw[flecha] (f\i)--(s\i);}
+  \node[font=\scriptsize\bfseries,text=utpGris] at (-0.8,0.65) {recibe};
+  \node[font=\scriptsize\bfseries,text=utpGris] at (2.6,0.65) {calcula};
+  \node[font=\scriptsize\bfseries,text=utpGris] at (5.9,0.65) {devuelve};
+  \node[font=\scriptsize,text=utpRojo,anchor=west] at (7.3,-2.2) {$\blacktriangleleft$ esta la escribes tú};
+  \draw[utpGrisMedio,dashed] (-2.2,-1.6) -- (8.5,-1.6);
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\concepto{Función definida por el usuario}{\small Una función que \textbf{tú escribes} con \texttt{CREATE FUNCTION}. Queda \textbf{guardada en la base de datos} y se usa dentro de un \texttt{SELECT}, igual que \texttt{ROUND} o \texttt{UPPER}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Tu primera función en MySQL}
+\small Empecemos por el caso más simple: un cupón de \textbf{porcentaje}.
+\vspace{0.15cm}
+\begin{center}
+\renewcommand{\piezax}{7.9}
+\begin{tikzpicture}
+  \pieza{0}{\kw{CREATE FUNCTION} aplicar\_porcentaje(}{el nombre de tu función}
+  \pieza{-0.62}{\ind p\_precio \kw{DECIMAL}(10,2),}{lo que recibe: \textbf{parámetros} con su tipo}
+  \pieza{-1.24}{\ind p\_porcentaje \kw{DECIMAL}(5,2))}{\ldots{} separados por comas}
+  \pieza{-1.86}{\kw{RETURNS DECIMAL}(10,2)}{el tipo de lo que devuelve}
+  \pieza{-2.48}{\kw{DETERMINISTIC}}{mismos datos de entrada, mismo resultado}
+  \pieza{-3.1}{\kw{RETURN} p\_precio - p\_precio * p\_porcentaje / 100;}{el cálculo que devuelve}
+\end{tikzpicture}
+\end{center}
+\vspace{0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.6\textwidth}
+\small Se usa como cualquier función:
+\begin{sqlcode}[\col]
+\kw{SELECT} aplicar\_porcentaje(120, 10) \kw{AS} a\_pagar;
+\end{sqlcode}
+\column{.36\textwidth}
+\res{r}{\cab{a\_pagar}}{108.00 \\}
+\end{columns}
+\vspace{0.1cm}
+{\footnotesize\gris{\texttt{p\_} al inicio es una costumbre: así se ve que \texttt{p\_precio} es un \textbf{parámetro} y no una columna.}}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{La misma función en SQL Server}
+\begin{columns}[T,onlytextwidth]
+\column{.47\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlmini}[\col]
+\kw{CREATE FUNCTION} aplicar\_porcentaje(\\
+\ind\mal{p\_precio} \kw{DECIMAL}(10,2),\\
+\ind\mal{p\_porcentaje} \kw{DECIMAL}(5,2))\\
+\kw{RETURNS DECIMAL}(10,2)\\
+\kw{DETERMINISTIC}\\
+\kw{RETURN} p\_precio - p\_precio * p\_porcentaje / 100;\\[6pt]
+\kw{SELECT} aplicar\_porcentaje(120, 10);
+\end{sqlmini}
+\column{.5\textwidth}
+\centering\etiqueta{SQL Server}
+\begin{sqlmini}[\col]
+\kw{CREATE} \mal{\kw{OR ALTER}} \kw{FUNCTION} \mal{dbo.}aplicar\_porcentaje(\\
+\ind\mal{@precio} \kw{DECIMAL}(10,2),\\
+\ind\mal{@porcentaje} \kw{DECIMAL}(5,2))\\
+\kw{RETURNS DECIMAL}(10,2)\\
+\mal{\kw{AS}}\\
+\mal{\kw{BEGIN}}\\
+\ind\kw{RETURN} @precio - @precio * @porcentaje / 100;\\
+\mal{\kw{END}};\\
+\mal{\kw{GO}}\\[4pt]
+\kw{SELECT} \mal{dbo.}aplicar\_porcentaje(120, 10);
+\end{sqlmini}
+\end{columns}
+\vspace{0.1cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}>{\bfseries}lll@{}}
+\toprule
+ & \bfseries MySQL & \bfseries SQL Server \\
+\midrule
+Parámetros & \texttt{p\_precio} & \texttt{@precio}: la \texttt{@} es obligatoria \\
+Cuerpo & \texttt{RETURN \ldots;} & entre \texttt{AS BEGIN} y \texttt{END} \\
+Si ya existe & \texttt{CREATE} da error & \texttt{CREATE OR ALTER} la reemplaza \\
+Para usarla & \texttt{aplicar\_porcentaje(\ldots)} & \texttt{dbo.aplicar\_porcentaje(\ldots)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Usarla sobre las filas de una tabla}
+\small En el panel: con una compra de S/ 120, ¿cuánto pagaría el cliente con cada cupón de porcentaje?
+\begin{columns}[c,onlytextwidth]
+\column{.55\textwidth}
+\begin{sqlcode}[\col]
+\kw{SELECT} codigo, valor\_descuento,\\
+\ind\dentro{aplicar\_porcentaje(120, valor\_descuento)}\\
+\ind\ind\kw{AS} a\_pagar\\
+\kw{FROM} cupon\\
+\kw{WHERE} tipo\_descuento = 'porcentaje'\\
+\kw{ORDER BY} id;
+\end{sqlcode}
+\column{.42\textwidth}
+\res{lrr}{\cab{codigo} & \cab{valor\_descuento} & \cab{a\_pagar}}{BIENVENIDA10 & 10.00 & 108.00 \\ VERANO15 & 15.00 & 102.00 \\ NAVIDAD25 & 25.00 & 90.00 \\}
+\end{columns}
+\vspace{0.2cm}
+\concepto{Idea clave}{\small La función se ejecuta \textbf{una vez por cada fila}: cada vez recibe el \texttt{valor\_descuento} de esa fila. En SQL Server se escribe \texttt{dbo.aplicar\_porcentaje}.}
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.49\textwidth}
+\begin{alertblock}{MySQL: sin \texttt{DETERMINISTIC}}
+\scriptsize\texttt{ERROR 1418 (HY000): This function has none of DETERMINISTIC, NO SQL, or READS SQL DATA in its declaration\ldots}
+\end{alertblock}
+\column{.49\textwidth}
+\begin{alertblock}{SQL Server: sin \texttt{dbo.}}
+\scriptsize\texttt{Msg 195: 'aplicar\_porcentaje' is not a recognized built-in function name.}
+\end{alertblock}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 3} La base de cupones y tu primera función}
+\npieza{1}\ \small Crea la base \texttt{cupones}: dos scripts, en orden. Están en \texttt{ejemplos/practicas/}:
+\vspace{0.1cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\setlength\tabcolsep{4pt}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\bfseries Gestor & \bfseries 1. Modelo físico (tablas) & \bfseries 2. Registros (datos) \\
+\midrule
+MySQL (Workbench) & \texttt{mysql/practica\_3\_modelo\_fisico.sql} & \texttt{mysql/practica\_3\_registros.sql} \\
+SQL Server (SSMS) & \texttt{sqlserver/practica\_3\_modelo\_fisico.sql} & \texttt{sqlserver/practica\_3\_registros.sql} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\npieza{2}\ \small Crea la función y pruébala. Los scripts están en \texttt{ejemplos/2\_cupones/}:
+\vspace{0.05cm}
+\begin{itemize}\setlength\itemsep{3pt}
+  \item \textbf{MySQL:} \texttt{1\_funciones\_mysql.sql} \qquad \textbf{SQL Server:} \texttt{1\_funciones\_sqlserver.sql}
+\end{itemize}
+\vspace{0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.62\textwidth}
+\npieza{3}\ \small Comprueba:
+\begin{sqlcode}[\col]
+\kw{SELECT} aplicar\_porcentaje(120, 10);\ \ \com{-- MySQL}\\
+\kw{SELECT} dbo.aplicar\_porcentaje(120, 10);\ \com{-- SQL Server}
+\end{sqlcode}
+\column{.34\textwidth}
+\res{r}{\cab{a\_pagar}}{108.00 \\}
+\end{columns}
+\end{frame}
+% =======================================================================
+\seccion{Variables y condicional IF}
+\begin{frame}{Un cupón de monto fijo no es un porcentaje}
+\small \texttt{NOVIEMBRE20} descuenta \textbf{S/ 20}, no el 20 \%. Con la función de antes, el cálculo sale mal:
+\begin{columns}[c,onlytextwidth]
+\column{.55\textwidth}
+\begin{sqlcode}[\col]
+\kw{SELECT} aplicar\_porcentaje(120, 20);
+\end{sqlcode}
+\column{.4\textwidth}
+\centering
+{\scriptsize\color{utpGris}resultado}\\[2pt]
+\mal{\ttfamily 96.00}\quad\small debía ser \textbf{100.00}
+\end{columns}
+\vspace{0.3cm}
+\small La función \texttt{precio\_final(precio, cupon)} tiene que hacer \textbf{tres pasos}:
+\vspace{0.3cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[paso,text width=3.6cm] (a) at (0,0) {\npieza{1} Leer el cupón y \textbf{guardar} su tipo y su valor};
+  \node[paso,text width=3.6cm] (b) at (4.6,0) {\npieza{2} \textbf{Según el tipo}, calcular el descuento};
+  \node[paso,text width=3.6cm] (c) at (9.2,0) {\npieza{3} Devolver el precio menos el descuento};
+  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c);
+  \node[font=\small\bfseries,text=utpRojo] at (0,-1) {variables};
+  \node[font=\small\bfseries,text=utpRojo] at (4.6,-1) {\texttt{IF}};
+  \node[font=\small\bfseries,text=utpRojo] at (9.2,-1) {\texttt{RETURN}};
+\end{tikzpicture}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Variables: guardar un valor para usarlo después}
+\concepto{Variable}{\small Un \textbf{nombre} que guarda \textbf{un valor} mientras se ejecuta tu código. Se le da un valor con \texttt{SET}.}
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlchico}[\col]
+\kw{SET} @precio = 120;\\
+\kw{SET} @descuento = 20;\\
+\kw{SELECT} @precio - @descuento \kw{AS} a\_pagar;\\
+\com{-- 100}
+\end{sqlchico}
+\footnotesize Guardar lo que devuelve un \texttt{SELECT}:
+\begin{sqlchico}[\col]
+\kw{SELECT} valor\_descuento \dentro{\kw{INTO} @descuento}\\
+\kw{FROM} cupon \kw{WHERE} codigo = 'NOVIEMBRE20';
+\end{sqlchico}
+\column{.48\textwidth}
+\centering\etiqueta{SQL Server}
+\begin{sqlchico}[\col]
+\kw{DECLARE} @precio \kw{DECIMAL}(10,2) = 120;\\
+\kw{DECLARE} @descuento \kw{DECIMAL}(10,2) = 20;\\
+\kw{SELECT} @precio - @descuento \kw{AS} a\_pagar;\\
+\com{-- 100.00}
+\end{sqlchico}
+\footnotesize Guardar lo que devuelve un \texttt{SELECT}:
+\begin{sqlchico}[\col]
+\kw{SELECT} \dentro{@descuento = valor\_descuento}\\
+\kw{FROM} cupon \kw{WHERE} codigo = 'NOVIEMBRE20';
+\end{sqlchico}
+\end{columns}
+\ojo{Dentro de una función de MySQL, las variables se crean con \texttt{DECLARE} y van \textbf{sin} \texttt{@}: \texttt{DECLARE v\_tipo VARCHAR(10);}}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{IF}: elegir un camino}
+\begin{columns}[c,onlytextwidth]
+\column{.42\textwidth}
+\centering
+\begin{tikzpicture}
+  \node[decision] (d) at (0,0) {¿el tipo es\\'porcentaje'?};
+  \node[paso,text width=2.4cm] (si) at (-1.65,-1.9) {descuento =\\precio $\times$ valor / 100};
+  \node[paso,text width=2.1cm] (no) at (1.65,-1.9) {descuento =\\valor};
+  \draw[flecha] (d.west) -| node[above,pos=.25,font=\scriptsize\bfseries]{sí} (si.north);
+  \draw[flecha] (d.east) -| node[above,pos=.25,font=\scriptsize\bfseries]{no} (no.north);
+\end{tikzpicture}\\[8pt]
+\small Se ejecuta \textbf{solo uno} de los dos caminos.
+\column{.55\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlcode}[\col]
+\kw{IF} v\_tipo = 'porcentaje' \mal{\kw{THEN}}\\
+\ind\kw{SET} v\_descuento = p\_precio * v\_valor / 100;\\
+\kw{ELSE}\\
+\ind\kw{SET} v\_descuento = v\_valor;\\
+\mal{\kw{END IF}};
+\end{sqlcode}
+\centering\etiqueta{SQL Server}
+\begin{sqlcode}[\col]
+\kw{IF} @tipo = 'porcentaje'\\
+\ind\kw{SET} @descuento = @precio * @valor / 100;\\
+\kw{ELSE}\\
+\ind\kw{SET} @descuento = @valor;
+\end{sqlcode}
+\end{columns}
+\analogia{En SQL Server no hay \texttt{THEN} ni \texttt{END IF}. Si un camino tiene \textbf{varias} instrucciones, van entre \texttt{BEGIN} y \texttt{END}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+\begin{frame}{Cierre}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\raggedright\bfseries}p{3.6cm}>{\raggedright\arraybackslash}p{9.4cm}}
+\toprule
+Función de ventana & Calcula sobre un grupo de filas sin juntarlas. Se reconoce por \texttt{OVER}. \\
+\texttt{PARTITION BY} & Separa las filas en grupos; el cálculo se hace en cada grupo. \\
+\texttt{ORDER BY} en \texttt{OVER} & Calcula en orden, sumando lo anterior: el total acumulado. \\
+\texttt{ROW\_NUMBER}, \texttt{RANK} & Numeran filas. Con empates, \texttt{RANK} salta y \texttt{DENSE\_RANK} no. \\
+\texttt{LAG}, \texttt{LEAD} & Traen un valor de la fila anterior o de la siguiente. \\
+Función del usuario & Tu propio cálculo, guardado en la base con \texttt{CREATE FUNCTION}. \\
+Variable & Un nombre que guarda un valor: \texttt{DECLARE}, \texttt{SET}, \texttt{SELECT \ldots{} INTO}. \\
+\texttt{IF} & Elige un camino. MySQL: \texttt{ELSEIF} y \texttt{END IF}; SQL Server: \texttt{ELSE IF}. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Referencias}
+\footnotesize
+\begin{itemize}\setlength\itemsep{7pt}
+\item Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2014). \textit{Fundamentos de bases de datos} (6.ª ed.). McGraw-Hill.
+\item Oracle. MySQL Reference Manual: \href{https://dev.mysql.com/doc/refman/8.0/en/window-functions.html}{\textit{Window Functions}}.
+\item Oracle. MySQL Reference Manual: \href{https://dev.mysql.com/doc/refman/8.0/en/create-procedure.html}{\textit{CREATE PROCEDURE and CREATE FUNCTION}} y \href{https://dev.mysql.com/doc/refman/8.0/en/if.html}{\textit{IF Statement}}.
+\item Microsoft. Transact-SQL: \href{https://learn.microsoft.com/sql/t-sql/statements/create-function-transact-sql}{\textit{CREATE FUNCTION}} y \href{https://learn.microsoft.com/sql/t-sql/language-elements/if-else-transact-sql}{\textit{IF...ELSE}}.
+\end{itemize}
+\end{frame}
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}
