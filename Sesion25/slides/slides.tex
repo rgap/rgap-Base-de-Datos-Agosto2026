@@ -6,8 +6,8 @@
 \input{header.tex}
 \usepackage{colortbl}
 
-\title{Funciones de ventana y programación SQL}
-\subtitle{\texttt{OVER}, funciones definidas por el usuario, variables e \texttt{IF}}
+\title{Funciones de ventana}
+\subtitle{\texttt{OVER}, \texttt{PARTITION BY}, rankings e introducción a las funciones definidas por el usuario}
 \date{Semana 13 - Sesión 25}
 \author{Rel Guzman}
 
@@ -138,7 +138,7 @@
 {\setbeamertemplate{footline}{}\maketitle}
 \begin{frame}[c]
 \begin{block}{Logro de la sesión}
-Al finalizar, podrás hacer cálculos sobre grupos de filas \textbf{sin juntarlas}, con \textbf{funciones de ventana}, y crear \textbf{tus propias funciones} con \textbf{variables} e \textbf{IF}, en MySQL y SQL Server.
+Al finalizar, podrás hacer cálculos sobre grupos de filas \textbf{sin juntarlas}, con \textbf{funciones de ventana}, en MySQL y SQL Server, y crear \textbf{tu primera función} en MySQL.
 \end{block}
 \end{frame}
 % =======================================================================
@@ -724,211 +724,6 @@ El resultado, 37.5, se escribe en \textbf{cada fila}. Así se ve que los pagos 2
 {\footnotesize\gris{\texttt{p\_} al inicio es una costumbre: así se ve que \texttt{p\_precio} es un \textbf{parámetro} y no una columna.}}
 \end{frame}
 % ---------------------------------------------------------------------
-\begin{frame}{La misma función en SQL Server}
-\begin{columns}[T,onlytextwidth]
-\column{.47\textwidth}
-\centering\etiqueta{MySQL}
-\begin{sqlmini}[\col]
-\kw{CREATE FUNCTION} aplicar\_porcentaje(\\
-\ind\mal{p\_precio} \kw{DECIMAL}(10,2),\\
-\ind\mal{p\_porcentaje} \kw{DECIMAL}(5,2))\\
-\kw{RETURNS DECIMAL}(10,2)\\
-\kw{DETERMINISTIC}\\
-\kw{RETURN} p\_precio - p\_precio * p\_porcentaje / 100;\\[6pt]
-\kw{SELECT} aplicar\_porcentaje(120, 10);
-\end{sqlmini}
-\column{.5\textwidth}
-\centering\etiqueta{SQL Server}
-\begin{sqlmini}[\col]
-\kw{CREATE} \mal{\kw{OR ALTER}} \kw{FUNCTION} \mal{dbo.}aplicar\_porcentaje(\\
-\ind\mal{@precio} \kw{DECIMAL}(10,2),\\
-\ind\mal{@porcentaje} \kw{DECIMAL}(5,2))\\
-\kw{RETURNS DECIMAL}(10,2)\\
-\mal{\kw{AS}}\\
-\mal{\kw{BEGIN}}\\
-\ind\kw{RETURN} @precio - @precio * @porcentaje / 100;\\
-\mal{\kw{END}};\\
-\mal{\kw{GO}}\\[4pt]
-\kw{SELECT} \mal{dbo.}aplicar\_porcentaje(120, 10);
-\end{sqlmini}
-\end{columns}
-\vspace{0.1cm}
-\begin{center}
-\footnotesize
-\renewcommand{\arraystretch}{1.1}
-\begin{tabular}{@{}>{\bfseries}lll@{}}
-\toprule
- & \bfseries MySQL & \bfseries SQL Server \\
-\midrule
-Parámetros & \texttt{p\_precio} & \texttt{@precio}: la \texttt{@} es obligatoria \\
-Cuerpo & \texttt{RETURN \ldots;} & entre \texttt{AS BEGIN} y \texttt{END} \\
-Si ya existe & \texttt{CREATE} da error & \texttt{CREATE OR ALTER} la reemplaza \\
-Para usarla & \texttt{aplicar\_porcentaje(\ldots)} & \texttt{dbo.aplicar\_porcentaje(\ldots)} \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{frame}
-% ---------------------------------------------------------------------
-\begin{frame}{Usarla sobre las filas de una tabla}
-\small En el panel: con una compra de S/ 120, ¿cuánto pagaría el cliente con cada cupón de porcentaje?
-\begin{columns}[c,onlytextwidth]
-\column{.55\textwidth}
-\begin{sqlcode}[\col]
-\kw{SELECT} codigo, valor\_descuento,\\
-\ind\dentro{aplicar\_porcentaje(120, valor\_descuento)}\\
-\ind\ind\kw{AS} a\_pagar\\
-\kw{FROM} cupon\\
-\kw{WHERE} tipo\_descuento = 'porcentaje'\\
-\kw{ORDER BY} id;
-\end{sqlcode}
-\column{.42\textwidth}
-\res{lrr}{\cab{codigo} & \cab{valor\_descuento} & \cab{a\_pagar}}{BIENVENIDA10 & 10.00 & 108.00 \\ VERANO15 & 15.00 & 102.00 \\ NAVIDAD25 & 25.00 & 90.00 \\}
-\end{columns}
-\vspace{0.2cm}
-\concepto{Idea clave}{\small La función se ejecuta \textbf{una vez por cada fila}: cada vez recibe el \texttt{valor\_descuento} de esa fila. En SQL Server se escribe \texttt{dbo.aplicar\_porcentaje}.}
-\vspace{0.1cm}
-\begin{columns}[T,onlytextwidth]
-\column{.49\textwidth}
-\begin{alertblock}{MySQL: sin \texttt{DETERMINISTIC}}
-\scriptsize\texttt{ERROR 1418 (HY000): This function has none of DETERMINISTIC, NO SQL, or READS SQL DATA in its declaration\ldots}
-\end{alertblock}
-\column{.49\textwidth}
-\begin{alertblock}{SQL Server: sin \texttt{dbo.}}
-\scriptsize\texttt{Msg 195: 'aplicar\_porcentaje' is not a recognized built-in function name.}
-\end{alertblock}
-\end{columns}
-\end{frame}
-% ---------------------------------------------------------------------
-\begin{frame}{\ins{Práctica 3} La base de cupones y tu primera función}
-\npieza{1}\ \small Crea la base \texttt{cupones}: dos scripts, en orden. Están en \texttt{ejemplos/practicas/}:
-\vspace{0.1cm}
-\begin{center}
-\footnotesize
-\renewcommand{\arraystretch}{1.3}
-\setlength\tabcolsep{4pt}
-\begin{tabular}{@{}lll@{}}
-\toprule
-\bfseries Gestor & \bfseries 1. Modelo físico (tablas) & \bfseries 2. Registros (datos) \\
-\midrule
-MySQL (Workbench) & \texttt{mysql/practica\_3\_modelo\_fisico.sql} & \texttt{mysql/practica\_3\_registros.sql} \\
-SQL Server (SSMS) & \texttt{sqlserver/practica\_3\_modelo\_fisico.sql} & \texttt{sqlserver/practica\_3\_registros.sql} \\
-\bottomrule
-\end{tabular}
-\end{center}
-\vspace{0.1cm}
-\npieza{2}\ \small Crea la función y pruébala. Los scripts están en \texttt{ejemplos/2\_cupones/}:
-\vspace{0.05cm}
-\begin{itemize}\setlength\itemsep{3pt}
-  \item \textbf{MySQL:} \texttt{1\_funciones\_mysql.sql} \qquad \textbf{SQL Server:} \texttt{1\_funciones\_sqlserver.sql}
-\end{itemize}
-\vspace{0.1cm}
-\begin{columns}[c,onlytextwidth]
-\column{.62\textwidth}
-\npieza{3}\ \small Comprueba:
-\begin{sqlcode}[\col]
-\kw{SELECT} aplicar\_porcentaje(120, 10);\ \ \com{-- MySQL}\\
-\kw{SELECT} dbo.aplicar\_porcentaje(120, 10);\ \com{-- SQL Server}
-\end{sqlcode}
-\column{.34\textwidth}
-\res{r}{\cab{a\_pagar}}{108.00 \\}
-\end{columns}
-\end{frame}
-% =======================================================================
-\seccion{Variables y condicional IF}
-\begin{frame}{Un cupón de monto fijo no es un porcentaje}
-\small \texttt{NOVIEMBRE20} descuenta \textbf{S/ 20}, no el 20 \%. Con la función de antes, el cálculo sale mal:
-\begin{columns}[c,onlytextwidth]
-\column{.55\textwidth}
-\begin{sqlcode}[\col]
-\kw{SELECT} aplicar\_porcentaje(120, 20);
-\end{sqlcode}
-\column{.4\textwidth}
-\centering
-{\scriptsize\color{utpGris}resultado}\\[2pt]
-\mal{\ttfamily 96.00}\quad\small debía ser \textbf{100.00}
-\end{columns}
-\vspace{0.3cm}
-\small La función \texttt{precio\_final(precio, cupon)} tiene que hacer \textbf{tres pasos}:
-\vspace{0.3cm}
-\begin{center}
-\begin{tikzpicture}
-  \node[paso,text width=3.6cm] (a) at (0,0) {\npieza{1} Leer el cupón y \textbf{guardar} su tipo y su valor};
-  \node[paso,text width=3.6cm] (b) at (4.6,0) {\npieza{2} \textbf{Según el tipo}, calcular el descuento};
-  \node[paso,text width=3.6cm] (c) at (9.2,0) {\npieza{3} Devolver el precio menos el descuento};
-  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c);
-  \node[font=\small\bfseries,text=utpRojo] at (0,-1) {variables};
-  \node[font=\small\bfseries,text=utpRojo] at (4.6,-1) {\texttt{IF}};
-  \node[font=\small\bfseries,text=utpRojo] at (9.2,-1) {\texttt{RETURN}};
-\end{tikzpicture}
-\end{center}
-\end{frame}
-% ---------------------------------------------------------------------
-\begin{frame}{Variables: guardar un valor para usarlo después}
-\concepto{Variable}{\small Un \textbf{nombre} que guarda \textbf{un valor} mientras se ejecuta tu código. Se le da un valor con \texttt{SET}.}
-\vspace{0.1cm}
-\begin{columns}[T,onlytextwidth]
-\column{.48\textwidth}
-\centering\etiqueta{MySQL}
-\begin{sqlchico}[\col]
-\kw{SET} @precio = 120;\\
-\kw{SET} @descuento = 20;\\
-\kw{SELECT} @precio - @descuento \kw{AS} a\_pagar;\\
-\com{-- 100}
-\end{sqlchico}
-\footnotesize Guardar lo que devuelve un \texttt{SELECT}:
-\begin{sqlchico}[\col]
-\kw{SELECT} valor\_descuento \dentro{\kw{INTO} @descuento}\\
-\kw{FROM} cupon \kw{WHERE} codigo = 'NOVIEMBRE20';
-\end{sqlchico}
-\column{.48\textwidth}
-\centering\etiqueta{SQL Server}
-\begin{sqlchico}[\col]
-\kw{DECLARE} @precio \kw{DECIMAL}(10,2) = 120;\\
-\kw{DECLARE} @descuento \kw{DECIMAL}(10,2) = 20;\\
-\kw{SELECT} @precio - @descuento \kw{AS} a\_pagar;\\
-\com{-- 100.00}
-\end{sqlchico}
-\footnotesize Guardar lo que devuelve un \texttt{SELECT}:
-\begin{sqlchico}[\col]
-\kw{SELECT} \dentro{@descuento = valor\_descuento}\\
-\kw{FROM} cupon \kw{WHERE} codigo = 'NOVIEMBRE20';
-\end{sqlchico}
-\end{columns}
-\ojo{Dentro de una función de MySQL, las variables se crean con \texttt{DECLARE} y van \textbf{sin} \texttt{@}: \texttt{DECLARE v\_tipo VARCHAR(10);}}
-\end{frame}
-% ---------------------------------------------------------------------
-\begin{frame}{\texttt{IF}: elegir un camino}
-\begin{columns}[c,onlytextwidth]
-\column{.42\textwidth}
-\centering
-\begin{tikzpicture}
-  \node[decision] (d) at (0,0) {¿el tipo es\\'porcentaje'?};
-  \node[paso,text width=2.4cm] (si) at (-1.65,-1.9) {descuento =\\precio $\times$ valor / 100};
-  \node[paso,text width=2.1cm] (no) at (1.65,-1.9) {descuento =\\valor};
-  \draw[flecha] (d.west) -| node[above,pos=.25,font=\scriptsize\bfseries]{sí} (si.north);
-  \draw[flecha] (d.east) -| node[above,pos=.25,font=\scriptsize\bfseries]{no} (no.north);
-\end{tikzpicture}\\[8pt]
-\small Se ejecuta \textbf{solo uno} de los dos caminos.
-\column{.55\textwidth}
-\centering\etiqueta{MySQL}
-\begin{sqlcode}[\col]
-\kw{IF} v\_tipo = 'porcentaje' \mal{\kw{THEN}}\\
-\ind\kw{SET} v\_descuento = p\_precio * v\_valor / 100;\\
-\kw{ELSE}\\
-\ind\kw{SET} v\_descuento = v\_valor;\\
-\mal{\kw{END IF}};
-\end{sqlcode}
-\centering\etiqueta{SQL Server}
-\begin{sqlcode}[\col]
-\kw{IF} @tipo = 'porcentaje'\\
-\ind\kw{SET} @descuento = @precio * @valor / 100;\\
-\kw{ELSE}\\
-\ind\kw{SET} @descuento = @valor;
-\end{sqlcode}
-\end{columns}
-\analogia{En SQL Server no hay \texttt{THEN} ni \texttt{END IF}. Si un camino tiene \textbf{varias} instrucciones, van entre \texttt{BEGIN} y \texttt{END}.}
-\end{frame}
-% ---------------------------------------------------------------------
 \begin{frame}[plain]
   \begin{tikzpicture}[remember picture,overlay]
     \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
@@ -952,9 +747,7 @@ Función de ventana & Calcula sobre un grupo de filas sin juntarlas. Se reconoce
 \texttt{ORDER BY} en \texttt{OVER} & Calcula en orden, sumando lo anterior: el total acumulado. \\
 \texttt{ROW\_NUMBER}, \texttt{RANK} & Numeran filas. Con empates, \texttt{RANK} salta y \texttt{DENSE\_RANK} no. \\
 \texttt{LAG}, \texttt{LEAD} & Traen un valor de la fila anterior o de la siguiente. \\
-Función del usuario & Tu propio cálculo, guardado en la base con \texttt{CREATE FUNCTION}. \\
-Variable & Un nombre que guarda un valor: \texttt{DECLARE}, \texttt{SET}, \texttt{SELECT \ldots{} INTO}. \\
-\texttt{IF} & Elige un camino. MySQL: \texttt{ELSEIF} y \texttt{END IF}; SQL Server: \texttt{ELSE IF}. \\
+Función del usuario & Tu propio cálculo, guardado en la base con \texttt{CREATE FUNCTION}. Se usa como \texttt{ROUND} o \texttt{UPPER}. \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -965,8 +758,8 @@ Variable & Un nombre que guarda un valor: \texttt{DECLARE}, \texttt{SET}, \textt
 \begin{itemize}\setlength\itemsep{7pt}
 \item Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2014). \textit{Fundamentos de bases de datos} (6.ª ed.). McGraw-Hill.
 \item Oracle. MySQL Reference Manual: \href{https://dev.mysql.com/doc/refman/8.0/en/window-functions.html}{\textit{Window Functions}}.
-\item Oracle. MySQL Reference Manual: \href{https://dev.mysql.com/doc/refman/8.0/en/create-procedure.html}{\textit{CREATE PROCEDURE and CREATE FUNCTION}} y \href{https://dev.mysql.com/doc/refman/8.0/en/if.html}{\textit{IF Statement}}.
-\item Microsoft. Transact-SQL: \href{https://learn.microsoft.com/sql/t-sql/statements/create-function-transact-sql}{\textit{CREATE FUNCTION}} y \href{https://learn.microsoft.com/sql/t-sql/language-elements/if-else-transact-sql}{\textit{IF...ELSE}}.
+\item Oracle. MySQL Reference Manual: \href{https://dev.mysql.com/doc/refman/8.0/en/create-procedure.html}{\textit{CREATE PROCEDURE and CREATE FUNCTION}}.
+\item Microsoft. Transact-SQL: \href{https://learn.microsoft.com/sql/t-sql/queries/select-over-clause-transact-sql}{\textit{SELECT - OVER clause}}.
 \end{itemize}
 \end{frame}
 % Cierre UTP

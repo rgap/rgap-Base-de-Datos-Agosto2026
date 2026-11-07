@@ -1,9 +1,7 @@
--- Práctica 3 (MySQL 8), paso 2 de 2: registros del sistema de cupones.
--- Antes ejecuta practica_3_modelo_fisico.sql.
--- Borra los cupones que haya y carga los de ejemplo.
+-- Práctica 2 (MySQL 8), paso 2 de 2: registros del sistema de cupones.
+-- Antes ejecuta practica_2_modelo_fisico.sql.
+-- Carga los cupones de ejemplo.
 USE cupones;
-
-DELETE FROM cupon;
 
 INSERT INTO cupon (id, codigo, descripcion, tipo_descuento, valor_descuento,
                    estado, vigente_desde, vigente_hasta) VALUES

@@ -1,10 +1,8 @@
--- Práctica 3 (SQL Server 2017 o superior), paso 2 de 2: registros del sistema de cupones.
--- Antes ejecuta practica_3_modelo_fisico.sql.
--- Borra los cupones que haya y carga los de ejemplo.
+-- Práctica 2 (SQL Server 2017 o superior), paso 2 de 2: registros del sistema de cupones.
+-- Antes ejecuta practica_2_modelo_fisico.sql.
+-- Carga los cupones de ejemplo.
 USE cupones;
 GO
-
-DELETE FROM cupon;
 
 -- IDENTITY_INSERT permite escribir el id a mano.
 SET IDENTITY_INSERT cupon ON;

@@ -1,9 +1,11 @@
--- Práctica 3 (MySQL 8), paso 1 de 2: modelo físico del sistema de cupones de descuento.
--- Después ejecuta practica_3_registros.sql.
-CREATE DATABASE IF NOT EXISTS cupones;
+-- Práctica 2 (MySQL 8), paso 1 de 2: modelo físico del sistema de cupones de descuento.
+-- Después ejecuta practica_2_registros.sql.
+-- Si la base ya existe, la borra y la crea de nuevo.
+DROP DATABASE IF EXISTS cupones;
+CREATE DATABASE cupones;
 USE cupones;
 
-CREATE TABLE IF NOT EXISTS cupon (
+CREATE TABLE cupon (
     id INT AUTO_INCREMENT PRIMARY KEY,
     codigo VARCHAR(255) NOT NULL UNIQUE CHECK (TRIM(codigo) <> ''),
     descripcion VARCHAR(255) NOT NULL CHECK (TRIM(descripcion) <> ''),
@@ -21,7 +23,7 @@ CREATE TABLE IF NOT EXISTS cupon (
 );
 
 -- Usuario y contraseña para entrar al panel. Solo hay uno (id = 1).
-CREATE TABLE IF NOT EXISTS administrador (
+CREATE TABLE administrador (
     id INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
     usuario VARCHAR(255) NOT NULL UNIQUE,
     contrasena VARCHAR(255) NOT NULL
