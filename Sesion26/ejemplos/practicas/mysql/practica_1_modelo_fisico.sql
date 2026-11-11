@@ -12,24 +12,26 @@ CREATE TABLE entrada (
     descripcion VARCHAR(255),
     -- En soles.
     precio DECIMAL(10,2) NOT NULL CHECK (precio > 0),
-    -- Entradas que aún se pueden vender. Cada compra descuenta una.
+    -- Entradas que aún se pueden vender. Cada venta descuenta una.
     disponibles INT NOT NULL DEFAULT 0 CHECK (disponibles >= 0),
     -- 1 = venta abierta, 0 = venta cerrada.
     venta_activa TINYINT NOT NULL DEFAULT 1 CHECK (venta_activa IN (0, 1))
 );
 
 -- Una entrada por persona, pagada en la pasarela simulada.
-CREATE TABLE compra (
+CREATE TABLE venta (
     id INT AUTO_INCREMENT PRIMARY KEY,
     entrada_id INT NOT NULL DEFAULT 1,
     -- 8 dígitos. UNIQUE: cada persona compra una sola entrada.
     dni CHAR(8) NOT NULL UNIQUE CHECK (dni REGEXP '^[0-9]{8}$'),
     nombre VARCHAR(255) NOT NULL CHECK (TRIM(nombre) <> ''),
+    -- Correo al que se envía el comprobante de la compra.
+    correo VARCHAR(254) NOT NULL CHECK (correo LIKE '%_@_%._%' AND correo NOT LIKE '% %'),
     -- Precio de la entrada al momento de pagar.
     precio DECIMAL(10,2) NOT NULL CHECK (precio > 0),
     -- Lo que devuelve la pasarela. Un pago no se registra dos veces.
     referencia_pago VARCHAR(255) NOT NULL UNIQUE CHECK (TRIM(referencia_pago) <> ''),
-    fecha_compra DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_venta DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (entrada_id) REFERENCES entrada(id)
 );
 

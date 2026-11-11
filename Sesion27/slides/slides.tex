@@ -1,0 +1,941 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+% Sin atajos de babel: así las comillas " del código se ven tal cual.
+\PassOptionsToPackage{es-noshorthands}{babel}
+
+\input{header.tex}
+\usepackage{colortbl}
+
+\title{Transacciones, SQLite y funciones}
+\subtitle{Tipos de transacciones, DB Browser, variables e \texttt{IF}}
+\date{Semana 14 - Sesión 27}
+\author{Rel Guzman}
+
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Comentario dentro de un bloque de código
+\newcommand{\com}[1]{\textcolor{utpGrisMedio}{#1}}
+% Texto de apoyo en gris
+\newcommand{\gris}[1]{\textcolor{utpGris}{#1}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre de un operador o de un gestor
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Número de paso
+\newcommand{\npieza}[1]{\tikz[baseline=-0.6ex]{\node[circle,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner sep=1.6pt,minimum size=4.2mm] {#1};}}
+% Celda o texto resaltado en rojo claro
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% Lo importante, resaltado en amarillo dentro de un bloque de código
+\newcommand{\dentro}[1]{{\setlength{\fboxsep}{1.5pt}\colorbox{yellow!45}{#1}}}
+% Fila de una tabla resaltada
+\newcommand{\fila}{\rowcolor{yellow!45}}
+\newcommand{\filagris}{\rowcolor{utpGrisClaro}}
+% Marcas de sí y no
+\newcommand{\si}{$\checkmark$}
+\newcommand{\no}{\textcolor{utpRojo}{$\times$}}
+% Bloques de código sobre fondo gris: normal, chico y mínimo
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+\newenvironment{sqlchico}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\scriptsize\vspace{5pt}\raggedright}
+  {\vspace{5pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+\newenvironment{sqlmini}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\fontsize{7}{8.3}\selectfont\vspace{4pt}\raggedright}
+  {\vspace{4pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+\newenvironment{sqlmicro}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\fontsize{6.4}{7.5}\selectfont\vspace{4pt}\raggedright}
+  {\vspace{4pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Ancho de una columna menos el borde del bloque de código
+\newcommand{\col}{\dimexpr\textwidth-2\fboxsep\relax}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.2em}}
+% Mensaje de error dentro de un bloque de código
+\newcommand{\err}[1]{\textcolor{utpRojo}{#1}}
+% Anatomía de una instrucción: cada pieza del código con su pregunta al lado
+\tikzset{
+  pieza/.style={fill=utpGrisClaro,font=\ttfamily\footnotesize,anchor=west,inner sep=5pt,
+    minimum height=0.62cm},
+  para/.style={font=\small,anchor=west,text=utpNegro}
+}
+\newcommand{\piezax}{7.6}
+\newcommand{\pieza}[3]{%
+  \node[pieza] at (0,#1) {#2};
+  \node[para] at (\piezax,#1) {\textcolor{utpRojo}{$\blacktriangleleft$}\ #3};}
+% Diapositiva de sección: una palabra bien grande
+\newcommand{\seccion}[2][1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#2}};
+    \ifnum#1=1
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+    \fi
+  \end{tikzpicture}
+\end{frame}}
+% Cabecera de columna dentro de una tabla en monoespaciado
+\newcommand{\cab}[1]{\normalfont\bfseries #1}
+% Resultado de una consulta: \res{columnas}{cabecera}{filas}
+\newcommand{\res}[3]{%
+  \centering{\scriptsize\color{utpGris}resultado}\\[3pt]
+  \footnotesize\ttfamily
+  \begin{tabular}{#1}
+  \toprule
+  #2 \\
+  \midrule
+  #3
+  \bottomrule
+  \end{tabular}}
+% Lo mismo, cuando debajo sigue más contenido del frame
+\newcommand{\resg}[3]{{\res{#1}{#2}{#3}\par}}
+% Tabla pequeña con su nombre arriba: \mini{nombre}{columnas}{cabecera}{filas}
+\newcommand{\mini}[4]{%
+  \begin{tabular}{@{}c@{}}
+  \tbl{#1}\\[3pt]
+  {\scriptsize\ttfamily
+  \begin{tabular}{#2}
+  \toprule
+  #3 \\
+  \midrule
+  #4
+  \bottomrule
+  \end{tabular}}
+  \end{tabular}}
+% Una tabla con título gris, alineada arriba: \tabla{título}{columnas}{cabecera}{filas}
+\newcommand{\tabla}[4]{%
+  \begin{tabular}[t]{@{}c@{}}
+  {\scriptsize\color{utpGris}#1}\\[3pt]
+  {\footnotesize\ttfamily
+  \begin{tabular}[t]{#2}
+  \toprule
+  #3 \\
+  \midrule
+  #4
+  \bottomrule
+  \end{tabular}}
+  \end{tabular}}
+% La pregunta del frame, en una caja naranja centrada
+\newcommand{\preg}[1]{{\centering\tikz\node[caja,cajanaranja,font=\normalsize,inner sep=6pt]{#1};\par}\vspace{4pt}}
+% Forma de lo que devuelve una consulta: celdas con borde
+\newcommand{\forma}[2]{{\ttfamily\footnotesize\renewcommand{\arraystretch}{1.25}%
+  \begin{tabular}{#1}\hline #2\end{tabular}}}
+% Estilos de los diagramas de esta sesión
+\tikzset{
+  codigo/.style={font=\ttfamily\footnotesize,inner sep=3pt},
+  sub/.style={codigo,draw=utpRojo,very thick,fill=yellow!45,rounded corners=2pt},
+  decision/.style={diamond,aspect=2.6,draw=utpRojo,very thick,fill=utpRojo!7,
+    font=\scriptsize,align=center,inner sep=1.5pt},
+  paso/.style={caja,font=\scriptsize,minimum height=.6cm,inner sep=4pt},
+  % Una instrucción en un diagrama de pasos y lo que queda debajo
+  inst/.style={draw=utpNegro,thick,rounded corners=1.5pt,fill=utpGrisClaro,font=\ttfamily\scriptsize,
+    minimum height=.8cm,minimum width=2.2cm,align=center,inner sep=3pt},
+  valor/.style={font=\footnotesize,align=center,text width=2.5cm},
+  carril/.style={font=\small\bfseries,anchor=east}
+}
+\begin{document}
+{\setbeamertemplate{footline}{}\maketitle}
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás explicar cómo se comportan las \textbf{transacciones} en MySQL y SQL Server, abrir una base \textbf{SQLite} con DB Browser y escribir \textbf{funciones} con \textbf{variables} e \textbf{IF}.
+\end{block}
+\end{frame}
+% =======================================================================
+% Revisión de la sesión anterior
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión: una venta con transacción}
+\renewcommand{\arraystretch}{0.85}
+\small Vender una entrada son \textbf{dos cambios}: descontar una entrada disponible y guardar la venta.
+\vspace{0.15cm}
+\begin{columns}[T,onlytextwidth]
+\column{.49\textwidth}
+\centering\etiqueta{La venta a Luis}
+\begin{sqlmini}[\col]
+\dentro{\kw{START TRANSACTION}};\\
+\kw{UPDATE} entrada\\
+\kw{SET} disponibles = disponibles - 1 \kw{WHERE} id = 1;\\
+\kw{INSERT INTO} venta (dni, nombre, correo,\\
+\ind precio, referencia\_pago)\\
+\kw{VALUES} ('70123456', 'Luis Rojas',\\
+\ind 'luis.rojas@example.com', 45.00, 'PAGO-0001');\\
+\dentro{\kw{COMMIT}};
+\end{sqlmini}
+\small 500 $\rightarrow$ \textbf{499}: se guardan \textbf{los dos} cambios.
+\column{.49\textwidth}
+\centering\etiqueta{Luis otra vez}
+\begin{sqlmini}[\col]
+\dentro{\kw{START TRANSACTION}};\\
+\kw{UPDATE} entrada\\
+\kw{SET} disponibles = disponibles - 1 \kw{WHERE} id = 1;\\
+\kw{INSERT INTO} venta (dni, nombre, correo,\\
+\ind precio, referencia\_pago)\\
+\kw{VALUES} (\mal{'70123456'}, 'Luis Rojas',\\
+\ind 'luis.rojas@example.com', 45.00, 'PAGO-0002');\\
+\err{-- ERROR 1062: Duplicate entry '70123456'}\\
+\dentro{\kw{ROLLBACK}};
+\end{sqlmini}
+\small 498 (pendiente) $\rightarrow$ \textbf{499}: se deshacen \textbf{los dos}.
+\end{columns}
+\vspace{0.3cm}
+\concepto{Transacción}{\small Un grupo de cambios que se guardan \textbf{todos juntos} (\texttt{COMMIT}) o \textbf{ninguno} (\texttt{ROLLBACK}). En SQL Server empieza con \texttt{BEGIN TRANSACTION}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Transacción: todo o nada}
+\concepto{Transacción}{\small Un grupo de cambios que se guardan \textbf{todos juntos} o \textbf{ninguno}.}
+\vspace{0.35cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[paso,fill=utpNegro,text=white,font=\scriptsize\bfseries\ttfamily] (ini) at (0,0) {START TRANSACTION};
+  \node[paso,text width=2.6cm,align=left,font=\scriptsize\ttfamily] (cam) at (3.9,0) {\npieza{1} \kw{UPDATE} \ldots\\[2pt]\npieza{2} \kw{INSERT} \ldots};
+  \node[decision] (d) at (7.4,0) {¿todo salió\\bien?};
+  \node[caja,cajanaranja,font=\scriptsize,text width=2.7cm] (c) at (10.7,0.85) {\texttt{\textbf{COMMIT}}\\se guardan \textbf{los dos}};
+  \node[caja,font=\scriptsize,text width=2.7cm] (r) at (10.7,-0.85) {\texttt{\textbf{ROLLBACK}}\\se deshacen \textbf{los dos}};
+  \draw[flecha] (ini)--(cam);
+  \draw[flecha] (cam)--(d);
+  \draw[flecha] (d.north) |- node[above,pos=.75,font=\scriptsize\bfseries]{sí} (c.west);
+  \draw[flecha] (d.south) |- node[below,pos=.75,font=\scriptsize\bfseries]{no} (r.west);
+\end{tikzpicture}
+\end{center}
+\vspace{0.35cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}lll@{}}
+\toprule
+ & \bfseries MySQL & \bfseries SQL Server \\
+\midrule
+Empezar & \texttt{START TRANSACTION;} & \texttt{\dentro{BEGIN} TRANSACTION;} \\
+Guardar todo & \texttt{COMMIT;} & \texttt{COMMIT;} \\
+Deshacer todo & \texttt{ROLLBACK;} & \texttt{ROLLBACK;} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Qué es autocommit?}
+\concepto{Autocommit}{\small El gestor hace el \texttt{COMMIT} \textbf{por ti} después de cada instrucción: cada instrucción es una transacción \textbf{por sí sola} y se guarda apenas termina.}
+\vspace{0.4cm}
+\begin{columns}[T,onlytextwidth]
+\column{.47\textwidth}
+\centering\etiqueta{Con autocommit}\\[2pt]
+{\scriptsize\gris{así trabajan MySQL y SQL Server al conectarte}}\\[8pt]
+\begin{tikzpicture}
+  \node[inst] (a) at (0,0) {\kw{UPDATE} \ldots};
+  \node[inst,fill=utpRojo!7,draw=utpRojo!75] (ac) at (2.9,0) {\texttt{COMMIT}\\\normalfont\tiny automático};
+  \node[inst] (b) at (0,-1.2) {\kw{INSERT} \ldots};
+  \node[inst,fill=utpRojo!7,draw=utpRojo!75] (bc) at (2.9,-1.2) {\texttt{COMMIT}\\\normalfont\tiny automático};
+  \draw[flecha] (a)--(ac); \draw[flecha] (b)--(bc);
+\end{tikzpicture}\\[6pt]
+\small Dos instrucciones = \textbf{dos} transacciones.\\Si el \texttt{INSERT} falla, el \texttt{UPDATE} \textbf{ya se guardó}.
+\column{.49\textwidth}
+\centering\etiqueta{Con una transacción}\\[2pt]
+{\scriptsize\gris{tú decides cuándo se guarda}}\\[8pt]
+\begin{tikzpicture}
+  \node[inst] (s) at (0,0) {\kw{START}\\\kw{TRANSACTION};};
+  \node[inst] (a) at (2.6,0) {\kw{UPDATE} \ldots};
+  \node[inst] (b) at (2.6,-1.2) {\kw{INSERT} \ldots};
+  \node[inst,fill=utpRojo!7,draw=utpRojo!75] (c) at (5.2,-1.2) {\texttt{COMMIT};\\\normalfont\tiny lo escribes tú};
+  \draw[flecha] (s)--(a); \draw[flecha] (a)--(b); \draw[flecha] (b)--(c);
+\end{tikzpicture}\\[6pt]
+\small Dos instrucciones = \textbf{una} transacción.\\Si el \texttt{INSERT} falla, puedes hacer \texttt{ROLLBACK}.
+\end{columns}
+\end{frame}
+% =======================================================================
+\seccion{Transacciones en MySQL}
+\begin{frame}{MySQL: al conectarte, todo se guarda al instante}
+\small Al abrir una conexión, MySQL trabaja en \textbf{autocommit}: cada instrucción se guarda \textbf{sola}, apenas termina.
+\vspace{0.5cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[valor] (s) at (-3.6,0) {quedan\\\textbf{\large 499}};
+  \node[inst] (a) at (0,0) {\kw{UPDATE} entrada \ldots\\disponibles - 1};
+  \node[inst] (b) at (4.2,0) {\kw{ROLLBACK};};
+  \draw[flecha] (s)--(a); \draw[flecha] (a)--(b);
+  \node[valor] at (0,-1.1) {quedan \textbf{498}\\\gris{ya está guardado}};
+  \node[valor] at (4.2,-1.1) {siguen \mal{498}\\\gris{no hay nada que deshacer}};
+\end{tikzpicture}
+\end{center}
+\vspace{0.5cm}
+\concepto{Autocommit}{\small Viene activado: \texttt{SELECT @@autocommit;} devuelve \texttt{1}. Para poder deshacer, primero hay que escribir \texttt{START TRANSACTION}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{MySQL: lo pendiente solo lo ves tú}
+\small Dos personas conectadas a la misma base. Quedan 499 entradas:
+\vspace{0.4cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[carril] at (-1.25,0) {Conexión 1};
+  \node[carril] at (-1.25,-2) {Conexión 2};
+  \node[inst] (a1) at (0,0) {\kw{START}\\\kw{TRANSACTION};};
+  \node[inst] (a2) at (2.55,0) {\kw{UPDATE} \ldots\\disponibles - 1};
+  \node[inst] (a3) at (5.1,0) {\kw{SELECT} \ldots\\$\rightarrow$ \mal{498}};
+  \node[inst] (a4) at (7.65,0) {\kw{COMMIT};};
+  \node[inst] (b3) at (5.1,-2) {\kw{SELECT} \ldots\\$\rightarrow$ \textbf{499}};
+  \node[inst] (b4) at (10.2,-2) {\kw{SELECT} \ldots\\$\rightarrow$ \colorbox{yellow!45}{498}};
+  \draw[flecha] (a1)--(a2); \draw[flecha] (a2)--(a3); \draw[flecha] (a3)--(a4);
+  \draw[flecha] (b3)--(b4);
+  \node[valor] at (5.1,-0.95) {\gris{pendiente}};
+  \node[valor] at (5.1,-2.95) {\gris{ve lo guardado}};
+  \node[valor] at (10.2,-2.95) {\gris{después del \texttt{COMMIT}}};
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\concepto{Idea clave}{\small Hasta el \texttt{COMMIT}, el cambio es \textbf{pendiente}: solo lo ve quien lo hizo. Los demás ven el último valor \textbf{guardado}, sin esperar.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{MySQL: dos \texttt{START TRANSACTION} seguidos}
+\small ¿Qué pasa si empiezas otra transacción sin cerrar la primera? Quedan 499:
+\vspace{0.5cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[inst] (a) at (0,0)    {\kw{START}\\\kw{TRANSACTION};};
+  \node[inst] (b) at (2.65,0) {\kw{UPDATE} \ldots\\disponibles - 1};
+  \node[inst,draw=utpRojo,very thick] (c) at (5.3,0) {\kw{START}\\\kw{TRANSACTION};};
+  \node[inst] (d) at (7.95,0) {\kw{UPDATE} \ldots\\disponibles - 1};
+  \node[inst] (e) at (10.6,0) {\kw{ROLLBACK};};
+  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c); \draw[flecha] (c)--(d); \draw[flecha] (d)--(e);
+  \node[valor] at (2.65,-1.05) {498\\\gris{pendiente}};
+  \node[valor] at (5.3,-1.05)  {\textbf{guarda el 498}\\\gris{hace \texttt{COMMIT} solo}};
+  \node[valor] at (7.95,-1.05) {497\\\gris{pendiente}};
+  \node[valor] at (10.6,-1.05) {vuelve a \mal{498}\\\gris{deshace solo la 2.ª}};
+\end{tikzpicture}
+\end{center}
+\vspace{0.5cm}
+\ojo{En MySQL no hay una transacción dentro de otra: un nuevo \texttt{START TRANSACTION} \textbf{guarda} lo que estaba pendiente.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Tipos de transacciones en MySQL}
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}
+  \tikzset{tipo/.style={caja,anchor=north,font=\small,inner sep=6pt}}
+  \node[tipo] at (0,0) {\parbox[t][3.1cm][t]{3.8cm}{\raggedright \textbf{Autocommit}\\\gris{\footnotesize viene por defecto}\\[6pt]
+    \footnotesize No escribes nada.\\[4pt] Cada instrucción se guarda \textbf{sola}, apenas termina.}};
+  \node[tipo,cajanaranja] at (4.4,0) {\parbox[t][3.1cm][t]{3.8cm}{\raggedright \textbf{Explícita}\\\gris{\footnotesize la que usamos}\\[6pt]
+    {\ttfamily\scriptsize START TRANSACTION;\\\ldots\\COMMIT; \normalfont o \ttfamily ROLLBACK;}\\[4pt]
+    \footnotesize Tú marcas el inicio y el fin.}};
+  \node[tipo] at (8.8,0) {\parbox[t][3.1cm][t]{3.8cm}{\raggedright \textbf{Implícita}\\\gris{\footnotesize poco usada}\\[6pt]
+    {\ttfamily\scriptsize SET autocommit = 0;}\\[4pt]
+    \footnotesize La transacción se abre \textbf{sola} y queda abierta hasta que escribes \texttt{COMMIT} o \texttt{ROLLBACK}.}};
+\end{tikzpicture}
+\end{center}
+\end{frame}
+% =======================================================================
+\seccion{Transacciones en SQL Server}
+\begin{frame}{SQL Server: al conectarte, todo se guarda al instante}
+\small Igual que MySQL, SQL Server trabaja en \textbf{autocommit}: cada instrucción se guarda \textbf{sola}, apenas termina.
+\vspace{0.5cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[valor] (s) at (-3.6,0) {quedan\\\textbf{\large 499}};
+  \node[inst] (a) at (0,0) {\kw{UPDATE} entrada \ldots\\disponibles - 1};
+  \node[inst] (b) at (4.2,0) {\kw{ROLLBACK};};
+  \draw[flecha] (s)--(a); \draw[flecha] (a)--(b);
+  \node[valor] at (0,-1.1) {quedan \textbf{498}\\\gris{ya está guardado}};
+  \node[valor,text width=4.6cm] at (4.2,-1.25) {siguen \mal{498}\\\err{\scriptsize Msg 3903: The ROLLBACK TRANSACTION request has no corresponding BEGIN TRANSACTION.}};
+\end{tikzpicture}
+\end{center}
+\vspace{0.4cm}
+\concepto{La diferencia}{\small MySQL no dice nada. SQL Server \textbf{avisa con un error} que no había ninguna transacción que deshacer.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{SQL Server: los demás esperan}
+\small Dos ventanas de \textbf{New Query} conectadas a la misma base. Quedan 499 entradas:
+\vspace{0.4cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[carril] at (-1.25,0) {Conexión 1};
+  \node[carril] at (-1.25,-2) {Conexión 2};
+  \node[inst] (a1) at (0,0) {\kw{BEGIN}\\\kw{TRANSACTION};};
+  \node[inst] (a2) at (2.55,0) {\kw{UPDATE} \ldots\\disponibles - 1};
+  \node[inst] (a3) at (5.1,0) {\kw{SELECT} \ldots\\$\rightarrow$ \mal{498}};
+  \node[inst] (a4) at (7.65,0) {\kw{COMMIT};};
+  \node[inst,draw=utpRojo,very thick] (b3) at (5.1,-2) {\kw{SELECT} \ldots\\\textbf{espera}\ldots};
+  \node[inst] (b4) at (10.2,-2) {$\rightarrow$ \colorbox{yellow!45}{498}};
+  \draw[flecha] (a1)--(a2); \draw[flecha] (a2)--(a3); \draw[flecha] (a3)--(a4);
+  \draw[flecha,dashed] (b3)--(b4);
+  \draw[flecha,utpGrisMedio] (a4.south) -- node[right,font=\scriptsize,text=utpGris]{la deja seguir} (a4.south |- b4.north west);
+  \node[valor] at (5.1,-0.95) {\gris{pendiente}};
+  \node[valor] at (5.1,-2.95) {\gris{no lee el valor viejo}};
+  \node[valor] at (10.2,-2.95) {\gris{responde al terminar}};
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\concepto{La diferencia}{\small En MySQL, la conexión 2 leía 499 al instante. En SQL Server \textbf{espera} hasta el \texttt{COMMIT} o el \texttt{ROLLBACK}. Por eso nunca dejes una transacción abierta.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{SQL Server: dos \texttt{BEGIN TRANSACTION} seguidos}
+\small SQL Server sí pone una transacción \textbf{dentro} de otra y las cuenta en \texttt{@@TRANCOUNT}. Quedan 499:
+\vspace{0.5cm}
+\begin{center}
+\begin{tikzpicture}
+  \tikzset{inst/.append style={minimum width=1.85cm}}
+  \node[inst] (a) at (0,0)     {\kw{BEGIN}\\\kw{TRANSACTION};};
+  \node[inst] (b) at (2.25,0)  {\kw{UPDATE} \ldots\\- 1};
+  \node[inst] (c) at (4.5,0)   {\kw{BEGIN}\\\kw{TRANSACTION};};
+  \node[inst] (d) at (6.75,0)  {\kw{UPDATE} \ldots\\- 1};
+  \node[inst,draw=utpRojo,very thick] (e) at (9,0) {\kw{COMMIT};};
+  \node[inst] (f) at (11.25,0) {\kw{ROLLBACK};};
+  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c); \draw[flecha] (c)--(d); \draw[flecha] (d)--(e); \draw[flecha] (e)--(f);
+  \foreach \x/\n in {0/1, 4.5/2, 9/1, 11.25/0}
+    \node[font=\scriptsize] at (\x,0.75) {\texttt{@@TRANCOUNT} = \textbf{\n}};
+  \node[valor,text width=2cm] at (2.25,-1.05) {498\\\gris{pendiente}};
+  \node[valor,text width=2cm] at (6.75,-1.05) {497\\\gris{pendiente}};
+  \node[valor,text width=2.1cm] at (9,-1.05)  {\textbf{no guarda}\\\gris{solo resta 1}};
+  \node[valor,text width=2.1cm] at (11.25,-1.05) {vuelve a \colorbox{yellow!45}{499}\\\gris{deshace todo}};
+\end{tikzpicture}
+\end{center}
+\vspace{0.5cm}
+\ojo{Los cambios se guardan cuando \texttt{@@TRANCOUNT} llega a \textbf{0} con un \texttt{COMMIT}. Un \texttt{ROLLBACK} deshace \textbf{todo}, aunque haya varias abiertas.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Tipos de transacciones en SQL Server}
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}
+  \tikzset{tipo/.style={caja,anchor=north,font=\small,inner sep=6pt}}
+  \node[tipo] at (0,0) {\parbox[t][3.1cm][t]{3.8cm}{\raggedright \textbf{Autocommit}\\\gris{\footnotesize viene por defecto}\\[6pt]
+    \footnotesize No escribes nada.\\[4pt] Cada instrucción se guarda \textbf{sola}, apenas termina.}};
+  \node[tipo,cajanaranja] at (4.4,0) {\parbox[t][3.1cm][t]{3.8cm}{\raggedright \textbf{Explícita}\\\gris{\footnotesize la que usamos}\\[6pt]
+    {\ttfamily\scriptsize BEGIN TRANSACTION;\\\ldots\\COMMIT; \normalfont o \ttfamily ROLLBACK;}\\[4pt]
+    \footnotesize Tú marcas el inicio y el fin.}};
+  \node[tipo] at (8.8,0) {\parbox[t][3.1cm][t]{3.8cm}{\raggedright \textbf{Implícita}\\\gris{\footnotesize poco usada}\\[6pt]
+    {\ttfamily\scriptsize SET IMPLICIT\_TRANSACTIONS ON;}\\[4pt]
+    \footnotesize La transacción se abre \textbf{sola} y queda abierta hasta que escribes \texttt{COMMIT} o \texttt{ROLLBACK}.}};
+\end{tikzpicture}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{MySQL y SQL Server: lo que cambia}
+\small En los dos, una transacción se guarda \textbf{toda o nada}. Cambia esto:
+\vspace{0.3cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{@{}>{\raggedright}p{4.6cm}>{\raggedright}p{3.9cm}>{\raggedright\arraybackslash}p{3.9cm}@{}}
+\toprule
+ & \bfseries MySQL & \bfseries SQL Server \\
+\midrule
+Empezar & \texttt{START TRANSACTION;} & \texttt{BEGIN TRANSACTION;} \\
+\texttt{ROLLBACK} sin transacción & no hace nada & da un \textbf{error} \\
+Otra conexión, mientras hay algo pendiente & ve el valor \textbf{guardado} & \textbf{espera} \\
+Empezar otra sin cerrar la primera & \textbf{guarda} la primera & la pone \textbf{dentro} de la primera \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+% =======================================================================
+\seccion{SQLite}
+\begin{frame}{SQLite: una base de datos en un archivo}
+\small La aplicación de la feria Fogón 2026 guarda sus datos en \textbf{SQLite}. No hay un servidor: toda la base es \textbf{un archivo}.
+\vspace{0.3cm}
+\begin{center}
+\begin{tikzpicture}
+  \tikzset{bd/.style={cylinder,shape border rotate=90,aspect=0.25,draw=utpRojo!75,very thick,fill=utpRojo!7,
+                      minimum width=1.6cm,minimum height=1.1cm,align=center,font=\scriptsize},
+           app/.style={caja,minimum width=2.3cm,font=\small}}
+  \node[font=\small\bfseries] at (2.6,1.25) {MySQL y SQL Server};
+  \node[app] (a1) at (0,0) {aplicación};
+  \node[caja,cajanaranja,text width=2.6cm,font=\scriptsize] (srv) at (3.3,0) {\textbf{servidor}\\siempre encendido,\\con usuario y contraseña};
+  \node[bd] (d1) at (6,0) {datos};
+  \draw[flecha] (a1)--(srv); \draw[flecha] (srv)--(d1);
+  \draw[utpGrisMedio,dashed] (7.3,1.4)--(7.3,-1.1);
+  \node[font=\small\bfseries] at (9.9,1.25) {SQLite};
+  \node[app] (a2) at (8.7,0) {aplicación};
+  \node[draw=utpNegro,very thick,fill=white,minimum width=1.6cm,minimum height=1.3cm,font=\ttfamily\scriptsize,align=center] (f) at (11.4,0) {feria.db\\[2pt]\normalfont\tiny un archivo};
+  \draw[flecha] (a2)--(f);
+\end{tikzpicture}
+\end{center}
+\vspace{0.4cm}
+\concepto{SQLite}{\small Un gestor de bases de datos que guarda \textbf{toda la base en un solo archivo} (\texttt{.db}).}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{SQLite: ¿qué lo hace distinto?}
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}
+  \tikzset{v/.style={caja,text width=5.2cm,minimum height=1.55cm,font=\small,align=center}}
+  \node[v] at (0,0)      {\npieza{1}\\[3pt]No se instala \textbf{ningún servidor}.};
+  \node[v] at (6.2,0)    {\npieza{2}\\[3pt]La base se \textbf{copia o se envía} como cualquier archivo.};
+  \node[v] at (0,-2.1)   {\npieza{3}\\[3pt]Se usa en \textbf{celulares}, \textbf{navegadores} y aplicaciones pequeñas.};
+  \node[v] at (6.2,-2.1) {\npieza{4}\\[3pt]El SQL es \textbf{casi el mismo}:\\{\ttfamily\footnotesize SELECT, INSERT, BEGIN TRANSACTION}\ldots};
+\end{tikzpicture}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{DB Browser for SQLite}
+\small Un programa gratuito para abrir un archivo \texttt{.db}, ver sus tablas y ejecutar SQL. Es como Workbench o SSMS, pero para SQLite.
+\vspace{0.25cm}
+\begin{center}
+\begin{tikzpicture}
+  \tikzset{btn/.style={draw=utpGrisMedio,fill=white,rounded corners=1.5pt,font=\scriptsize,inner sep=3pt},
+           tab/.style={draw=utpGrisMedio,fill=utpGrisClaro,font=\scriptsize,inner sep=3pt}}
+  \node[draw=utpNegro,very thick,fill=white,minimum width=12.4cm,minimum height=3.6cm,anchor=north] (w) at (0,0) {};
+  \node[anchor=north,fill=utpNegro,text=white,minimum width=12.4cm,minimum height=.5cm,font=\scriptsize\bfseries] (t) at (w.north) {DB Browser for SQLite -- feria.db};
+  \node[btn,anchor=north west] (n) at ([xshift=2mm,yshift=-2mm]t.south west) {New Database};
+  \node[btn,anchor=west] (o) at ([xshift=1.5mm]n.east) {Open Database};
+  \node[btn,anchor=west] (wc) at ([xshift=1.5mm]o.east) {Write Changes};
+  \node[btn,anchor=west] (rc) at ([xshift=1.5mm]wc.east) {Revert Changes};
+  \node[tab,anchor=north west] (t1) at ([yshift=-3mm]n.south west) {Database Structure};
+  \node[tab,anchor=west] (t2) at ([xshift=0.5mm]t1.east) {Browse Data};
+  \node[tab,anchor=west] (t3) at ([xshift=0.5mm]t2.east) {Edit Pragmas};
+  \node[tab,anchor=west,fill=white,draw=utpNegro] (t4) at ([xshift=0.5mm]t3.east) {Execute SQL};
+  \node[anchor=north west,fill=utpGrisClaro,font=\ttfamily\scriptsize,text width=7.6cm,inner sep=4pt] (sql) at ([yshift=-2mm]t1.south west)
+    {\kw{SELECT} nombre, precio, disponibles \kw{FROM} entrada;};
+  \node[anchor=west,draw=utpGrisMedio,fill=white,font=\scriptsize,inner sep=3pt] (run) at ([xshift=2mm]sql.east) {$\blacktriangleright$ Ctrl+Return o F5};
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}>{\bfseries}ll@{}}
+\toprule
+Database Structure & las tablas y sus columnas \\
+Browse Data & las filas de una tabla, para verlas o editarlas \\
+Execute SQL & escribir SQL y ejecutarlo \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 1} Una webapp con SQLite}
+\small La carpeta \texttt{webapp\_sencilla} del curso es una página web que lee la base \texttt{agenda.db}.
+\vspace{0.15cm}
+\begin{columns}[T,onlytextwidth]
+\column{.5\textwidth}
+\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}c>{\raggedright\arraybackslash}p{5.6cm}@{}}
+\npieza{1} & Abre una terminal dentro de \texttt{webapp\_sencilla}. \\
+\npieza{2} & Escribe \texttt{npm install} \gris{(solo la primera vez)}. \\
+\npieza{3} & Escribe \texttt{npm run dev}. \\
+\npieza{4} & En el navegador, entra a \texttt{http://localhost:3000} \\
+\npieza{5} & En DB Browser: \textbf{Open Database} $\rightarrow$ \texttt{base\_de\_datos/agenda.db} $\rightarrow$ \textbf{Browse Data} $\rightarrow$ tabla \tbl{contacto}. \\
+\end{tabular}
+\column{.46\textwidth}
+\centering
+\begin{tikzpicture}
+  \node[draw=utpNegro,very thick,fill=white,minimum width=5.6cm,minimum height=3.1cm,anchor=north] (w) at (0,0) {};
+  \node[anchor=north,fill=utpGrisClaro,draw=utpNegro,very thick,minimum width=5.6cm,minimum height=.5cm,font=\ttfamily\scriptsize] (b) at (w.north) {localhost:3000};
+  \node[anchor=north west,font=\small\bfseries] at ([xshift=3mm,yshift=-1.5mm]b.south west) {Agenda};
+  \node[anchor=north west,font=\scriptsize] at ([xshift=3mm,yshift=-6.5mm]b.south west) {3 registros};
+  \node[anchor=north,font=\scriptsize] at ([yshift=-10.5mm]b.south) {%
+    \renewcommand{\arraystretch}{1.05}%
+    \begin{tabular}{|l|l|l|}\hline
+    \bfseries id & \bfseries nombre & \bfseries telefono \\\hline
+    1 & Ana Torres & 987654321 \\\hline
+    2 & Luis Ramos & 912345678 \\\hline
+    3 & María Quispe & 956789123 \\\hline
+    \end{tabular}};
+\end{tikzpicture}\\[4pt]
+{\scriptsize\gris{Lo que muestra el navegador en el paso \npieza{4}.}}
+\end{columns}
+\vspace{0.25cm}
+\concepto{Comprueba}{\small En \textbf{Browse Data} ves las \textbf{mismas 3 filas}: la página ejecuta \texttt{SELECT * FROM contacto} sobre el archivo \texttt{agenda.db}.}
+{\centering\scriptsize\gris{Necesitas Node.js 22.13 o superior. Para apagar la página, pulsa Ctrl+C en la terminal.}\par}
+\end{frame}
+% =======================================================================
+\seccion{Programación en SQL}
+\begin{frame}{Caso de estudio: sistema de cupones de descuento}
+\begin{columns}[T,onlytextwidth]
+\column{.47\textwidth}
+\small Una tienda en línea lanza \textbf{códigos de descuento}.
+\vspace{0.2cm}
+\begin{itemize}\setlength\itemsep{2pt}
+  \item El \textbf{responsable de promociones} registra los cupones y los activa o desactiva.
+  \item El \textbf{cliente} escribe el código al pagar.
+  \item Un cupón descuenta un \textbf{porcentaje} o un \textbf{monto fijo} en soles.
+  \item Tiene fecha de inicio y, si se quiere, fecha de fin.
+\end{itemize}
+\column{.5\textwidth}
+\centering
+\begin{tikzpicture}
+  \tikzset{panel/.style={draw=utpNegro,very thick,fill=white,minimum width=6.4cm,minimum height=3.3cm,anchor=north}}
+  \node[panel] (p) at (0,0) {};
+  \node[anchor=north,fill=utpNegro,text=white,minimum width=6.4cm,minimum height=.55cm,font=\footnotesize\bfseries]
+    (b) at (p.north) {Tienda: pagar mi compra};
+  \node[anchor=north west,font=\small] at ([xshift=4mm,yshift=-3mm]b.south west) {Total de la compra};
+  \node[anchor=north east,font=\small\bfseries] at ([xshift=-4mm,yshift=-3mm]b.south east) {S/ 120.00};
+  \node[anchor=north west,font=\small] at ([xshift=4mm,yshift=-10mm]b.south west) {Cupón};
+  \node[anchor=north east,draw=utpGrisMedio,font=\ttfamily\small,minimum width=2.8cm,inner sep=3pt]
+    at ([xshift=-4mm,yshift=-9.4mm]b.south east) {BIENVENIDA10};
+  \draw[utpGrisMedio] ([xshift=4mm,yshift=-17mm]b.south west) -- ([xshift=-4mm,yshift=-17mm]b.south east);
+  \node[anchor=north west,font=\small\bfseries] at ([xshift=4mm,yshift=-19mm]b.south west) {A pagar};
+  \node[anchor=north east,font=\small\bfseries,text=utpRojo] at ([xshift=-4mm,yshift=-19mm]b.south east) {S/ ?};
+\end{tikzpicture}
+\end{columns}
+\vspace{0cm}
+\begin{center}
+\mini{cupon}{rllrlll}{\cab{id} & \cab{codigo} & \cab{tipo\_descuento} & \cab{valor\_descuento} & \cab{estado} & \cab{vigente\_desde} & \cab{vigente\_hasta}}{%
+1 & BIENVENIDA10 & porcentaje & 10.00 & activo & 2026-01-01 & NULL \\
+2 & NOVIEMBRE20 & monto\_fijo & 20.00 & activo & 2026-11-01 & 2026-12-01 \\
+3 & VERANO15 & porcentaje & 15.00 & activo & 2026-01-01 & 2026-04-01 \\
+4 & NAVIDAD25 & porcentaje & 25.00 & activo & 2026-12-15 & 2026-12-26 \\
+5 & PRUEBA50 & monto\_fijo & 50.00 & inactivo & 2026-10-01 & NULL \\}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Cuánto paga el cliente? La fórmula va en la base}
+\small Una compra de \textbf{S/ 120}. El cálculo depende del tipo de cupón:
+\vspace{0.15cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\bfseries Cupón & \bfseries Tipo & \bfseries Cálculo & \bfseries Paga \\
+\midrule
+\texttt{BIENVENIDA10} & porcentaje: 10 & $120 - 120 \times 10 / 100$ & \textbf{S/ 108.00} \\
+\texttt{NOVIEMBRE20} & monto fijo: 20 & $120 - 20$ & \textbf{S/ 100.00} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\begin{columns}[c,onlytextwidth]
+\column{.5\textwidth}
+\centering
+\begin{tikzpicture}
+  \foreach \t/\y/\i in {Panel de cupones/0/1, Tienda en línea/-0.8/2}
+    \node[paso,minimum width=2.6cm] (a\i) at (0,\y) {\t};
+  \node[caja,cajanaranja,font=\scriptsize,align=center] (f) at (3.6,-0.4) {base de datos\\[2pt]\texttt{precio\_final()}};
+  \foreach \i in {1,2} \draw[flecha] (a\i.east) -- (f.west);
+\end{tikzpicture}
+\column{.46\textwidth}
+\raggedright\small Los \textbf{dos sistemas} necesitan el mismo cálculo. Si lo escribe cada uno, el panel puede mostrar un precio y la tienda cobrar otro.\\[6pt]
+Se escribe \textbf{una vez}, en la base, como \textbf{función}, y todos la usan.
+\end{columns}
+\vspace{0.2cm}
+\concepto{Función definida por el usuario}{\small Una función que \textbf{tú escribes} con \texttt{CREATE FUNCTION}. Queda \textbf{guardada en la base} y se usa en un \texttt{SELECT}, igual que \texttt{ROUND} o \texttt{UPPER}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Una función en MySQL y en SQL Server}
+\small El caso más simple: un cupón de \textbf{porcentaje}.
+\begin{columns}[T,onlytextwidth]
+\column{.47\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlmini}[\col]
+\kw{CREATE FUNCTION} aplicar\_porcentaje(\\
+\ind\mal{p\_precio} \kw{DECIMAL}(10,2),\\
+\ind\mal{p\_porcentaje} \kw{DECIMAL}(5,2))\\
+\kw{RETURNS DECIMAL}(10,2)\\
+\kw{DETERMINISTIC}\\
+\kw{RETURN} p\_precio - p\_precio * p\_porcentaje / 100;\\[6pt]
+\kw{SELECT} aplicar\_porcentaje(120, 10);\ \com{-- 108.00}
+\end{sqlmini}
+\column{.5\textwidth}
+\centering\etiqueta{SQL Server}
+\begin{sqlmini}[\col]
+\kw{CREATE} \mal{\kw{OR ALTER}} \kw{FUNCTION} \mal{dbo.}aplicar\_porcentaje(\\
+\ind\mal{@precio} \kw{DECIMAL}(10,2),\\
+\ind\mal{@porcentaje} \kw{DECIMAL}(5,2))\\
+\kw{RETURNS DECIMAL}(10,2)\\
+\mal{\kw{AS}}\\
+\mal{\kw{BEGIN}}\\
+\ind\kw{RETURN} @precio - @precio * @porcentaje / 100;\\
+\mal{\kw{END}};\\
+\mal{\kw{GO}}\\[4pt]
+\kw{SELECT} \mal{dbo.}aplicar\_porcentaje(120, 10);\ \com{-- 108.00}
+\end{sqlmini}
+\end{columns}
+\vspace{0.1cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.1}
+\begin{tabular}{@{}>{\bfseries}lll@{}}
+\toprule
+ & \bfseries MySQL & \bfseries SQL Server \\
+\midrule
+Parámetros & \texttt{p\_precio} (\texttt{p\_}: costumbre) & \texttt{@precio}: la \texttt{@} es obligatoria \\
+Cuerpo & \texttt{RETURN \ldots;} & entre \texttt{AS BEGIN} y \texttt{END} \\
+Para usarla & \texttt{aplicar\_porcentaje(\ldots)} & \texttt{dbo.aplicar\_porcentaje(\ldots)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Usarla sobre las filas de una tabla}
+\small En el panel: con una compra de S/ 120, ¿cuánto pagaría el cliente con cada cupón de porcentaje?
+\begin{columns}[c,onlytextwidth]
+\column{.55\textwidth}
+\begin{sqlcode}[\col]
+\kw{SELECT} codigo, valor\_descuento,\\
+\ind\dentro{aplicar\_porcentaje(120, valor\_descuento)}\\
+\ind\ind\kw{AS} a\_pagar\\
+\kw{FROM} cupon\\
+\kw{WHERE} tipo\_descuento = 'porcentaje'\\
+\kw{ORDER BY} id;
+\end{sqlcode}
+\column{.42\textwidth}
+\res{lrr}{\cab{codigo} & \cab{valor\_descuento} & \cab{a\_pagar}}{BIENVENIDA10 & 10.00 & 108.00 \\ VERANO15 & 15.00 & 102.00 \\ NAVIDAD25 & 25.00 & 90.00 \\}
+\end{columns}
+\vspace{0.3cm}
+\concepto{Idea clave}{\small La función se ejecuta \textbf{una vez por cada fila}: cada vez recibe el \texttt{valor\_descuento} de esa fila. En SQL Server se escribe \texttt{dbo.aplicar\_porcentaje}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Un cupón de monto fijo necesita variables e \texttt{IF}}
+\small \texttt{NOVIEMBRE20} descuenta \textbf{S/ 20}, no el 20 \%. Con la función de antes, el cálculo sale mal:
+\begin{columns}[c,onlytextwidth]
+\column{.55\textwidth}
+\begin{sqlcode}[\col]
+\kw{SELECT} aplicar\_porcentaje(120, 20);
+\end{sqlcode}
+\column{.4\textwidth}
+\centering
+{\scriptsize\color{utpGris}resultado}\\[2pt]
+\mal{\ttfamily 96.00}\quad\small debía ser \textbf{100.00}
+\end{columns}
+\vspace{0.3cm}
+\small La función \texttt{precio\_final(precio, cupon)} tiene que hacer \textbf{tres pasos}:
+\vspace{0.3cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[paso,text width=3.6cm] (a) at (0,0) {\npieza{1} Leer el cupón y \textbf{guardar} su tipo y su valor};
+  \node[paso,text width=3.6cm] (b) at (4.6,0) {\npieza{2} \textbf{Según el tipo}, calcular el descuento};
+  \node[paso,text width=3.6cm] (c) at (9.2,0) {\npieza{3} Devolver el precio menos el descuento};
+  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c);
+  \node[font=\small\bfseries,text=utpRojo] at (0,-1) {variables};
+  \node[font=\small\bfseries,text=utpRojo] at (4.6,-1) {\texttt{IF}};
+  \node[font=\small\bfseries,text=utpRojo] at (9.2,-1) {\texttt{RETURN}};
+\end{tikzpicture}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Variables: guardar un valor para usarlo después}
+\concepto{Variable}{\small Un \textbf{nombre} que guarda \textbf{un valor} mientras se ejecuta tu código. Se le da un valor con \texttt{SET}.}
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlchico}[\col]
+\kw{SET} @precio = 120;\\
+\kw{SET} @descuento = 20;\\
+\kw{SELECT} @precio - @descuento \kw{AS} a\_pagar;\\
+\com{-- 100}
+\end{sqlchico}
+\footnotesize Guardar lo que devuelve un \texttt{SELECT}:
+\begin{sqlchico}[\col]
+\kw{SELECT} valor\_descuento \dentro{\kw{INTO} @descuento}\\
+\kw{FROM} cupon \kw{WHERE} codigo = 'NOVIEMBRE20';
+\end{sqlchico}
+\column{.48\textwidth}
+\centering\etiqueta{SQL Server}
+\begin{sqlchico}[\col]
+\kw{DECLARE} @precio \kw{DECIMAL}(10,2) = 120;\\
+\kw{DECLARE} @descuento \kw{DECIMAL}(10,2) = 20;\\
+\kw{SELECT} @precio - @descuento \kw{AS} a\_pagar;\\
+\com{-- 100.00}
+\end{sqlchico}
+\footnotesize Guardar lo que devuelve un \texttt{SELECT}:
+\begin{sqlchico}[\col]
+\kw{SELECT} \dentro{@descuento = valor\_descuento}\\
+\kw{FROM} cupon \kw{WHERE} codigo = 'NOVIEMBRE20';
+\end{sqlchico}
+\end{columns}
+\ojo{Dentro de una función de MySQL, las variables se crean con \texttt{DECLARE} y van \textbf{sin} \texttt{@}: \texttt{DECLARE v\_tipo VARCHAR(10);}}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{IF}: elegir un camino}
+\begin{columns}[c,onlytextwidth]
+\column{.42\textwidth}
+\centering
+\begin{tikzpicture}
+  \node[decision] (d) at (0,0) {¿el tipo es\\'porcentaje'?};
+  \node[paso,text width=2.4cm] (si) at (-1.65,-1.9) {descuento =\\precio $\times$ valor / 100};
+  \node[paso,text width=2.1cm] (no) at (1.65,-1.9) {descuento =\\valor};
+  \draw[flecha] (d.west) -| node[above,pos=.25,font=\scriptsize\bfseries]{sí} (si.north);
+  \draw[flecha] (d.east) -| node[above,pos=.25,font=\scriptsize\bfseries]{no} (no.north);
+\end{tikzpicture}\\[8pt]
+\small Se ejecuta \textbf{solo uno} de los dos caminos.
+\column{.55\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlcode}[\col]
+\kw{IF} v\_tipo = 'porcentaje' \mal{\kw{THEN}}\\
+\ind\kw{SET} v\_descuento = p\_precio * v\_valor / 100;\\
+\kw{ELSE}\\
+\ind\kw{SET} v\_descuento = v\_valor;\\
+\mal{\kw{END IF}};
+\end{sqlcode}
+\centering\etiqueta{SQL Server}
+\begin{sqlcode}[\col]
+\kw{IF} @tipo = 'porcentaje'\\
+\ind\kw{SET} @descuento = @precio * @valor / 100;\\
+\kw{ELSE}\\
+\ind\kw{SET} @descuento = @valor;
+\end{sqlcode}
+\end{columns}
+\analogia{En SQL Server no hay \texttt{THEN} ni \texttt{END IF}. Si un camino tiene \textbf{varias} instrucciones, van entre \texttt{BEGIN} y \texttt{END}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Todo junto: \texttt{precio\_final} en MySQL}
+\begin{columns}[c,onlytextwidth]
+\column{.58\textwidth}
+\begin{sqlmicro}[\col]
+\dentro{\kw{DELIMITER} \$\$}\\
+\kw{CREATE FUNCTION} precio\_final(p\_precio \kw{DECIMAL}(10,2),\\
+\ind\ind\ind\ind\ind\ind\ind\ind\ind\ind p\_cupon\_id \kw{INT})\\
+\kw{RETURNS DECIMAL}(10,2)\\
+\kw{READS SQL DATA}\\
+\kw{BEGIN}\\
+\ind\kw{DECLARE} v\_tipo \kw{VARCHAR}(10);\\
+\ind\kw{DECLARE} v\_valor \kw{DECIMAL}(10,2);\\
+\ind\kw{DECLARE} v\_descuento \kw{DECIMAL}(10,2);\\[1.5pt]
+\ind\kw{SELECT} tipo\_descuento, valor\_descuento \kw{INTO} v\_tipo, v\_valor\\
+\ind\kw{FROM} cupon \kw{WHERE} id = p\_cupon\_id;\hfill\npieza{1}\\[1.5pt]
+\ind\kw{IF} v\_tipo = 'porcentaje' \kw{THEN}\\
+\ind\ind\kw{SET} v\_descuento = p\_precio * v\_valor / 100;\\
+\ind\kw{ELSE}\\
+\ind\ind\kw{SET} v\_descuento = v\_valor;\\
+\ind\kw{END IF};\hfill\npieza{2}\\[1.5pt]
+\ind\kw{IF} v\_descuento > p\_precio \kw{THEN}\\
+\ind\ind\kw{SET} v\_descuento = p\_precio;\\
+\ind\kw{END IF};\\[1.5pt]
+\ind\kw{RETURN} p\_precio - v\_descuento;\hfill\npieza{3}\\
+\kw{END}\dentro{\$\$}\\
+\dentro{\kw{DELIMITER} ;}
+\end{sqlmicro}
+\column{.39\textwidth}
+\raggedright\footnotesize
+\textbf{\texttt{BEGIN} \ldots{} \texttt{END}}: agrupa varias instrucciones, cada una con su \texttt{;}.\\[5pt]
+\textbf{\texttt{DELIMITER \$\$}}: le dice a MySQL que la función termina en \texttt{\$\$}, no en el primer \texttt{;}.\\[5pt]
+\textbf{\texttt{READS SQL DATA}}: la función lee una tabla.\\[5pt]
+El segundo \texttt{IF} evita que se pague menos de 0.
+\vspace{0.2cm}
+\begin{sqlmini}[\col]
+\kw{SELECT} precio\_final(120, 1),\ \com{-- 108.00}\\
+\ind\ind\ind precio\_final(120, 2),\ \com{-- 100.00}\\
+\ind\ind\ind precio\_final(30, 5);\ \ \ \com{-- \ \ 0.00}
+\end{sqlmini}
+{\scriptsize\gris{Cupones 1, 2 y 5. Con \texttt{PRUEBA50} el descuento (50) es mayor que el precio (30): paga 0.}}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\texttt{IF} con varios caminos: \texttt{ELSEIF}}
+\renewcommand{\arraystretch}{0.85}
+\small ¿En qué situación está cada cupón? Se revisa \textbf{en orden}: gana la primera condición que se cumple.
+\begin{columns}[T,onlytextwidth]
+\column{.5\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlmini}[\col]
+\kw{IF} v\_estado = 'inactivo' \kw{THEN}\\
+\ind\kw{SET} v\_situacion = 'inactivo';\\
+\dentro{\kw{ELSEIF}} p\_fecha < v\_desde \kw{THEN}\\
+\ind\kw{SET} v\_situacion = 'por empezar';\\
+\dentro{\kw{ELSEIF}} v\_hasta \kw{IS NOT NULL}\\
+\ind\ind\kw{AND} p\_fecha >= v\_hasta \kw{THEN}\\
+\ind\kw{SET} v\_situacion = 'vencido';\\
+\kw{ELSE}\\
+\ind\kw{SET} v\_situacion = 'vigente';\\
+\kw{END IF};
+\end{sqlmini}
+\centering\etiqueta{SQL Server}
+\begin{sqlmini}[\col]
+\kw{IF} @estado = 'inactivo' \ldots\\
+\dentro{\kw{ELSE IF}} @fecha < @desde \ldots\\
+\dentro{\kw{ELSE IF}} @hasta \kw{IS NOT NULL AND} \ldots\\
+\kw{ELSE} \ldots
+\end{sqlmini}
+\column{.47\textwidth}
+\begin{sqlmini}[\col]
+\kw{SELECT} codigo,\\
+\ind situacion\_cupon(id, '2026-11-10') \kw{AS} situacion\\
+\kw{FROM} cupon \kw{ORDER BY} id;
+\end{sqlmini}
+\res{ll}{\cab{codigo} & \cab{situacion}}{BIENVENIDA10 & vigente \\ NOVIEMBRE20 & vigente \\ VERANO15 & vencido \\ NAVIDAD25 & por empezar \\ PRUEBA50 & inactivo \\}
+\par\vspace{4pt}
+{\centering\normalfont\scriptsize\color{utpGris}La fecha es fija para que todos veamos lo mismo.\\En la aplicación se usa la fecha de hoy.\par}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 2} La base de cupones y sus funciones}
+\npieza{1}\ \small Crea la base \texttt{cupones}: dos scripts, en orden. Están en \texttt{ejemplos/practicas/}:
+\vspace{0.1cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\setlength\tabcolsep{4pt}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\bfseries Gestor & \bfseries 1. Modelo físico (tablas) & \bfseries 2. Registros (datos) \\
+\midrule
+MySQL (Workbench) & \texttt{mysql/practica\_2\_modelo\_fisico.sql} & \texttt{mysql/practica\_2\_registros.sql} \\
+SQL Server (SSMS) & \texttt{sqlserver/practica\_2\_modelo\_fisico.sql} & \texttt{sqlserver/practica\_2\_registros.sql} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\npieza{2}\ \small Crea las funciones y pruébalas. Los scripts están en \texttt{ejemplos/cupones/}, en este orden:
+\vspace{0.05cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\bfseries Gestor & \bfseries 1. Primera función & \bfseries 2. Variables e \texttt{IF} \\
+\midrule
+MySQL & \texttt{1\_funciones\_mysql.sql} & \texttt{2\_variables\_if\_mysql.sql} \\
+SQL Server & \texttt{1\_funciones\_sqlserver.sql} & \texttt{2\_variables\_if\_sqlserver.sql} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.05cm}
+\npieza{3}\ \small Comprueba que al final del segundo script salgan solo los cupones vigentes: \textbf{BIENVENIDA10} paga \textbf{108.00} y \textbf{NOVIEMBRE20} paga \textbf{100.00}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+\begin{frame}{Cierre}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\raggedright\bfseries}p{3.6cm}>{\raggedright\arraybackslash}p{9.4cm}}
+\toprule
+SQLite & Una base de datos en un archivo. Se abre con DB Browser for SQLite. \\
+DB Browser & Programa para abrir un archivo \texttt{.db}, ver sus tablas y ejecutar SQL. \\
+Función del usuario & Tu propio cálculo, guardado en la base con \texttt{CREATE FUNCTION}. \\
+Variable & Un nombre que guarda un valor: \texttt{DECLARE}, \texttt{SET}, \texttt{SELECT \ldots{} INTO}. \\
+\texttt{IF} & Elige un camino. MySQL: \texttt{ELSEIF} y \texttt{END IF}; SQL Server: \texttt{ELSE IF}. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Referencias}
+\footnotesize
+\begin{itemize}\setlength\itemsep{7pt}
+\item Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2014). \textit{Fundamentos de bases de datos} (6.ª ed.). McGraw-Hill.
+\item Oracle. MySQL Reference Manual: \href{https://dev.mysql.com/doc/refman/8.0/en/create-procedure.html}{\textit{CREATE PROCEDURE and CREATE FUNCTION}} y \href{https://dev.mysql.com/doc/refman/8.0/en/if.html}{\textit{IF Statement}}.
+\item Microsoft. Transact-SQL: \href{https://learn.microsoft.com/sql/t-sql/statements/create-function-transact-sql}{\textit{CREATE FUNCTION}} y \href{https://learn.microsoft.com/sql/t-sql/language-elements/if-else-transact-sql}{\textit{IF...ELSE}}.
+\item SQLite. \href{https://www.sqlite.org/lang_transaction.html}{\textit{Transaction}}. DB Browser for SQLite: \href{https://sqlitebrowser.org}{\textit{sqlitebrowser.org}}.
+\end{itemize}
+\end{frame}
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}

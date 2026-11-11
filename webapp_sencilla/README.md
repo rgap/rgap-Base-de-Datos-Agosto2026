@@ -15,7 +15,7 @@ Cuando entras a la página, se ejecuta este SQL:
 SELECT * FROM contacto
 ```
 
-y verás sus filas en el navegador.
+y verás sus filas en una tabla en el navegador.
 
 ## Prueba
 
