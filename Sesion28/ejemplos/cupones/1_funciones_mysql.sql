@@ -1,7 +1,7 @@
 -- Funciones definidas por el usuario (MySQL 8).
 -- Caso de estudio: sistema de cupones de descuento.
--- Antes haz la práctica 2 (ejemplos/practicas/mysql/: practica_2_modelo_fisico.sql
--- y practica_2_registros.sql).
+-- Antes haz la práctica 1 (ejemplos/practicas/mysql/: practica_1_modelo_fisico.sql
+-- y practica_1_registros.sql).
 
 USE cupones;
 

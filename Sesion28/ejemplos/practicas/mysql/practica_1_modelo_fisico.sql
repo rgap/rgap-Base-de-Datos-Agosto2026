@@ -1,5 +1,5 @@
--- Práctica 2 (MySQL 8), paso 1 de 2: modelo físico del sistema de cupones de descuento.
--- Después ejecuta practica_2_registros.sql.
+-- Práctica 1 (MySQL 8), paso 1 de 2: modelo físico del sistema de cupones de descuento.
+-- Después ejecuta practica_1_registros.sql.
 -- Si la base ya existe, la borra y la crea de nuevo.
 DROP DATABASE IF EXISTS cupones;
 CREATE DATABASE cupones;

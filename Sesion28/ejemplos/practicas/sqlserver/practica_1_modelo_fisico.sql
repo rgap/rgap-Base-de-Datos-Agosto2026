@@ -1,5 +1,5 @@
--- Práctica 2 (SQL Server 2017 o superior), paso 1 de 2: modelo físico del sistema
--- de cupones de descuento. Después ejecuta practica_2_registros.sql.
+-- Práctica 1 (SQL Server 2017 o superior), paso 1 de 2: modelo físico del sistema
+-- de cupones de descuento. Después ejecuta practica_1_registros.sql.
 -- GO separa los lotes de instrucciones en SSMS.
 -- Si la base ya existe, la borra y la crea de nuevo.
 USE master;

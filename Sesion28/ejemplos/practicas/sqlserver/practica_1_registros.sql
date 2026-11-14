@@ -1,5 +1,5 @@
--- Práctica 2 (SQL Server 2017 o superior), paso 2 de 2: registros del sistema de cupones.
--- Antes ejecuta practica_2_modelo_fisico.sql.
+-- Práctica 1 (SQL Server 2017 o superior), paso 2 de 2: registros del sistema de cupones.
+-- Antes ejecuta practica_1_modelo_fisico.sql.
 -- Carga los cupones de ejemplo.
 USE cupones;
 GO

@@ -1,7 +1,7 @@
 -- Funciones definidas por el usuario (SQL Server).
 -- Caso de estudio: sistema de cupones de descuento.
--- Antes haz la práctica 2 (ejemplos/practicas/sqlserver/: practica_2_modelo_fisico.sql
--- y practica_2_registros.sql).
+-- Antes haz la práctica 1 (ejemplos/practicas/sqlserver/: practica_1_modelo_fisico.sql
+-- y practica_1_registros.sql).
 
 USE cupones;
 GO
