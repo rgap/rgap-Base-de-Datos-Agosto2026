@@ -6,11 +6,10 @@ Todos los formularios tienen un botón **«Datos demo»** que los completa con d
 
 Es el mismo sistema que `55_venta_de_entradas_para_feria_gastronomica`, pero lo central aquí es **dónde vive la regla de la compra**. Cuando la venta abre, muchos visitantes pagan a la vez; si dos compras leen al mismo tiempo que queda una entrada, ambas podrían registrarse (sobreventa). Eso no lo resuelve la aplicación sino MySQL:
 
-- La única forma de registrar una compra es `CALL comprar_entrada(...)`, un procedimiento almacenado con `SQL SECURITY DEFINER`. Bloquea la entrada con `SELECT ... FOR UPDATE`, comprueba la venta abierta, el DNI, la referencia del pago y las entradas disponibles, descuenta una y guarda la venta. Si algo falla hace `ROLLBACK`.
-- La aplicación se conecta con el usuario `app_feria`, que **no puede** hacer `INSERT`, `UPDATE` ni `DELETE` en ninguna tabla. Aunque un error en el código intentara vender sin descontar, MySQL lo rechazaría.
-- La configuración de la entrada (`configurar_entrada`) y el inicio de sesión (`credencial_valida`) también pasan por rutinas de la base. La aplicación ni siquiera puede leer la tabla `administrador`.
+- La compra se registra con `CALL comprar_entrada(...)`, un procedimiento almacenado. Bloquea la entrada con `SELECT ... FOR UPDATE`, comprueba la venta abierta, el DNI, la referencia del pago y las entradas disponibles, descuenta una y guarda la venta. Si algo falla hace `ROLLBACK`.
+- La configuración de la entrada (`configurar_entrada`) y el inicio de sesión (`credencial_valida`) también pasan por rutinas de la base.
 
-Por eso este caso usa MySQL y no SQLite: SQLite no tiene procedimientos almacenados ni usuarios con permisos.
+Por eso este caso usa MySQL y no SQLite: SQLite no tiene procedimientos almacenados. En `57_venta_de_entradas_con_usuario_y_permisos` se agrega además un usuario de MySQL para la aplicación que solo puede leer y llamar a las rutinas.
 
 ## Ejecutar
 
@@ -21,10 +20,10 @@ brew install mysql
 brew services start mysql
 ```
 
-1. Crear la base, las tablas, las rutinas y el usuario de la aplicación (una sola vez, como `root`; en Homebrew la contraseña de `root` está vacía, así que basta con pulsar Enter):
+1. Crear la base, las tablas y las rutinas (una sola vez, como `root`; en Homebrew la contraseña de `root` está vacía, así que basta con pulsar Enter):
 
    ```bash
-   npm run db:crear      # equivale a: mysql -u root -p < ../_specs/modelo_fisico.sql
+   npm run db:crear      # crea la base feria_entrada y aplica specs/modelo_fisico.sql
    ```
 
 2. Instalar la dependencia (`mysql2`) e iniciar:
@@ -34,14 +33,12 @@ brew services start mysql
    npm start
    ```
 
-Queda disponible en `http://localhost:3000`. Se puede cambiar el puerto con `PORT` y la conexión con `DATABASE_URL` (por defecto `mysql://app_feria:app_feria@localhost:3306/feria_entradas`).
+Queda disponible en `http://localhost:3000`. Se puede cambiar el puerto con `PORT` y la conexión con `DATABASE_URL` (por defecto `mysql://root@localhost:3306/feria_entrada`; si `root` tiene contraseña: `mysql://root:CONTRASEÑA@localhost:3306/feria_entrada`).
 
 ## Comprobar que la base protege la venta
 
-Conéctate como lo hace la aplicación:
-
 ```bash
-mysql -u app_feria -papp_feria feria_entradas
+mysql -u root -p feria_entrada
 ```
 
 ```sql
@@ -51,17 +48,11 @@ SELECT @id, @fecha, @entrada, @precio;
 
 -- El mismo DNI otra vez: lo rechaza el procedimiento y no descuenta nada.
 CALL comprar_entrada('70123456', 'Luis Rojas', 'luis@correo.com', 'orden-2', @id, @fecha, @entrada, @precio);
-
--- Todo lo demás lo rechaza MySQL ("command denied").
-UPDATE entrada SET disponibles = 1000;
-INSERT INTO venta (dni, nombre, correo, precio, referencia_pago) VALUES ('11111111', 'x', 'x@x.pe', 1, 'x');
-DELETE FROM venta;
-SELECT * FROM administrador;
 ```
 
-Para ver el bloqueo, abre dos sesiones como `app_feria`. Deja la entrada con una sola disponible (`CALL configurar_entrada(45, 1, 1);`) y llama a `comprar_entrada` con DNI distintos en las dos a la vez. Una compra se registra y la otra recibe «Ya no quedan entradas disponibles.».
+Para ver el bloqueo, abre dos sesiones. Deja la entrada con una sola disponible (`CALL configurar_entrada(45, 1, 1);`) y llama a `comprar_entrada` con DNI distintos en las dos a la vez. Una compra se registra y la otra recibe «Ya no quedan entradas disponibles.».
 
-Para empezar de cero: `mysql -u root -p -e "DROP DATABASE feria_entradas"` y repetir el paso 1.
+Para empezar de cero basta el pie «Reiniciar datos» de la aplicación.
 
 ## Estructura
 
@@ -69,7 +60,7 @@ Para empezar de cero: `mysql -u root -p -e "DROP DATABASE feria_entradas"` y rep
 server.js       # inicia el servidor
 src/
   app.js        # rutas y respuestas HTTP; sirve las páginas
-  db.js         # conexión como app_feria: CALL comprar_entrada, configurar_entrada y reiniciar_datos; lectura de entrada y ventas; credencial_valida
+  db.js         # conexión a MySQL: CALL comprar_entrada y configurar_entrada; lectura de entrada y ventas; credencial_valida; reinicio de datos
   validation.js # validación de la configuración de la entrada y de la compra
   auth.js       # inicio de sesión de administración: hash de contraseña (node:crypto), comprobado por MySQL, y sesiones en memoria
 public/
@@ -82,7 +73,7 @@ public/
   admin-common.js     # utilidades de administración
   reset.js            # pie "Reiniciar datos"
   style.css
-../_specs/      # requisitos y esquema MySQL (tablas, procedimientos, función y permisos)
+specs/      # requisitos y esquema MySQL (tablas, procedimientos y función)
 package.json    # ejecución, dependencia mysql2 y versión de Node
 ```
 
@@ -104,7 +95,7 @@ package.json    # ejecución, dependencia mysql2 y versión de Node
 
 ## Acceso de administración
 
-Las vistas `/admin` y sus operaciones exigen una sesión iniciada en `/login`. Credenciales iniciales: usuario **`admin`**, contraseña **`admin`**. Viven en la tabla `administrador` de `../_specs/modelo_fisico.sql` (el usuario en claro y la contraseña como hash SHA-256); para cambiarlas, edita esa fila. El backend calcula el hash y se lo pasa a `credencial_valida`, que responde si coincide. La sesión usa una cookie `HttpOnly` y caduca a las 12 horas de inactividad. La portada, la compra y `POST /api/reset` (utilidad de demostración del pie "Reiniciar datos") no requieren sesión.
+Las vistas `/admin` y sus operaciones exigen una sesión iniciada en `/login`. Credenciales iniciales: usuario **`admin`**, contraseña **`admin`**. Viven en la tabla `administrador` de `specs/modelo_fisico.sql` (el usuario en claro y la contraseña como hash SHA-256); para cambiarlas, edita esa fila. El backend calcula el hash y se lo pasa a `credencial_valida`, que responde si coincide. La sesión usa una cookie `HttpOnly` y caduca a las 12 horas de inactividad. La portada, la compra y `POST /api/reset` (utilidad de demostración del pie "Reiniciar datos") no requieren sesión.
 
 ## API
 
@@ -114,20 +105,19 @@ Las vistas `/admin` y sus operaciones exigen una sesión iniciada en `/login`. C
 - `PATCH /api/entrada` — fija `{ precio, disponibles, venta_activa }` y devuelve la entrada actualizada; requiere sesión. `400` si el precio no es positivo con dos decimales como máximo o las entradas disponibles no son un entero no negativo.
 - `POST /api/compras` — registra una compra pagada: `{ dni, nombre, correo, referencia_pago }`. Público. `400` si los datos son inválidos (DNI de 8 dígitos, nombre obligatorio, correo válido); `409` si la venta está cerrada, si el DNI ya compró, si la referencia de pago ya se registró o si no quedan entradas disponibles.
 - `GET /api/compras` — ventas (más recientes primero): `fecha_venta`, `dni`, `nombre`, `correo`, `precio` y `referencia_pago`; requiere sesión.
-- `POST /api/reset` — reinicia todos los datos al estado inicial con `reiniciar_datos`. Utilidad de demostración: es la única vía por la que la aplicación puede borrar ventas y en un sistema real no existiría.
+- `POST /api/reset` — reinicia todos los datos al estado inicial: elimina las tablas y vuelve a aplicar `specs/modelo_fisico.sql`. Utilidad de demostración.
 
 Si MySQL no está en marcha o el esquema no se aplicó, la API responde `503` y la consola del servidor indica qué revisar.
 
 ## Modelo
 
-Tres tablas y cuatro rutinas, todo en `../_specs/modelo_fisico.sql`:
+Tres tablas y tres rutinas, todo en `specs/modelo_fisico.sql`:
 
 - `entrada` — una sola fila (`CHECK id = 1`) con `precio` (`DECIMAL(10,2)`), `disponibles` y `venta_activa`.
 - `venta` — el `dni` (8 dígitos, `UNIQUE`: una entrada por persona), el `nombre`, el `correo` para el comprobante, el `precio` al pagar, la `referencia_pago` (`UNIQUE`: un pago no se registra dos veces) y la `fecha_venta` en UTC.
 - `administrador` — la credencial única (usuario y hash de la contraseña).
 - `comprar_entrada` (procedimiento) — bloquea la entrada (`SELECT ... FOR UPDATE`), comprueba venta abierta, DNI nuevo, referencia nueva y al menos una entrada disponible, descuenta una, inserta la venta y confirma. Ante cualquier error hace `ROLLBACK`. Devuelve el id, la fecha, la entrada y el precio por parámetros `OUT`.
 - `configurar_entrada` (procedimiento) — fija precio, disponibles y estado; rechaza un precio con más de dos decimales.
-- `reiniciar_datos` (procedimiento) — utilidad de demostración: borra las ventas y restablece la entrada.
 - `credencial_valida` (función) — devuelve si el usuario (distinguiendo mayúsculas) y el hash coinciden.
 
 En `55_venta_de_entradas_para_feria_gastronomica` la misma transacción la arma la aplicación en `src/db.js`. Aquí la arma la base: si mañana otra aplicación (una boletería, un script) vende entradas, también tendrá que pasar por `comprar_entrada`.

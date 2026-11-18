@@ -12,15 +12,16 @@ import { DatabaseSync } from "node:sqlite";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 // La ruta del archivo SQLite se puede redirigir con SQLITE_DATABASE (útil en pruebas).
-const databasePath = process.env.SQLITE_DATABASE || join(root, "feria.db");
+const databasePath = process.env.SQLITE_DATABASE || join(root, "feria_entrada.db");
 const database = new DatabaseSync(databasePath);
 
 // El esquema se guarda en memoria para poder reaplicarlo al reiniciar los datos.
 const schemaSql = readFileSync(join(root, "specs", "modelo_fisico.sql"), "utf8");
 
-// foreign_keys se activa por conexión; el esquema se aplica tal cual está en el archivo.
+// foreign_keys se activa por conexión.
 database.exec("PRAGMA foreign_keys = ON");
-database.exec(schemaSql);
+// El esquema solo se aplica a una base nueva (sin tablas).
+if (!database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table'").get()) database.exec(schemaSql);
 
 // Error de negocio esperado: src/app.js lo traduce a una respuesta con `status`.
 export class ReglaError extends Error {

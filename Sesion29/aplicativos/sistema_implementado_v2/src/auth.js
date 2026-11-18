@@ -1,6 +1,6 @@
 // Autenticación de la administración (Requisito 6, Regla 9): un solo usuario y
 // una sola contraseña compartidos, sin cuentas. La credencial vive en la tabla
-// `administrador` (_specs/modelo_fisico.sql) como `usuario` + SHA-256(contraseña).
+// `administrador` (specs/modelo_fisico.sql) como `usuario` + SHA-256(contraseña).
 // Aquí solo se calcula el hash; la comparación la hace MySQL con la función
 // credencial_valida, porque la aplicación no puede leer esa tabla. Las sesiones
 // son efímeras, se guardan en memoria y se referencian con una cookie HttpOnly;
@@ -17,7 +17,7 @@ export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 // token -> vencimiento (epoch ms).
 const sesiones = new Map();
 
-// SHA-256 de la contraseña en hexadecimal (igual que _specs/modelo_fisico.sql).
+// SHA-256 de la contraseña en hexadecimal (igual que specs/modelo_fisico.sql).
 function hashear(password) {
   return createHash("sha256").update(password).digest("hex");
 }
@@ -31,7 +31,7 @@ function purgar() {
 }
 
 // Verifica el usuario y la contraseña recibidos (Regla 9). El usuario se
-// compara distinguiendo mayúsculas (columna utf8mb4_bin); la contraseña, por su
+// compara distinguiendo mayúsculas (columna VARBINARY); la contraseña, por su
 // hash.
 export async function credencialValida(usuario, password) {
   if (typeof usuario !== "string" || typeof password !== "string" || !password) return false;

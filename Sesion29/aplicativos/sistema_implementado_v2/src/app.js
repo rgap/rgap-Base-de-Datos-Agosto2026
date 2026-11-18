@@ -205,7 +205,7 @@ export async function handleRequest(request, response) {
       || error.message === "Solicitud demasiado grande."
     ) return json(response, 400, { error: error.message });
 
-    // MySQL apagado o credenciales de app_feria incorrectas: se avisa sin dar
+    // MySQL apagado o credenciales de DATABASE_URL incorrectas: se avisa sin dar
     // detalles al navegador.
     if (error.code === "ECONNREFUSED" || error.code === "ER_ACCESS_DENIED_ERROR" || error.code === "ER_BAD_DB_ERROR") {
       console.error(`No se pudo conectar con MySQL (${error.code}). Revisa DATABASE_URL y que el esquema esté aplicado.`);

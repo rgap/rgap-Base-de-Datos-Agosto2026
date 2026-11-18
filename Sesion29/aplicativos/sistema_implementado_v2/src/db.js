@@ -1,22 +1,30 @@
-// Acceso a MySQL. La aplicación se conecta como `app_feria`, un usuario que NO
-// puede escribir en ninguna tabla (../_specs/modelo_fisico.sql): solo puede
-// leer `entrada` y `venta` y ejecutar las rutinas almacenadas.
+// Acceso a MySQL. Las escrituras pasan por las rutinas almacenadas de
+// specs/modelo_fisico.sql:
 //
 // - comprar_entrada (procedimiento): bloquea la entrada, comprueba la venta
 //   abierta, el DNI, la referencia y las entradas disponibles, descuenta una y
 //   guarda la venta en una sola transacción (Requisito 2, Reglas 4 a 8).
 // - configurar_entrada (procedimiento): fija precio, disponibles y estado (Requisito 3).
-// - reiniciar_datos (procedimiento): utilidad de demostración «Reiniciar datos».
-// - credencial_valida (función): compara usuario y hash sin que la aplicación
-//   pueda leer la tabla `administrador` (Requisito 6, Regla 9).
-//
-// Por eso aquí no hay ningún INSERT, UPDATE ni DELETE: aunque se escribieran,
-// MySQL los rechazaría con "command denied".
+// - credencial_valida (función): compara usuario y hash dentro de la base
+//   (Requisito 6, Regla 9).
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import mysql from "mysql2/promise";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 // La conexión se puede redirigir con DATABASE_URL.
 const databaseUrl = process.env.DATABASE_URL
-  || "mysql://app_feria:app_feria@localhost:3306/feria_entradas";
+  || "mysql://root@localhost:3306/feria_entrada";
+
+// El esquema se guarda en memoria para poder reaplicarlo al reiniciar los datos.
+// Las líneas DELIMITER son del cliente mysql, no de SQL: se quitan y cada
+// "END //" vuelve a terminar en ";". El servidor separa las sentencias.
+const schemaSql = readFileSync(join(root, "specs", "modelo_fisico.sql"), "utf8")
+  .replace(/^DELIMITER .*$/gm, "")
+  .replace(/\/\/[ \t]*$/gm, ";");
 
 const pool = mysql.createPool({
   uri: databaseUrl,
@@ -29,10 +37,37 @@ const pool = mysql.createPool({
 // Reinicio de datos
 // ---------------------------------------------------------------------------
 
-// Botón «Reiniciar datos» del pie de página: borra las ventas y devuelve la
-// entrada a sus valores iniciales.
+// Botón «Reiniciar datos» del pie de página: elimina las tablas y las
+// rutinas de la aplicación y vuelve a aplicar el esquema, incluida la entrada inicial.
+// Usa una conexión propia con multipleStatements (el esquema son muchas
+// sentencias) y FOREIGN_KEY_CHECKS, que vale solo para esa conexión. En MySQL
+// cada DROP y CREATE confirma por sí solo: no hay transacción que deshacer.
 export async function resetData() {
-  await pool.query("CALL reiniciar_datos()");
+  const conexion = await mysql.createConnection({ uri: databaseUrl, multipleStatements: true });
+  try {
+    const [tablas] = await conexion.query(`
+      SELECT table_name AS nombre
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
+    `);
+    await conexion.query("SET FOREIGN_KEY_CHECKS = 0");
+    for (const { nombre } of tablas) {
+      await conexion.query(`DROP TABLE IF EXISTS \`${nombre}\``);
+    }
+    await conexion.query("SET FOREIGN_KEY_CHECKS = 1");
+    // Las rutinas no se borran con las tablas: el esquema las vuelve a crear.
+    const [rutinas] = await conexion.query(`
+      SELECT routine_name AS nombre, routine_type AS tipo
+      FROM information_schema.routines
+      WHERE routine_schema = DATABASE()
+    `);
+    for (const { nombre, tipo } of rutinas) {
+      await conexion.query(`DROP ${tipo} \`${nombre}\``);
+    }
+    await conexion.query(schemaSql);
+  } finally {
+    await conexion.end();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -115,8 +150,7 @@ export async function registrarCompra({ dni, nombre, correo, referenciaPago }) {
 // ---------------------------------------------------------------------------
 
 // Compras registradas, de la más reciente a la más antigua (Requisito 4). La
-// búsqueda por DNI, nombre, correo o referencia la resuelve el frontend. Leer
-// sí está permitido (GRANT SELECT).
+// búsqueda por DNI, nombre, correo o referencia la resuelve el frontend.
 export async function listVentas() {
   const [ventas] = await pool.query(`
     SELECT id, fecha_venta, dni, nombre, correo, precio, referencia_pago
