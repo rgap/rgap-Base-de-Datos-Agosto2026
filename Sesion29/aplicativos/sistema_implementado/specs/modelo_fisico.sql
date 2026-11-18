@@ -29,6 +29,10 @@ CREATE TABLE administrador (
     contrasena TEXT NOT NULL
 );
 
+-- ======================================================================
+-- DATOS INICIALES (INSERT): registros que la base trae al crearse
+-- ======================================================================
+
 INSERT OR IGNORE INTO entrada (id, nombre, descripcion, precio, disponibles, venta_activa) VALUES
     (1, 'Entrada Fogón 2026',
      'Acceso a los tres días de la feria: más de 40 stands, cocina en vivo y mercado de productores.',

@@ -31,9 +31,17 @@ CREATE TABLE administrador (
     contrasena CHAR(64) NOT NULL
 );
 
+-- ======================================================================
+-- PROCEDIMIENTOS ALMACENADOS Y FUNCIONES
+-- ======================================================================
 
 DELIMITER //
 
+-- PROCEDIMIENTO ALMACENADO: comprar_entrada
+-- Registra la compra de una entrada en una sola transacción.
+-- Comprueba que la venta esté abierta, que el DNI y la referencia de pago no
+-- se repitan y que queden entradas; descuenta una y guarda la venta.
+-- Devuelve el id y la fecha de la venta, el nombre de la entrada y el precio pagado.
 CREATE PROCEDURE comprar_entrada(
     IN p_dni CHAR(8),
     IN p_nombre VARCHAR(120),
@@ -97,6 +105,9 @@ BEGIN
     COMMIT;
 END //
 
+-- PROCEDIMIENTO ALMACENADO: configurar_entrada
+-- El administrador fija el precio, las entradas
+-- disponibles y si la venta está abierta.
 CREATE PROCEDURE configurar_entrada(
     -- Más decimales que la columna, para rechazar un tercer decimal en vez de redondearlo (Regla 2).
     IN p_precio DECIMAL(20, 6),
@@ -115,6 +126,9 @@ BEGIN
     WHERE id = 1;
 END //
 
+-- FUNCIÓN: credencial_valida
+-- Devuelve verdadero si el usuario y el hash SHA-256 de la
+-- contraseña coinciden con la credencial de administración.
 CREATE FUNCTION credencial_valida(p_usuario VARCHAR(255), p_contrasena_hash CHAR(64))
 RETURNS BOOLEAN
 READS SQL DATA
@@ -127,6 +141,10 @@ BEGIN
 END //
 
 DELIMITER ;
+
+-- ======================================================================
+-- DATOS INICIALES (INSERT): registros que la base trae al crearse
+-- ======================================================================
 
 INSERT IGNORE INTO entrada (id, nombre, descripcion, precio, disponibles, venta_activa) VALUES
     (1, 'Entrada Fogón 2026',
