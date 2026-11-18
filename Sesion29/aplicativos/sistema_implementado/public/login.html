@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1d2b20" />
+    <title>Iniciar sesión | Fogón</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22%3E%3Ctext%20x=%2250%22%20y=%22.9em%22%20text-anchor=%22middle%22%20font-size=%2290%22%3E%F0%9F%8D%B2%3C/text%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body class="public-page">
+    <header class="site-header">
+      <a class="public-brand" href="/" aria-label="Ir al inicio">
+        <span class="public-brand-mark" aria-hidden="true">F</span>
+        <span><strong>Fogón</strong><small>Feria gastronómica</small></span>
+      </a>
+    </header>
+
+    <main class="login-main">
+      <section class="login-card">
+        <p class="eyebrow">Panel de administración</p>
+        <h1>Iniciar sesión</h1>
+        <p class="login-lead">Introduce el usuario y la contraseña compartidos para configurar la entrada y revisar las ventas.</p>
+        <p id="login-error" class="inline-message" role="alert" hidden></p>
+        <form id="login-form">
+          <label>Usuario
+            <input id="usuario" name="usuario" type="text" autocomplete="username" required autofocus />
+          </label>
+          <label>Contraseña
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <div class="form-actions">
+            <button id="entrar" class="primary" type="submit">Entrar</button>
+            <button id="usar-demo" class="secondary" type="button">Datos demo</button>
+          </div>
+        </form>
+        <a class="quiet-link" href="/"><span aria-hidden="true">←</span> Volver a la portada</a>
+      </section>
+    </main>
+
+    <script src="/login.js"></script>
+    <script src="/reset.js"></script>
+  </body>
+</html>

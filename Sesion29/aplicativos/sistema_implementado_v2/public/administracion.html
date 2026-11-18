@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1d2b20" />
+    <title>Entrada | Fogón</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22%3E%3Ctext%20x=%2250%22%20y=%22.9em%22%20text-anchor=%22middle%22%20font-size=%2290%22%3E%F0%9F%8D%B2%3C/text%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body class="management-page">
+    <aside class="sidebar">
+      <a class="admin-brand" href="/admin">
+        <span class="admin-brand-mark" aria-hidden="true">F</span>
+        <span><strong>Fogón</strong><small>Panel de administración</small></span>
+      </a>
+      <nav class="admin-nav" aria-label="Navegación de administración">
+        <a class="active" href="/admin" aria-current="page"><span aria-hidden="true">≡</span>Entrada</a>
+        <a href="/admin/ventas"><span aria-hidden="true">S/</span>Ventas</a>
+      </nav>
+      <p class="sidebar-note">Espacio del administrador: fija el precio y las entradas disponibles, abre o cierra la venta y revisa las compras.</p>
+    </aside>
+
+    <main class="admin-workspace">
+      <header class="mobile-admin-header">
+        <a class="admin-brand" href="/admin">
+          <span class="admin-brand-mark" aria-hidden="true">F</span>
+          <span><strong>Fogón</strong><small>Administración</small></span>
+        </a>
+        <nav class="mobile-admin-nav" aria-label="Navegación de administración">
+          <a class="active" href="/admin" aria-current="page">Entrada</a>
+          <a href="/admin/ventas">Ventas</a>
+        </nav>
+      </header>
+
+      <p id="mensaje" class="message" role="alert" hidden></p>
+      <section class="admin-view">
+        <div class="admin-heading">
+          <div>
+            <p class="eyebrow">Configuración</p>
+            <h1>Entrada de la feria</h1>
+            <p>Fija el precio y cuántas entradas quedan a la venta, y abre o cierra la venta.</p>
+          </div>
+          <div class="heading-actions">
+            <a class="heading-link" href="/">Ver portada <span aria-hidden="true">→</span></a>
+            <button type="button" class="heading-link heading-logout" data-cerrar-sesion>Cerrar sesión</button>
+          </div>
+        </div>
+
+        <div class="sales-summary" aria-live="polite">
+          <div class="summary-tile"><small>Entradas vendidas</small><strong id="resumen-vendidas">0</strong></div>
+          <div class="summary-tile"><small>Entradas disponibles</small><strong id="resumen-disponibles">0</strong></div>
+          <div class="summary-tile"><small>Recaudado</small><strong id="resumen-total">S/ 0.00</strong></div>
+        </div>
+
+        <div class="form-layout">
+        <form id="entrada-form" class="form-card" novalidate>
+          <fieldset>
+            <legend id="entrada-nombre">Entrada</legend>
+            <div class="field-grid">
+              <label>Precio (S/) <span aria-hidden="true">*</span><input id="precio" name="precio" type="number" min="0.01" step="0.01" inputmode="decimal" required /></label>
+              <label>Disponibles <span aria-hidden="true">*</span><input id="disponibles" name="disponibles" type="number" min="0" step="1" inputmode="numeric" required /></label>
+            </div>
+            <label class="switch-field"><input id="venta-activa" name="venta_activa" type="checkbox" /> <span>Venta abierta</span></label>
+            <p class="field-help">Con la venta cerrada, la portada muestra la entrada pero no permite comprar.</p>
+          </fieldset>
+
+          <div class="form-actions">
+            <button id="guardar-entrada" class="primary" type="submit">Guardar cambios</button>
+            <button id="usar-demo" class="secondary" type="button">Datos demo</button>
+          </div>
+        </form>
+
+        <aside class="form-hint">
+          <h2>Cómo llenar</h2>
+          <ul>
+            <li>Hay <strong>una sola entrada</strong>, válida para los tres días de la feria.</li>
+            <li>El <strong>precio</strong> es en soles y admite hasta dos decimales. Cambiarlo no afecta a las compras ya registradas.</li>
+            <li>Las <strong>entradas disponibles</strong> son las que aún se pueden vender; cada compra descuenta una. Pueden ser 0.</li>
+            <li>Cada <strong>DNI</strong> puede comprar una sola entrada.</li>
+          </ul>
+        </aside>
+        </div>
+      </section>
+    </main>
+
+    <script src="/admin-common.js"></script>
+    <script src="/administracion.js"></script>
+    <script src="/reset.js"></script>
+  </body>
+</html>

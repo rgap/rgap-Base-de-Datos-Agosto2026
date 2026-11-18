@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#c2410c" />
+    <title>Fogón | Feria gastronómica 2026</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22%3E%3Ctext%20x=%2250%22%20y=%22.9em%22%20text-anchor=%22middle%22%20font-size=%2290%22%3E%F0%9F%8D%B2%3C/text%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body class="public-page">
+    <header class="site-header">
+      <a class="public-brand" href="/" aria-label="Ir al inicio">
+        <span class="public-brand-mark" aria-hidden="true">F</span>
+        <span><strong>Fogón</strong><small>Feria gastronómica</small></span>
+      </a>
+      <a class="management-link" href="/admin">Administrar feria</a>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-content">
+          <ul class="hero-facts" aria-label="Datos de la feria">
+            <li>4 – 6 dic 2026</li>
+            <li>Lima</li>
+            <li>Entrada única</li>
+          </ul>
+          <h1>Tres días de <em>sazón</em> sin pausa</h1>
+          <p class="hero-copy">Cocineras y cocineros de todo el país, cocina en vivo y mercado de productores. Una sola entrada te da acceso a los tres días.</p>
+          <ul class="hero-points">
+            <li>Más de 40 stands de cocina regional</li>
+            <li>Escenario con cocina en vivo</li>
+            <li>Una entrada por persona, a tu nombre y DNI</li>
+          </ul>
+        </div>
+
+        <section id="comprar" class="ticket-card" aria-labelledby="entrada-nombre" aria-busy="true">
+          <p class="ticket-kicker">Entrada · válida los 3 días</p>
+          <h2 id="entrada-nombre">Cargando entrada…</h2>
+          <p id="entrada-descripcion" class="ticket-description"></p>
+          <div class="ticket-price-row">
+            <strong id="entrada-precio" class="price"></strong>
+            <span id="entrada-disponibles" class="stock"></span>
+          </div>
+
+          <form id="compra-form" class="ticket-form" novalidate>
+            <p id="compra-aviso" class="inline-message" role="status" hidden></p>
+            <div class="purchase-fields">
+              <label for="comprador-dni">DNI
+                <input id="comprador-dni" name="dni" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="8 dígitos" aria-describedby="comprador-dni-error" />
+                <span id="comprador-dni-error" class="field-error" hidden></span>
+              </label>
+              <label for="comprador-nombre">Nombre completo
+                <input id="comprador-nombre" name="nombre" autocomplete="name" maxlength="120" placeholder="Como figura en tu DNI" aria-describedby="comprador-nombre-error" />
+                <span id="comprador-nombre-error" class="field-error" hidden></span>
+              </label>
+              <label for="comprador-correo" class="field-wide">Correo electrónico
+                <input id="comprador-correo" name="correo" type="email" autocomplete="email" maxlength="254" placeholder="Aquí te enviaremos el comprobante" aria-describedby="comprador-correo-error" />
+                <span id="comprador-correo-error" class="field-error" hidden></span>
+              </label>
+            </div>
+            <div class="form-actions ticket-actions">
+              <button id="pagar" class="primary" type="submit" disabled>Pagar</button>
+              <button id="compra-demo" class="secondary" type="button">Datos demo</button>
+            </div>
+            <p class="purchase-note">Pago simulado en modo de prueba: no se cobra nada. Solo se permite una entrada por DNI.</p>
+          </form>
+        </section>
+      </section>
+
+      <div class="rule" role="presentation"></div>
+
+      <section class="featured-section" aria-labelledby="incluye-titulo">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Lo que te espera</p>
+            <h2 id="incluye-titulo">Qué incluye tu entrada</h2>
+          </div>
+        </div>
+        <div class="feature-grid">
+          <figure class="feature-card">
+            <img src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=900&q=70&auto=format&fit=crop" alt="Brochetas a la parrilla" loading="lazy" width="900" height="600" />
+            <figcaption><strong>Stands de cocina regional</strong>Parrillas, guisos y antojitos de costa, sierra y selva.</figcaption>
+          </figure>
+          <figure class="feature-card">
+            <img src="https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=900&q=70&auto=format&fit=crop" alt="Personas compartiendo una mesa con un chef" loading="lazy" width="900" height="600" />
+            <figcaption><strong>Cocina en vivo</strong>Chefs invitados cocinan en el escenario principal cada día.</figcaption>
+          </figure>
+          <figure class="feature-card">
+            <img src="https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=900&q=70&auto=format&fit=crop" alt="Mazorcas de maíz y verduras a la parrilla" loading="lazy" width="900" height="600" />
+            <figcaption><strong>Mercado de productores</strong>Ingredientes de temporada directo de quienes los cultivan.</figcaption>
+          </figure>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="public-brand footer-brand" href="/">
+        <span class="public-brand-mark" aria-hidden="true">F</span>
+        <span><strong>Fogón</strong><small>Feria gastronómica</small></span>
+      </a>
+      <p>Pagos simulados con Lemon Squeezy en modo de prueba. Proyecto de demostración.</p>
+    </footer>
+
+    <script src="/checkout.js"></script>
+    <script src="/compra.js"></script>
+    <script src="/reset.js"></script>
+  </body>
+</html>

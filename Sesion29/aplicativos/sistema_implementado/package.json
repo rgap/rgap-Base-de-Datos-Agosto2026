@@ -1,0 +1,11 @@
+{
+  "name": "venta-de-entradas-para-feria-gastronomica",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "dev": "node server.js"
+  }
+}

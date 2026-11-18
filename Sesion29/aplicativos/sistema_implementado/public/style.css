@@ -1,0 +1,1704 @@
+/* Escala general: la interfaz se ve como al 130 % de zoom del navegador.
+   Los rem crecen con este font-size; las medidas en px ya están multiplicadas por 1.3. */
+html { font-size: 130%; }
+
+:root {
+  color-scheme: light;
+  /* Paleta "Fogón": crema tostada, rojo tomate, verde hierba y dorado de maíz. */
+  --paper: #f6eee2;
+  --paper-2: #fdf8f0;
+  --card: #ffffff;
+  --ink: #1e1611;
+  --ink-soft: #4a3b31;
+  --muted: #73635a;
+  --line: #e3d5c3;
+  --line-strong: #1e1611;
+  --accent: #c2410c;
+  --accent-ink: #9a3412;
+  --accent-soft: #fde4d2;
+  --night: #1d2b20;
+  --night-soft: #b9c7b6;
+  --gold: #f2b134;
+  --gold-soft: #fbe9c3;
+  --success: #2f7d4f;
+  --success-soft: #e4f4e8;
+  --danger: #b42318;
+  --danger-soft: #fbe6e3;
+  --shadow: 7.8px 7.8px 0 var(--line-strong);
+  --radius: 5.2px;
+  --wrap: 1534px;
+  --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --display: "Archivo Black", "Inter", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  /* Hueco para la barra de demostración fija (.reset-footer). */
+  padding-bottom: 67.6px;
+  color: var(--ink);
+  font-family: var(--font);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+a {
+  color: inherit;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+:focus-visible {
+  outline: 3.9px solid var(--accent);
+  outline-offset: 2.6px;
+}
+
+.eyebrow {
+  margin: 0 0 15.6px;
+  color: var(--accent-ink);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+/* ---------- Cabecera pública ---------- */
+
+.public-page {
+  background: var(--paper);
+  background-image:
+    repeating-linear-gradient(90deg, rgb(30 22 17 / 3.5%) 0 1.3px, transparent 1.3px 83.2px);
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  gap: 28.6px;
+  width: min(var(--wrap), calc(100% - 57.2px));
+  margin: 0 auto;
+  padding: 26px 0;
+  border-bottom: 2.6px solid var(--line-strong);
+}
+
+.public-brand,
+.admin-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 14.3px;
+  text-decoration: none;
+}
+
+.public-brand-mark {
+  display: grid;
+  width: 44.2px;
+  height: 44.2px;
+  place-items: center;
+  border: 2.6px solid var(--line-strong);
+  border-radius: 50%;
+  color: var(--paper-2);
+  background: var(--accent);
+  font-family: var(--display);
+  font-size: 1rem;
+  transform: rotate(-6deg);
+}
+
+.public-brand strong {
+  display: block;
+  font-family: var(--display);
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.public-brand small {
+  display: block;
+  margin-top: 3.9px;
+  color: var(--muted);
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.management-link {
+  margin-left: auto;
+  padding: 11.7px 18.2px;
+  border: 2.6px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-transform: uppercase;
+  box-shadow: 3.9px 3.9px 0 var(--line-strong);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.management-link:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 5.2px 5.2px 0 var(--line-strong);
+}
+
+/* ---------- Hero ---------- */
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  align-items: center;
+  gap: clamp(41.6px, 6vw, 93.6px);
+  width: min(var(--wrap), calc(100% - 57.2px));
+  margin: 0 auto;
+  padding: clamp(41.6px, 5vw, 72.8px) 0;
+}
+
+.hero h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2.6rem, 6.4vw, 4.6rem);
+  line-height: 0.98;
+  text-transform: uppercase;
+}
+
+.hero h1 em {
+  font-style: normal;
+  color: var(--accent);
+  -webkit-text-stroke: 1.3px var(--line-strong);
+}
+
+.hero-copy {
+  max-width: 40ch;
+  margin: 28.6px 0 0;
+  color: var(--ink-soft);
+  font-size: 1.02rem;
+}
+
+.quiet-link {
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-decoration: underline;
+  text-underline-offset: 5.2px;
+  text-transform: uppercase;
+}
+
+/* ---------- Divisor ---------- */
+
+.rule {
+  width: min(var(--wrap), calc(100% - 57.2px));
+  height: 0;
+  margin: 0 auto;
+  border-top: 2.6px solid var(--line-strong);
+}
+
+/* ---------- Qué incluye ---------- */
+
+.featured-section {
+  width: min(var(--wrap), calc(100% - 57.2px));
+  margin: 0 auto;
+  padding: clamp(72.8px, 9vw, 124.8px) 0;
+}
+
+.section-heading,
+.admin-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 31.2px;
+}
+
+.section-heading {
+  margin-bottom: 39px;
+  padding-bottom: 20.8px;
+  border-bottom: 2.6px solid var(--line-strong);
+}
+
+.section-heading h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(1.7rem, 3.6vw, 2.6rem);
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+/* ---------- Pie ---------- */
+
+.site-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 31.2px;
+  width: min(var(--wrap), calc(100% - 57.2px));
+  margin: 0 auto;
+  padding: 36.4px 0 57.2px;
+  border-top: 2.6px solid var(--line-strong);
+}
+
+.site-footer p,
+.site-footer > a:not(.public-brand) {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+/* ---------- Catálogo ---------- */
+
+.result-count {
+  display: inline-block;
+  margin: 0;
+  padding: 7.8px 15.6px;
+  border: 2.6px solid var(--line-strong);
+  border-radius: 1298.7px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* Slider de precio: se resetea el estilo genérico de `input` (padding/borde/
+   margen) para que la pista ocupe todo el ancho y el tirador llegue a los extremos. */
+
+.stock {
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.stock-available {
+  color: var(--success);
+}
+
+.stock-empty {
+  color: var(--danger);
+}
+
+.empty-state,
+.loading-state {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 62.4px 31.2px;
+  border: 2.6px dashed var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: var(--card);
+  text-align: center;
+}
+
+.empty-state strong {
+  display: block;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 1.05rem;
+  text-transform: uppercase;
+}
+
+.empty-state p {
+  margin: 7.8px 0 0;
+  font-size: 0.82rem;
+}
+
+.inline-message {
+  margin: 0 0 20.8px;
+  padding: 14.3px 16.9px;
+  border: 2.6px solid var(--danger);
+  border-radius: var(--radius);
+  color: var(--danger);
+  background: var(--danger-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* ---------- Administración ---------- */
+
+.management-page {
+  color: var(--ink);
+  background: var(--paper-2);
+}
+
+.sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 10;
+  display: flex;
+  width: 325px;
+  flex-direction: column;
+  /* El padding inferior deja libre la franja que ocupa la barra fija de demo. */
+  padding: 33.8px 26px 83.2px;
+  border-right: 2.6px solid var(--line-strong);
+  color: var(--paper-2);
+  background: var(--night);
+}
+
+.admin-brand {
+  color: inherit;
+}
+
+.admin-brand-mark {
+  display: grid;
+  width: 49.4px;
+  height: 49.4px;
+  flex: 0 0 49.4px;
+  place-items: center;
+  border: 2.6px solid var(--paper-2);
+  border-radius: var(--radius);
+  font-family: var(--display);
+  font-size: 0.78rem;
+}
+
+.admin-brand strong {
+  display: block;
+  font-family: var(--display);
+  text-transform: uppercase;
+}
+
+.admin-brand small {
+  display: block;
+  margin-top: 3.9px;
+  color: var(--night-soft);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.admin-nav {
+  display: grid;
+  gap: 5.2px;
+  margin-top: 49.4px;
+}
+
+.admin-nav a {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 15.6px;
+  border-radius: var(--radius);
+  color: #d6dfd3;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.admin-nav a:hover,
+.admin-nav a.active {
+  color: var(--night);
+  background: var(--paper-2);
+}
+
+.admin-nav span {
+  display: grid;
+  width: 26px;
+  place-items: center;
+}
+
+.sidebar-note {
+  margin: auto 5.2px 0;
+  color: var(--night-soft);
+  font-size: 0.74rem;
+  line-height: 1.6;
+}
+
+.admin-workspace {
+  width: calc(100% - 325px);
+  min-height: 100vh;
+  margin-left: 325px;
+  padding: 52px clamp(31.2px, 5vw, 83.2px) 88.4px;
+}
+
+.admin-view {
+  width: min(1352px, 100%);
+  margin: 0 auto;
+}
+
+.admin-heading {
+  margin-bottom: 36.4px;
+  padding-bottom: 20.8px;
+  border-bottom: 2.6px solid var(--line-strong);
+}
+
+.heading-link {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 20.8px;
+  border: 2.6px solid var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--card);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-transform: uppercase;
+  box-shadow: 3.9px 3.9px 0 var(--line-strong);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.heading-link:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 5.2px 5.2px 0 var(--line-strong);
+}
+
+.admin-heading h1 {
+  margin: 5.2px 0 7.8px;
+  font-family: var(--display);
+  font-size: clamp(1.7rem, 3vw, 2.2rem);
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.admin-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.mobile-admin-header {
+  display: none;
+}
+
+.form-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 676px) 390px;
+  gap: 36.4px;
+  align-items: start;
+  justify-content: start;
+}
+
+.form-hint {
+  position: sticky;
+  top: 26px;
+  padding: 26px 28.6px;
+  border: 2.6px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--gold-soft);
+  box-shadow: var(--shadow);
+}
+
+.form-hint h2 {
+  margin: 0 0 15.6px;
+  font-family: var(--display);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+}
+
+.form-hint ul {
+  margin: 0;
+  padding-left: 23.4px;
+}
+
+.form-hint li {
+  margin-bottom: 10.4px;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.form-hint li:last-child {
+  margin-bottom: 0;
+}
+
+.form-hint code {
+  padding: 1.3px 6.5px;
+  border: 1.3px solid var(--line-strong);
+  border-radius: 3.9px;
+  background: var(--paper-2);
+  font-size: 0.9em;
+}
+
+.form-card {
+  border: 2.6px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: clamp(26px, 4vw, 41.6px);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.form-card fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.form-card fieldset + fieldset {
+  margin-top: 33.8px;
+  padding-top: 28.6px;
+  border-top: 2.6px solid var(--line-strong);
+}
+
+.form-card legend {
+  width: 100%;
+  margin-bottom: 19.5px;
+  padding: 0;
+  font-family: var(--display);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+}
+
+.form-card legend small,
+label small {
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: none;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20.8px;
+}
+
+label {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+input,
+textarea,
+select {
+  display: block;
+  width: 100%;
+  margin-top: 9.1px;
+  padding: 14.3px 15.6px;
+  border: 2.6px solid var(--line-strong);
+  border-radius: var(--radius);
+  outline: none;
+  color: inherit;
+  background: var(--paper-2);
+  font-weight: 500;
+  transition: box-shadow 120ms ease;
+}
+
+textarea {
+  min-height: 124.8px;
+  resize: vertical;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9a8a7e;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 3.9px 3.9px 0 var(--accent);
+}
+
+.field-help {
+  margin: 10.4px 0 15.6px;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+fieldset > .field-help:first-of-type {
+  margin-top: 0;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 13px;
+  margin-top: 33.8px;
+}
+
+.primary,
+.secondary {
+  min-height: 57.2px;
+  padding: 14.3px 26px;
+  border: 2.6px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.primary {
+  color: var(--paper-2);
+  background: var(--accent);
+  box-shadow: 3.9px 3.9px 0 var(--line-strong);
+}
+
+.primary:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 5.2px 5.2px 0 var(--line-strong);
+}
+
+.secondary {
+  color: var(--ink);
+  background: var(--card);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--paper);
+}
+
+/* ---------- Actualizar stock ---------- */
+
+.stock-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 18.2px 23.4px;
+  margin-bottom: 26px;
+}
+
+.stock-toolbar label {
+  flex: 1 1 260px;
+  max-width: 338px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stock-toolbar label:last-of-type {
+  max-width: 468px;
+}
+
+.stock-toolbar .result-count {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* Inventario agrupado por polo: encabezado + una línea por talla. */
+
+/* Registro: una fila de stock por talla, con la vista previa de su SKU. */
+
+.message {
+  position: fixed;
+  z-index: 30;
+  top: 26px;
+  right: 28.6px;
+  max-width: min(520px, calc(100vw - 41.6px));
+  margin: 0;
+  padding: 16.9px 20.8px;
+  border: 2.6px solid var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+.message-error {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 1066px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .site-header {
+    flex-wrap: wrap;
+  }
+
+  .form-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .form-hint {
+    position: static;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .admin-workspace {
+    width: 100%;
+    margin: 0;
+    padding: 0 23.4px 67.6px;
+  }
+
+  .mobile-admin-header {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0 -18px 39px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15.6px;
+    padding: 19.5px 23.4px;
+    color: var(--paper-2);
+    background: var(--night);
+  }
+
+  .mobile-admin-nav {
+    display: flex;
+    gap: 10.4px;
+  }
+
+  .mobile-admin-nav a {
+    padding: 7.8px 15.6px;
+    border: 2.6px solid rgb(255 255 255 / 30%);
+    border-radius: var(--radius);
+    color: #d6dfd3;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-decoration: none;
+    text-transform: uppercase;
+  }
+
+  .mobile-admin-nav a.active {
+    border-color: var(--paper-2);
+    color: var(--night);
+    background: var(--paper-2);
+  }
+}
+
+@media (max-width: 728px) {
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .section-heading,
+.admin-heading,
+.site-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .form-actions,
+  .form-actions button {
+    width: 100%;
+  }
+
+  .message {
+    top: auto;
+    right: 18.2px;
+    bottom: 18.2px;
+    left: 18.2px;
+    max-width: none;
+  }
+}
+
+/* ---------- Barra de demostración fija ---------- */
+/* Pie fijo en la parte inferior de todas las páginas con el botón, centrado,
+   para reiniciar los datos al estado inicial. Es una utilidad de demo. */
+.reset-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 10.4px 20.8px;
+  border-top: 2.6px solid var(--line-strong);
+  background: var(--card);
+}
+
+/* Etiqueta discreta a la izquierda; el botón queda centrado en la barra. */
+.reset-footer::before {
+  content: "Demo";
+  position: absolute;
+  left: 20.8px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.reset-footer .reset-datos-btn {
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5rem 1.15rem;
+  border-radius: var(--radius);
+  border: 2.6px solid var(--line-strong);
+  background: var(--paper-2);
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow: 3.9px 3.9px 0 var(--line-strong);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.reset-footer .reset-datos-btn:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 5.2px 5.2px 0 var(--line-strong);
+}
+
+.reset-footer .reset-datos-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+  box-shadow: none;
+}
+
+/* La barra cruza todo el ancho de la página, también por encima de la barra
+   lateral de administración (z-index mayor que .sidebar). */
+
+@media (max-width: 624px) {
+  .reset-footer::before {
+    display: none;
+  }
+}
+
+/* ---------- Iniciar sesión ---------- */
+
+.login-main {
+  display: flex;
+  justify-content: center;
+  padding: clamp(52px, 11vh, 145.6px) 28.6px 104px;
+}
+
+.login-card {
+  width: min(546px, 100%);
+  padding: clamp(31.2px, 5vw, 46.8px);
+  border: 2.6px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.login-card h1 {
+  margin: 5.2px 0 10.4px;
+  font-family: var(--display);
+  font-size: clamp(1.6rem, 3vw, 2rem);
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.login-lead {
+  margin: 0 0 26px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.login-card form {
+  display: grid;
+  gap: 20.8px;
+}
+
+/* En el login, "Entrar" y "Datos demo" comparten la fila al 50 % cada uno. */
+.login-card .form-actions {
+  margin-top: 10.4px;
+  flex-wrap: nowrap;
+}
+
+.login-card .form-actions button {
+  flex: 1;
+  min-width: 0;
+}
+
+.login-card .quiet-link {
+  display: inline-block;
+  margin-top: 23.4px;
+}
+
+/* Acciones del encabezado de administración (catálogo + cerrar sesión). */
+.heading-actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 13px;
+}
+
+.heading-logout {
+  font-family: var(--font);
+}
+
+/* ---------- Confirmación ----------
+   Cuadro propio para confirmar "Reiniciar datos", en lugar del cuadro nativo del navegador. */
+.confirm-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  padding: 0;
+  border: 2.6px solid var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.confirm-dialog::backdrop {
+  background: rgb(29 43 32 / 60%);
+}
+.confirm-body {
+  padding: 1.4rem 1.5rem 1.25rem;
+  text-align: left;
+}
+.confirm-body h2 {
+  margin: 0 0 0.45rem;
+  font-size: 1.1rem;
+  line-height: 1.3;
+}
+.confirm-body p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.3rem;
+}
+
+/* =====================================================================
+   Feria gastronómica: piezas propias de la venta de entradas
+   ===================================================================== */
+
+/* ---------- Portada: datos de la feria ---------- */
+
+.hero-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10.4px;
+  margin: 0 0 26px;
+  padding: 0;
+  list-style: none;
+}
+
+.hero-facts li {
+  padding: 7.8px 14.3px;
+  border: 2.6px solid var(--line-strong);
+  border-radius: 1298.7px;
+  background: var(--card);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-facts li:first-child {
+  background: var(--gold);
+}
+
+.hero-points {
+  display: grid;
+  gap: 10.4px;
+  margin: 31.2px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.hero-points li {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.hero-points li::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  border: 2.6px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* ---------- Portada: compra ---------- */
+
+.ticket-card {
+  align-self: center;
+  min-width: 0;
+  padding: clamp(23.4px, 3vw, 36.4px);
+  border: 2.6px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  scroll-margin-top: 26px;
+}
+
+.ticket-kicker {
+  display: inline-block;
+  margin: 0 0 15.6px;
+  padding: 5.2px 11.7px;
+  border: 2.6px solid var(--line-strong);
+  border-radius: 1298.7px;
+  background: var(--gold);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ticket-card h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.ticket-description {
+  margin: 10.4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.ticket-price-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10.4px 18.2px;
+  margin-top: 20.8px;
+}
+
+.ticket-price-row .price {
+  font-family: var(--display);
+  font-size: clamp(1.9rem, 3.4vw, 2.5rem);
+  line-height: 1;
+}
+
+.ticket-price-row .stock {
+  padding: 5.2px 11.7px;
+  border: 2.6px solid currentColor;
+  border-radius: 1298.7px;
+  background: var(--success-soft);
+}
+
+.ticket-price-row .stock-empty {
+  background: var(--danger-soft);
+}
+
+.ticket-form {
+  margin-top: 23.4px;
+  padding-top: 23.4px;
+  border-top: 2.6px dashed var(--line-strong);
+}
+
+.ticket-actions {
+  margin-top: 20.8px;
+}
+
+.ticket-actions .primary {
+  flex: 1 1 auto;
+}
+
+/* ---------- Qué incluye: fotos ---------- */
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 23.4px;
+}
+
+.feature-card {
+  margin: 0;
+  overflow: hidden;
+  border: 2.6px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.feature-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  border-bottom: 2.6px solid var(--line-strong);
+  background: var(--accent-soft);
+}
+
+.feature-card figcaption {
+  padding: 18.2px 20.8px 22.1px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.feature-card strong {
+  display: block;
+  margin-bottom: 5.2px;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 0.95rem;
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
+/* ---------- Administración: entrada ---------- */
+
+.switch-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 10.4px;
+  margin-top: 20.8px;
+  cursor: pointer;
+}
+
+.switch-field input {
+  flex: 0 0 auto;
+  width: 23.4px;
+  height: 23.4px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--success);
+}
+
+.switch-field input:focus {
+  box-shadow: none;
+}
+
+.sales-summary.sales-summary-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.purchase-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  gap: 15.6px;
+  align-items: start;
+}
+
+.purchase-fields .field-wide {
+  grid-column: 1 / -1;
+}
+
+.field-error {
+  display: block;
+  margin-top: 6.5px;
+  color: var(--danger);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+input[aria-invalid="true"] {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.purchase-note {
+  margin: 10.4px 0 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+/* ---------- Pasarela simulada (checkout overlay de Lemon Squeezy) ----------
+   Tiene a propósito un aspecto distinto del sitio: es una ventana "de terceros". */
+
+.ls-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 26px 16px;
+  overflow-y: auto;
+  background: rgb(17 12 34 / 62%);
+  backdrop-filter: blur(3px);
+}
+
+.ls-panel {
+  position: relative;
+  width: min(572px, 100%);
+  margin: auto;
+  overflow: hidden;
+  border-radius: 18px;
+  color: #1b1530;
+  background: #ffffff;
+  box-shadow: 0 30px 80px rgb(17 12 34 / 35%);
+  animation: ls-in 180ms ease-out;
+}
+
+@keyframes ls-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.ls-testmode {
+  padding: 7.8px 16px;
+  border-bottom: 1px solid #f5dfc0;
+  color: #8a4b00;
+  background: #fff4e5;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.ls-head {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 18.2px 23.4px;
+  border-bottom: 1px solid #ece9f3;
+}
+
+.ls-logo {
+  width: 36.4px;
+  height: 36.4px;
+  flex: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffe680, #ffc233 60%, #f2a900);
+  box-shadow: inset 0 0 0 2px rgb(0 0 0 / 6%);
+}
+
+.ls-head strong {
+  display: block;
+  font-size: 0.84rem;
+  letter-spacing: -0.01em;
+}
+
+.ls-head small {
+  display: block;
+  color: #6b6580;
+  font-size: 0.66rem;
+}
+
+.ls-close {
+  display: grid;
+  width: 44.2px;
+  height: 44.2px;
+  flex: none;
+  margin-left: auto;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: #1b1530;
+  background: #f3f1f8;
+  font-size: 0.86rem;
+}
+
+.ls-close:hover:not(:disabled) {
+  background: #e7e3f3;
+}
+
+.ls-close:focus-visible,
+.ls-pay:focus-visible,
+.ls-demo:focus-visible {
+  outline: 3px solid #7047eb;
+  outline-offset: 2px;
+}
+
+.ls-body {
+  padding: 20.8px 23.4px 23.4px;
+}
+
+.ls-summary {
+  padding: 15.6px 18.2px;
+  border-radius: 12px;
+  background: #f7f6fb;
+}
+
+.ls-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 13px;
+  color: #4a4560;
+  font-size: 0.76rem;
+}
+
+.ls-summary-row span:last-child {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.ls-summary-row + .ls-summary-row {
+  margin-top: 5.2px;
+}
+
+.ls-summary-total {
+  margin-top: 10.4px;
+  padding-top: 10.4px;
+  border-top: 1px solid #e4e1ee;
+  color: #1b1530;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.ls-form {
+  display: grid;
+  gap: 15.6px;
+  margin-top: 20.8px;
+}
+
+.ls-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 13px;
+}
+
+.ls-form-head h3 {
+  margin: 0;
+  font-size: 0.86rem;
+  letter-spacing: -0.01em;
+}
+
+.ls-form label {
+  color: #4a4560;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+.ls-form input {
+  margin-top: 6.5px;
+  padding: 13px 14.3px;
+  border: 1.5px solid #d9d5e6;
+  border-radius: 10px;
+  color: #1b1530;
+  background: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.ls-form input:focus-visible,
+.ls-success h2:focus {
+  outline: none;
+}
+
+.ls-form input:focus {
+  border-color: #7047eb;
+  box-shadow: 0 0 0 3.9px rgb(112 71 235 / 18%);
+}
+
+.ls-form input[aria-invalid="true"] {
+  border-color: #d92d20;
+  background: #ffffff;
+}
+
+.ls-form input::placeholder {
+  color: #a49fb5;
+}
+
+.ls-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 13px;
+}
+
+.ls-field-error {
+  display: block;
+  margin-top: 5.2px;
+  color: #b42318;
+  font-size: 0.64rem;
+  font-weight: 600;
+}
+
+.ls-error {
+  margin: 0;
+  padding: 11.7px 14.3px;
+  border-radius: 10px;
+  color: #b42318;
+  background: #fef3f2;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.ls-pay {
+  display: flex;
+  width: 100%;
+  min-height: 57.2px;
+  align-items: center;
+  justify-content: center;
+  gap: 10.4px;
+  border: 0;
+  border-radius: 12px;
+  color: #ffffff;
+  background: #7047eb;
+  font-size: 0.86rem;
+  font-weight: 700;
+  transition: background 150ms ease;
+}
+
+.ls-pay:hover:not(:disabled) {
+  background: #5b33d6;
+}
+
+.ls-pay:disabled {
+  cursor: progress;
+  opacity: 0.8;
+}
+
+.ls-spinner {
+  width: 18.2px;
+  height: 18.2px;
+  border: 2.6px solid rgb(255 255 255 / 40%);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: ls-spin 700ms linear infinite;
+}
+
+@keyframes ls-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ls-test-cards {
+  margin: 0;
+  padding: 11.7px 14.3px;
+  border: 1px dashed #d9d5e6;
+  border-radius: 10px;
+  color: #6b6580;
+  font-size: 0.66rem;
+  line-height: 1.6;
+}
+
+.ls-test-cards code {
+  color: #1b1530;
+  font-weight: 700;
+}
+
+.ls-demo {
+  padding: 6.5px 13px;
+  border: 1.3px solid #d6d3e0;
+  border-radius: 999px;
+  color: #5b3bd1;
+  background: #f4f1fe;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.ls-demo:hover:not(:disabled) {
+  border-color: #7047eb;
+}
+
+.ls-foot {
+  padding: 0 23.4px 18.2px;
+  color: #8a849c;
+  font-size: 0.62rem;
+  text-align: center;
+}
+
+.ls-success {
+  text-align: center;
+}
+
+.ls-check {
+  display: grid;
+  width: 62.4px;
+  height: 62.4px;
+  margin: 5.2px auto 13px;
+  place-items: center;
+  border-radius: 50%;
+  color: #1f7a45;
+  background: #e7f8ee;
+}
+
+.ls-check svg {
+  width: 31.2px;
+  height: 31.2px;
+}
+
+.ls-success h2 {
+  margin: 0 0 5.2px;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+
+.ls-success > p {
+  margin: 0 0 18.2px;
+  color: #6b6580;
+  font-size: 0.76rem;
+}
+
+.ls-receipt {
+  display: grid;
+  gap: 6.5px;
+  margin: 0 0 20.8px;
+  padding: 15.6px 18.2px;
+  border-radius: 12px;
+  background: #f7f6fb;
+  text-align: left;
+}
+
+.ls-receipt div {
+  display: flex;
+  justify-content: space-between;
+  gap: 13px;
+  font-size: 0.72rem;
+}
+
+.ls-receipt dt {
+  color: #6b6580;
+}
+
+.ls-receipt dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ls-panel { animation: none; }
+  .ls-spinner { animation-duration: 2s; }
+}
+
+/* ---------- Administración: ventas ---------- */
+
+.sales-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18.2px;
+  margin-bottom: 26px;
+}
+
+.summary-tile {
+  padding: 18.2px 20.8px;
+  border: 2.6px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: 3.9px 3.9px 0 var(--line-strong);
+}
+
+.summary-tile:last-child {
+  background: var(--gold-soft);
+}
+
+.summary-tile small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.summary-tile strong {
+  display: block;
+  margin-top: 5.2px;
+  font-family: var(--display);
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 2.6px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.sales-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.74rem;
+}
+
+.sales-table th {
+  padding: 13px 15.6px;
+  border-bottom: 2.6px solid var(--line-strong);
+  background: var(--paper-2);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sales-table td {
+  padding: 13px 15.6px;
+  border-top: 1.3px solid var(--line);
+  vertical-align: top;
+}
+
+.sales-table tbody tr:first-child td {
+  border-top: 0;
+}
+
+.sales-table .nowrap {
+  white-space: nowrap;
+}
+
+.sales-table .num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.cell-main {
+  display: block;
+  font-weight: 700;
+}
+
+.cell-sub {
+  display: block;
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+
+.ref-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.64rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1066px) {
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 728px) {
+  .sales-summary,
+  .purchase-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .ls-row {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,6 +1,7 @@
 -- Procedimientos almacenados (SQL Server).
 -- Caso de estudio: sistema de cupones de descuento.
--- Antes ejecuta 1_funciones_sqlserver.sql y 2_variables_if_sqlserver.sql.
+-- Antes ejecuta la práctica 1 (ejemplos/practicas/sqlserver/) y, de Sesion28/ejemplos/cupones/,
+-- 1_funciones_sqlserver.sql y 2_variables_if_sqlserver.sql (crean precio_final y situacion_cupon).
 
 USE cupones;
 GO
@@ -22,11 +23,9 @@ GO
 EXEC dbo.desactivar_cupon 'VERANO15';
 
 SELECT codigo, estado FROM cupon WHERE codigo = 'VERANO15';
--- VERANO15  inactivo
 
 -- Con un código que no existe no cambia nada, y tampoco avisa:
 EXEC dbo.desactivar_cupon 'VERANO1';
--- (0 rows affected)
 GO
 
 -- ---------------------------------------------------------------
@@ -56,10 +55,8 @@ END;
 GO
 
 EXEC dbo.desactivar_cupon 'VERANO1';
--- El cupón no existe
 
 EXEC dbo.desactivar_cupon 'VERANO15';
--- Cupón desactivado
 GO
 
 -- ---------------------------------------------------------------
@@ -79,8 +76,6 @@ END;
 GO
 
 EXEC dbo.cupones_vigentes 120, '2026-11-10';
--- BIENVENIDA10  108.00
--- NOVIEMBRE20   100.00
 GO
 
 -- Los procedimientos quedan guardados en la base cupones. Así los ves:
@@ -93,10 +88,6 @@ GO
 
 -- Usar un procedimiento dentro de un SELECT, como si fuera una función:
 -- SELECT dbo.desactivar_cupon('VERANO15');
--- Msg 4121: Cannot find either column "dbo" or the user-defined function or
--- aggregate "dbo.desactivar_cupon", or the name is ambiguous.
 
 -- Olvidar un parámetro:
 -- EXEC dbo.cupones_vigentes 120;
--- Msg 201: Procedure or function 'cupones_vigentes' expects parameter '@fecha',
--- which was not supplied.

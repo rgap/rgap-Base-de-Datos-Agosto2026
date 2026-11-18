@@ -1,0 +1,1093 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+% Sin atajos de babel: así las comillas " del código se ven tal cual.
+\PassOptionsToPackage{es-noshorthands}{babel}
+
+\input{header.tex}
+\usepackage{colortbl}
+\usetikzlibrary{decorations.pathreplacing}
+
+\title{Procedimientos almacenados}
+\subtitle{Usos comunes de funciones y procedimientos en MySQL y SQL Server}
+\date{Semana 15 - Sesión 29}
+\author{Rel Guzman}
+
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Comentario dentro de un bloque de código
+\newcommand{\com}[1]{\textcolor{utpGrisMedio}{#1}}
+% Texto de apoyo en gris
+\newcommand{\gris}[1]{\textcolor{utpGris}{#1}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre de un operador o de un gestor
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Número de paso
+\newcommand{\npieza}[1]{\tikz[baseline=-0.6ex]{\node[circle,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner sep=1.6pt,minimum size=4.2mm] {#1};}}
+% Celda o texto resaltado en rojo claro
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% Lo importante, resaltado en amarillo dentro de un bloque de código
+\newcommand{\dentro}[1]{{\setlength{\fboxsep}{1.5pt}\colorbox{yellow!45}{#1}}}
+% Fila de una tabla resaltada
+\newcommand{\fila}{\rowcolor{yellow!45}}
+\newcommand{\filagris}{\rowcolor{utpGrisClaro}}
+% Marcas de sí y no
+\newcommand{\si}{$\checkmark$}
+\newcommand{\no}{\textcolor{utpRojo}{$\times$}}
+% Bloques de código sobre fondo gris: normal, chico y mínimo
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+\newenvironment{sqlchico}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\scriptsize\vspace{5pt}\raggedright}
+  {\vspace{5pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+\newenvironment{sqlmini}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\fontsize{7}{8.3}\selectfont\vspace{4pt}\raggedright}
+  {\vspace{4pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+\newenvironment{sqlmicro}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\fontsize{6.4}{7.5}\selectfont\vspace{4pt}\raggedright}
+  {\vspace{4pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Ancho de una columna menos el borde del bloque de código
+\newcommand{\col}{\dimexpr\textwidth-2\fboxsep\relax}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.2em}}
+% Mensaje de error dentro de un bloque de código
+\newcommand{\err}[1]{\textcolor{utpRojo}{#1}}
+% Anatomía de una instrucción: cada pieza del código con su pregunta al lado
+\tikzset{
+  pieza/.style={fill=utpGrisClaro,font=\ttfamily\footnotesize,anchor=west,inner sep=5pt,
+    minimum height=0.62cm},
+  para/.style={font=\small,anchor=west,text=utpNegro}
+}
+\newcommand{\piezax}{7.6}
+\newcommand{\pieza}[3]{%
+  \node[pieza] at (0,#1) {#2};
+  \node[para] at (\piezax,#1) {\textcolor{utpRojo}{$\blacktriangleleft$}\ #3};}
+% Diapositiva de sección: una palabra bien grande
+\newcommand{\seccion}[2][1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#2}};
+    \ifnum#1=1
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+    \fi
+  \end{tikzpicture}
+\end{frame}}
+% Cabecera de columna dentro de una tabla en monoespaciado
+\newcommand{\cab}[1]{\normalfont\bfseries #1}
+% Resultado de una consulta: \res{columnas}{cabecera}{filas}
+\newcommand{\res}[3]{%
+  \centering{\scriptsize\color{utpGris}resultado}\\[3pt]
+  \footnotesize\ttfamily
+  \begin{tabular}{#1}
+  \toprule
+  #2 \\
+  \midrule
+  #3
+  \bottomrule
+  \end{tabular}}
+% Lo mismo, cuando debajo sigue más contenido del frame
+\newcommand{\resg}[3]{{\res{#1}{#2}{#3}\par}}
+% Tabla pequeña con su nombre arriba: \mini{nombre}{columnas}{cabecera}{filas}
+\newcommand{\mini}[4]{%
+  \begin{tabular}{@{}c@{}}
+  \tbl{#1}\\[3pt]
+  {\scriptsize\ttfamily
+  \begin{tabular}{#2}
+  \toprule
+  #3 \\
+  \midrule
+  #4
+  \bottomrule
+  \end{tabular}}
+  \end{tabular}}
+% Una tabla con título gris, alineada arriba: \tabla{título}{columnas}{cabecera}{filas}
+\newcommand{\tabla}[4]{%
+  \begin{tabular}[t]{@{}c@{}}
+  {\scriptsize\color{utpGris}#1}\\[3pt]
+  {\footnotesize\ttfamily
+  \begin{tabular}[t]{#2}
+  \toprule
+  #3 \\
+  \midrule
+  #4
+  \bottomrule
+  \end{tabular}}
+  \end{tabular}}
+% La pregunta del frame, en una caja naranja centrada
+\newcommand{\preg}[1]{{\centering\tikz\node[caja,cajanaranja,font=\normalsize,inner sep=6pt]{#1};\par}\vspace{4pt}}
+% Forma de lo que devuelve una consulta: celdas con borde
+\newcommand{\forma}[2]{{\ttfamily\footnotesize\renewcommand{\arraystretch}{1.25}%
+  \begin{tabular}{#1}\hline #2\end{tabular}}}
+% Estilos de los diagramas de esta sesión
+\tikzset{
+  codigo/.style={font=\ttfamily\footnotesize,inner sep=3pt},
+  sub/.style={codigo,draw=utpRojo,very thick,fill=yellow!45,rounded corners=2pt},
+  decision/.style={diamond,aspect=2.6,draw=utpRojo,very thick,fill=utpRojo!7,
+    font=\scriptsize,align=center,inner sep=1.5pt},
+  paso/.style={caja,font=\scriptsize,minimum height=.6cm,inner sep=4pt},
+  % Una instrucción en un diagrama de pasos y lo que queda debajo
+  inst/.style={draw=utpNegro,thick,rounded corners=1.5pt,fill=utpGrisClaro,font=\ttfamily\scriptsize,
+    minimum height=.8cm,minimum width=2.2cm,align=center,inner sep=3pt},
+  valor/.style={font=\footnotesize,align=center,text width=2.5cm},
+  carril/.style={font=\small\bfseries,anchor=east}
+}
+% ---------------------------------------------------------------------
+% Ventana de MySQL Workbench dibujada (sección de procedimientos)
+\definecolor{wbBarra}{HTML}{E6E9ED}
+% Íconos de Workbench
+\newcommand{\rayo}{\tikz[baseline=-0.35ex]\fill[yellow!85!orange,draw=orange!70!black,line width=.3pt]
+  (0.07,0.17)--(-0.06,-0.01)--(0.01,-0.01)--(-0.04,-0.17)--(0.09,0.04)--(0.02,0.04)--cycle;}
+\newcommand{\rayocursor}{\rayo\kern-0.5pt{\fontsize{6}{6}\selectfont\bfseries I}}
+\newcommand{\okwb}{\tikz[baseline={([yshift=-0.6ex]current bounding box.center)}]{\node[circle,fill=green!55!black,text=white,inner sep=0.4pt,
+  font=\fontsize{5}{5}\selectfont]{$\checkmark$};}}
+\newcommand{\errwb}{\tikz[baseline={([yshift=-0.6ex]current bounding box.center)}]{\node[circle,fill=utpRojo,text=white,inner sep=0.6pt,
+  font=\fontsize{5}{5}\selectfont\bfseries]{$\times$};}}
+\newcommand{\refrescar}{\tikz[baseline=-0.6ex]{\draw[-{Stealth[length=2pt]},thick,utpGris] (0.09,0) arc (0:290:0.09);}}
+\newcommand{\carpeta}{\tikz[baseline=-0.4ex]{\fill[yellow!70!orange] (0,0) rectangle (0.24,0.15);
+  \fill[yellow!70!orange] (0,0.15) rectangle (0.1,0.2);}}
+\newcommand{\disco}{\tikz[baseline=-0.4ex]{\fill[blue!45!black] (0,0) rectangle (0.2,0.2);
+  \fill[white] (0.05,0.12) rectangle (0.15,0.2);}}
+\newcommand{\sqlmas}{\tikz[baseline=-0.6ex]{\node[draw=utpGris,fill=white,rounded corners=1pt,inner sep=1.5pt,
+  font=\fontsize{5.5}{6}\selectfont\bfseries]{SQL\textcolor{green!50!black}{+}};}}
+\newcommand{\abierto}{\textcolor{utpGris}{$\blacktriangledown$}\,}
+\newcommand{\cerrado}{\textcolor{utpGris}{$\blacktriangleright$}\,}
+\newcommand{\iconobase}{\tikz[baseline=-0.1ex]{\fill[cyan!45!black] (0,0) rectangle (0.15,0.15);}\,}
+% Código del editor con número de línea: \lineas{1 & código \\ 2 & código \\}
+\newcommand{\lineas}[1]{\begin{tabular}{@{}>{\color{utpGrisMedio}}r@{\hspace{8pt}}l@{}}#1\end{tabular}}
+% Panel Output: \salida{icono & # & acción & mensaje \\}
+\newcommand{\salida}[1]{{\fontsize{6.5}{8}\selectfont\begin{tabular}{@{}c@{\hspace{5pt}}c@{\hspace{8pt}}l@{\hspace{14pt}}l@{}}
+  & \textcolor{utpGris}{\#} & \textcolor{utpGris}{Action} & \textcolor{utpGris}{Message} \\ #1\end{tabular}}}
+% Result Grid: \grilla{columnas}{cabecera}{filas}
+\newcommand{\grilla}[3]{{\ttfamily\scriptsize\setlength\tabcolsep{5pt}\renewcommand{\arraystretch}{1.15}%
+  \begin{tabular}{#1}\hline\rowcolor{wbBarra}#2 \\\hline #3\hline\end{tabular}}}
+% La ventana completa: \wbventana{árbol del Navigator}{código}{título del panel de abajo}{panel de abajo}
+% Nombra: sqlmas, refrescar, arbol, pestana, rayo, rayoc, editor, paneltit, panel.
+\newcommand{\wbventana}[4]{%
+  \draw[utpGrisMedio,fill=white] (0,0) rectangle (12.4,-5.1);
+  \fill[wbBarra] (0,0) rectangle (12.4,-0.45); \draw[utpGrisMedio] (0,-0.45)--(12.4,-0.45);
+  \node (sqlmas) at (0.4,-0.225) {\sqlmas};
+  \foreach \x in {1.0,1.45,1.9,2.35} \fill[utpGrisMedio!50] (\x-0.12,-0.11) rectangle (\x+0.12,-0.34);
+  \fill[wbBarra] (0,-0.45) rectangle (3.2,-0.8);
+  \node[anchor=west,font=\scriptsize\bfseries] at (0.08,-0.625) {Navigator};
+  \node[anchor=west,font=\fontsize{5.5}{6}\selectfont\bfseries,text=utpGris] at (0.08,-1.0) {SCHEMAS};
+  \node[inner sep=1pt] (refrescar) at (2.95,-1.0) {\refrescar};
+  \node[anchor=north west,font=\scriptsize,align=left,inner sep=2pt] (arbol) at (0.08,-1.2) {#1};
+  \draw[utpGrisMedio] (3.2,-0.45)--(3.2,-5.1);
+  \node[anchor=south west,draw=utpGrisMedio,fill=white,font=\scriptsize,inner sep=2pt] (pestana) at (3.3,-0.8) {Query 1};
+  \fill[wbBarra] (3.2,-0.8) rectangle (12.4,-1.22); \draw[utpGrisMedio] (3.2,-0.8)--(12.4,-0.8) (3.2,-1.22)--(12.4,-1.22);
+  \node (abrir) at (3.5,-1.01) {\carpeta};
+  \node (guardar) at (3.85,-1.01) {\disco};
+  \node[inner sep=1.5pt] (rayo) at (4.3,-1.01) {\rayo};
+  \node[inner sep=1.5pt] (rayoc) at (4.72,-1.01) {\rayocursor};
+  \foreach \x in {5.2,5.55,5.9} \fill[utpGrisMedio!50] (\x-0.11,-0.9) rectangle (\x+0.11,-1.12);
+  \node[anchor=north west,font=\ttfamily\scriptsize,align=left,inner sep=3pt] (editor) at (3.25,-1.27) {#2};
+  \fill[wbBarra] (3.2,-3.35) rectangle (12.4,-3.7); \draw[utpGrisMedio] (3.2,-3.35)--(12.4,-3.35) (3.2,-3.7)--(12.4,-3.7);
+  \node[anchor=west,font=\scriptsize\bfseries] (paneltit) at (3.3,-3.525) {#3};
+  \node[anchor=north west,font=\scriptsize,inner sep=3pt] (panel) at (3.25,-3.75) {#4};
+}
+% Marca roja con número alrededor de un nodo de la ventana: \senal{nodo}{número}
+\newcommand{\senal}[2]{%
+  \draw[utpRojo,very thick,rounded corners=2pt] ([shift={(-2pt,-2pt)}]#1.south west) rectangle ([shift={(2pt,2pt)}]#1.north east);
+  \node[circle,fill=utpRojo,text=white,font=\bfseries\scriptsize,inner sep=1.2pt,minimum size=4.2mm]
+    at ([shift={(3pt,3pt)}]#1.north east) {#2};}
+% Igual, con el número abajo a la derecha
+\newcommand{\senalabajo}[2]{%
+  \draw[utpRojo,very thick,rounded corners=2pt] ([shift={(-2pt,-2pt)}]#1.south west) rectangle ([shift={(2pt,2pt)}]#1.north east);
+  \node[circle,fill=utpRojo,text=white,font=\bfseries\scriptsize,inner sep=1.2pt,minimum size=4.2mm]
+    at ([shift={(3pt,-3pt)}]#1.south east) {#2};}
+% Árbol del Navigator con la base cupones abierta
+\newcommand{\arbolcupones}[1]{%
+  \abierto\iconobase\textbf{cupones}\\
+  \hspace*{8pt}\cerrado Tables\\
+  \hspace*{8pt}\cerrado Views\\
+  #1}
+\begin{document}
+{\setbeamertemplate{footline}{}\maketitle}
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás decidir \textbf{cuándo} conviene una función o un \textbf{procedimiento almacenado}, y crear y usar procedimientos en MySQL Workbench y SQL Server.
+\end{block}
+\end{frame}
+% =======================================================================
+% Revisión de la sesión anterior
+% ---------------------------------------------------------------------
+\tikzset{
+  rbd/.style={cylinder,shape border rotate=90,aspect=0.25,draw=utpRojo!75,very thick,fill=utpRojo!7,
+              minimum width=1.8cm,minimum height=1.4cm,align=center,font=\ttfamily\scriptsize},
+  rap/.style={caja,font=\small,minimum width=2.6cm,minimum height=1.2cm,align=center},
+  rsql/.style={fill=utpGrisClaro,font=\ttfamily\scriptsize,inner sep=4pt,align=center},
+  zona/.style={draw=utpGrisMedio,thick,dashed,rounded corners=4pt},
+  rtit/.style={font=\footnotesize\bfseries,anchor=north west,align=left},
+  pide/.style={font=\scriptsize,align=center}
+}
+\begin{frame}{Revisión: aplicación 1, la agenda}
+\small \texttt{Sesion27/webapp}: una aplicación web que muestra los contactos de una agenda.
+\vspace{0.3cm}
+\begin{center}
+\begin{tikzpicture}
+  \draw[zona] (-1.3,1.6) rectangle (2.1,-1.3);
+  \draw[zona,fill=utpRojo!3] (4.4,1.6) rectangle (12.6,-1.3);
+  \node[rtit] at (-1.25,1.55) {CLIENTE\\[-1pt]\normalfont\scriptsize se ejecuta en el navegador};
+  \node[rtit] at (4.45,1.55) {SERVIDOR\\[-1pt]\normalfont\scriptsize se ejecuta en Node.js, en el puerto 3000};
+  \node[rap] (n) at (0.4,-0.1) {navegador\\\scriptsize\texttt{localhost:3000}};
+  \node[rap,cajanaranja] (a) at (5.95,-0.1) {\textbf{aplicación}\\\scriptsize\texttt{app.js}};
+  \node[rbd] (d) at (11.35,-0.1) {agenda.db};
+  \draw[flecha] ([yshift=2.5mm]n.east) -- node[pide,above]{pide la página} ([yshift=2.5mm]a.west);
+  \draw[flecha] ([yshift=-2.5mm]a.west) -- node[pide,below]{tabla HTML} ([yshift=-2.5mm]n.east);
+  \draw[flecha] (a) -- node[rsql]{\kw{SELECT} *\\\kw{FROM} contacto} (d);
+\end{tikzpicture}
+\end{center}
+\vspace{0.4cm}
+\concepto{¿Por qué?}{\small La página muestra \textbf{exactamente} lo que devuelve el \texttt{SELECT}. Si alguien agrega un contacto con \texttt{INSERT}, aparece al recargar, \textbf{sin cambiar} \texttt{app.js}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión: aplicación 2, la feria}
+\small \texttt{Sesion28/sistema\_implementado}: una aplicación web que vende las entradas de una feria.
+\vspace{0.3cm}
+\begin{center}
+\begin{tikzpicture}
+  \draw[zona] (-1.3,1.6) rectangle (2.1,-1.3);
+  \draw[zona,fill=utpRojo!3] (4.4,1.6) rectangle (12.6,-1.3);
+  \node[rtit] at (-1.25,1.55) {CLIENTE\\[-1pt]\normalfont\scriptsize se ejecuta en el navegador};
+  \node[rtit] at (4.45,1.55) {SERVIDOR\\[-1pt]\normalfont\scriptsize se ejecuta en Node.js, en el puerto 3000};
+  \node[rap] (n) at (0.4,-0.1) {\texttt{compra.js}\\\scriptsize botón \textbf{Pagar}};
+  \node[rap,cajanaranja] (a) at (5.95,-0.1) {\textbf{aplicación}\\\scriptsize\texttt{src/db.js}};
+  \node[rbd] (d) at (11.35,-0.1) {feria.db};
+  \draw[flecha] ([yshift=2.5mm]n.east) -- node[pide,above]{\texttt{POST /api/compras}} ([yshift=2.5mm]a.west);
+  \draw[flecha] ([yshift=-2.5mm]a.west) -- node[pide,below]{respuesta} ([yshift=-2.5mm]n.east);
+  \draw[flecha] (a) -- node[rsql]{\kw{BEGIN}\\\kw{UPDATE} + \kw{INSERT}\\\kw{COMMIT}} (d);
+\end{tikzpicture}
+\end{center}
+\vspace{0.4cm}
+\concepto{¿Por qué?}{\small El SQL está \textbf{en el servidor}, en el código de la aplicación. La base (SQLite) es un \textbf{archivo} en el mismo servidor.\\ En MySQL y SQL Server ese SQL puede \textbf{guardarse en la base}.}
+\end{frame}
+% =======================================================================
+\seccion{Usos comunes de funciones}
+\begin{frame}{Funciones, uso 1: aplicar un porcentaje}
+\small La tienda en línea necesita saber cuánto paga el cliente con un descuento en porcentaje.
+\begin{columns}[c,onlytextwidth]
+\column{.47\textwidth}
+\begin{sqlchico}[\col]
+\kw{CREATE FUNCTION} aplicar\_porcentaje(\\
+\ind p\_precio \ \ \ \ \kw{DECIMAL}(10,2),\\
+\ind p\_porcentaje \kw{DECIMAL}(5,2))\\
+\kw{RETURNS DECIMAL}(10,2)\\
+\kw{DETERMINISTIC}\\
+\kw{RETURN} \dentro{p\_precio - p\_precio * p\_porcentaje / 100};
+\end{sqlchico}
+\column{.5\textwidth}
+\begin{sqlmini}[\col]
+\kw{SELECT} codigo, valor\_descuento,\\
+\ind\dentro{aplicar\_porcentaje(120, valor\_descuento)}\\
+\ind\ind\kw{AS} a\_pagar\\
+\kw{FROM} cupon\\
+\kw{WHERE} tipo\_descuento = 'porcentaje'\\
+\kw{ORDER BY} id;
+\end{sqlmini}
+\res{lrr}{\cab{codigo} & \cab{valor\_descuento} & \cab{a\_pagar}}{BIENVENIDA10 & 10.00 & 108.00 \\ VERANO15 & 15.00 & 102.00 \\ NAVIDAD25 & 25.00 & 90.00 \\}
+\end{columns}
+\vspace{0.2cm}
+\concepto{Se usa para}{\small Fórmulas que muchos necesitan: el precio con descuento, el total con IGV, la comisión de un vendedor. Si la fórmula cambia, se cambia \textbf{en un solo lugar}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Funciones, uso 2: ¿el cupón está vigente?}
+\small La app móvil solo debe mostrar los cupones que se pueden usar en una fecha.
+\begin{columns}[c,onlytextwidth]
+\column{.47\textwidth}
+\begin{sqlmini}[\col]
+\kw{CREATE FUNCTION} es\_vigente(\\
+\ind p\_estado \kw{VARCHAR}(10),\\
+\ind p\_desde \ \kw{DATETIME},\\
+\ind p\_hasta \ \kw{DATETIME},\\
+\ind p\_fecha \ \kw{DATETIME})\\
+\kw{RETURNS BOOLEAN}\\
+\kw{DETERMINISTIC}\\
+\kw{RETURN} \dentro{p\_estado = 'activo'}\\
+\ind\ind\dentro{\kw{AND} p\_desde <= p\_fecha}\\
+\ind\ind\dentro{\kw{AND} (p\_hasta \kw{IS NULL OR} p\_fecha < p\_hasta)};
+\end{sqlmini}
+{\centering\scriptsize Activo, ya empezó y no ha terminado. La condición vale \textbf{1} (sí) o \textbf{0} (no).\par}
+\column{.5\textwidth}
+\begin{sqlmini}[\col]
+\kw{SELECT} codigo,\\
+\ind\dentro{es\_vigente(estado, vigente\_desde,}\\
+\ind\ind\dentro{vigente\_hasta, '2026-11-10')} \kw{AS} vigente\\
+\kw{FROM} cupon \kw{ORDER BY} id;
+\end{sqlmini}
+\res{lr}{\cab{codigo} & \cab{vigente}}{BIENVENIDA10 & 1 \\ NOVIEMBRE20 & 1 \\ VERANO15 & 0 \\ NAVIDAD25 & 0 \\ PRUEBA50 & 0 \\}
+\end{columns}
+\vspace{0.15cm}
+\concepto{Se usa para}{\small Reglas que responden sí o no: ¿el cupón está vigente?, ¿el cliente es frecuente?, ¿hay stock? Sirve en el \texttt{SELECT} y en el \texttt{WHERE}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 1} Crea las funciones de los usos 1 y 2}
+\npieza{1}\ \small Crea la base \texttt{cupones} con los scripts de \texttt{ejemplos/practicas/mysql/} o \texttt{sqlserver/}, en orden:\\
+\hspace*{6.2mm}\texttt{\footnotesize practica\_1\_modelo\_fisico.sql} (tablas) y luego \texttt{\footnotesize practica\_1\_registros.sql} (datos).\\[8pt]
+\npieza{2}\ Escribe (o copia) \texttt{aplicar\_porcentaje} y \texttt{es\_vigente}, y ejecútalas. Están en \texttt{ejemplos/cupones/}:
+\vspace{0.05cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}llp{5.6cm}@{}}
+\toprule
+\bfseries Gestor & \bfseries Script & \bfseries Lo que cambia \\
+\midrule
+MySQL (Workbench) & \texttt{1\_funciones\_mysql.sql} & lo mismo que en las diapositivas \\
+SQL Server (SSMS) & \texttt{1\_funciones\_sqlserver.sql} & \texttt{@}, \texttt{AS BEGIN}\ldots\texttt{END}, \texttt{dbo.}, y \texttt{BIT} con \texttt{IIF} en vez de \texttt{BOOLEAN} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.05cm}
+\npieza{3}\ \small Comprueba: \texttt{aplicar\_porcentaje(120, 10)} da \textbf{108.00}, y \texttt{es\_vigente} da \textbf{1}\\
+\hspace*{6.2mm}solo para \textbf{BIENVENIDA10} y \textbf{NOVIEMBRE20}.\\[8pt]
+\hspace*{6.2mm}\parbox[t]{.93\textwidth}{\footnotesize\gris{¿\textit{Error 1304: FUNCTION aplicar\_porcentaje already exists}? Ya la habías creado: el script empieza con \texttt{DROP FUNCTION IF EXISTS}. En SQL Server, \texttt{CREATE OR ALTER} la reemplaza.}}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Qué hace \texttt{DELIMITER}?}
+\small Workbench \textbf{corta} lo que escribes en cada \texttt{;}. Con \texttt{BEGIN}\ldots\texttt{END}, adentro hay \textbf{varios} \texttt{;}:
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{Sin DELIMITER}
+\begin{sqlmicro}[\col]
+\kw{CREATE FUNCTION} aplicar\_porcentaje(\ldots)\\
+\kw{RETURNS DECIMAL}(10,2)\\
+\kw{DETERMINISTIC}\\
+\kw{BEGIN}\\
+\ind\kw{DECLARE} v\_desc \kw{DECIMAL}(10,2)\mal{;}\ \com{← corta aquí}\\
+\ind\kw{SET} v\_desc = p\_precio * p\_porcentaje / 100;\\
+\ind\kw{RETURN} p\_precio - v\_desc;\\
+\kw{END};
+\end{sqlmicro}
+\vspace{-2pt}
+{\footnotesize Llega un \texttt{CREATE} \textbf{a medias}:}\\[1pt]
+{\ttfamily\scriptsize\color{utpRojo}Error Code: 1064. You have an error in your SQL syntax\ldots}
+\column{.48\textwidth}
+\centering\etiqueta{Con DELIMITER}
+\begin{sqlmicro}[\col]
+\dentro{\kw{DELIMITER} \$\$}\ \com{← ahora se termina en \$\$}\\
+\kw{CREATE FUNCTION} aplicar\_porcentaje(\ldots)\\
+\kw{RETURNS DECIMAL}(10,2)\\
+\kw{DETERMINISTIC}\\
+\kw{BEGIN}\\
+\ind\kw{DECLARE} v\_desc \kw{DECIMAL}(10,2);\\
+\ind\kw{SET} v\_desc = p\_precio * p\_porcentaje / 100;\\
+\ind\kw{RETURN} p\_precio - v\_desc;\\
+\kw{END}\dentro{\$\$}\ \com{← fin del CREATE}\\
+\dentro{\kw{DELIMITER} ;}\ \com{← vuelve el ;}
+\end{sqlmicro}
+\end{columns}
+\vspace{0.2cm}
+\concepto{DELIMITER}{\small Cambia el signo que marca el \textbf{fin de una instrucción}. No es SQL: es una orden para Workbench. Los usos 1 y 2 no lo necesitan: tienen \textbf{un solo} \texttt{;}. En SQL Server no existe: allí se usa \texttt{GO}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Qué significa \texttt{DETERMINISTIC}?}
+\small \textbf{Determinista}: con los \textbf{mismos datos de entrada}, la función devuelve \textbf{siempre lo mismo}.
+\vspace{0.2cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}>{\raggedright}p{6.6cm}>{\raggedright}p{2.9cm}>{\raggedright\arraybackslash}p{3.1cm}@{}}
+\toprule
+\bfseries Llamada & \bfseries Devuelve & \bfseries ¿Determinista? \\
+\midrule
+\texttt{aplicar\_porcentaje(120, 10)} & 108.00, siempre & \si\ \texttt{DETERMINISTIC} \\
+\texttt{\scriptsize es\_vigente('activo', '2026-11-01',\newline\hspace*{1.5em}'2026-12-01', '2026-11-10')} & 1, siempre & \si\ \texttt{DETERMINISTIC} \\
+una función igual, pero con \texttt{NOW()} en vez de la fecha que recibe & 1 hoy, 0 en diciembre & \no\ \texttt{NOT DETERMINISTIC} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\small Por eso \texttt{es\_vigente} recibe la fecha como parámetro: así, la misma pregunta siempre tiene la misma respuesta.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Una función \texttt{NOT DETERMINISTIC}: \texttt{es\_vigente\_hoy}}
+\small Igual que \texttt{es\_vigente}, pero sin recibir la fecha: usa \texttt{NOW()}, la fecha y hora de \textbf{este momento}.
+\begin{columns}[c,onlytextwidth]
+\column{.5\textwidth}
+\begin{sqlmini}[\col]
+\kw{CREATE FUNCTION} es\_vigente\_hoy(\\
+\ind p\_estado \kw{VARCHAR}(10),\\
+\ind p\_desde \ \kw{DATETIME},\\
+\ind p\_hasta \ \kw{DATETIME})\\
+\kw{RETURNS BOOLEAN}\\
+\dentro{\kw{NOT DETERMINISTIC}}\\
+\kw{NO SQL}\ \com{-- no lee ninguna tabla}\\
+\kw{RETURN} p\_estado = 'activo'\\
+\ind\ind\kw{AND} p\_desde <= \dentro{\kw{NOW}()}\\
+\ind\ind\kw{AND} (p\_hasta \kw{IS NULL OR} \dentro{\kw{NOW}()} < p\_hasta);
+\end{sqlmini}
+\column{.46\textwidth}
+\begin{sqlmicro}[\col]
+\kw{SELECT} codigo,\\
+\ind es\_vigente\_hoy(estado, vigente\_desde,\\
+\ind\ind vigente\_hasta) \kw{AS} vigente\_hoy\\
+\kw{FROM} cupon \kw{ORDER BY} id;
+\end{sqlmicro}
+\vspace{-6pt}
+\res{lr}{\cab{codigo} & \cab{vigente\_hoy}}{BIENVENIDA10 & 1 \\ \fila NOVIEMBRE20 & 1 \\ VERANO15 & 0 \\ NAVIDAD25 & 0 \\ PRUEBA50 & 0 \\}
+\par\vspace{3pt}
+{\centering\normalfont\scriptsize\gris{Hoy, 18 de noviembre. El 2 de diciembre, \texttt{NOVIEMBRE20} da \textbf{0}.}\par}
+\end{columns}
+\vspace{0.1cm}
+\concepto{NOT DETERMINISTIC}{\small Con los \textbf{mismos datos} puede devolver \textbf{otra cosa}, según cuándo se ejecute: \texttt{NOW()}, \texttt{RAND()}\ldots}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 2} \texttt{aplicar\_porcentaje} con \texttt{BEGIN}\ldots\texttt{END}}
+\npieza{1}\ \small Abre una pestaña nueva sobre la base \texttt{cupones}. \npieza{2}\ Copia y pega el código. \npieza{3}\ Ejecuta todo.
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.49\textwidth}
+\centering\etiqueta{MySQL Workbench: rayo \rayo}
+\begin{sqlmicro}[\col]
+\kw{USE} cupones;\\
+\kw{DROP FUNCTION IF EXISTS} aplicar\_porcentaje;\\[2pt]
+\dentro{\kw{DELIMITER} \$\$}\\
+\kw{CREATE FUNCTION} aplicar\_porcentaje(\\
+\ind p\_precio \ \ \ \ \kw{DECIMAL}(10,2),\\
+\ind p\_porcentaje \kw{DECIMAL}(5,2))\\
+\kw{RETURNS DECIMAL}(10,2)\\
+\kw{DETERMINISTIC}\\
+\kw{BEGIN}\\
+\ind\kw{DECLARE} v\_desc \kw{DECIMAL}(10,2);\\
+\ind\kw{SET} v\_desc = p\_precio * p\_porcentaje / 100;\\
+\ind\kw{RETURN} p\_precio - v\_desc;\\
+\kw{END}\dentro{\$\$}\\
+\dentro{\kw{DELIMITER} ;}\\[2pt]
+\kw{SELECT} aplicar\_porcentaje(120, 10) \kw{AS} a\_pagar;
+\end{sqlmicro}
+\column{.49\textwidth}
+\centering\etiqueta{SQL Server (SSMS): Execute}
+\begin{sqlmicro}[\col]
+\kw{USE} cupones;\\
+\dentro{\kw{GO}}\\[2pt]
+\kw{CREATE OR ALTER FUNCTION} dbo.aplicar\_porcentaje(\\
+\ind @precio \ \ \ \ \kw{DECIMAL}(10,2),\\
+\ind @porcentaje \kw{DECIMAL}(5,2))\\
+\kw{RETURNS DECIMAL}(10,2)\\
+\kw{AS}\\
+\kw{BEGIN}\\
+\ind\kw{DECLARE} @desc \kw{DECIMAL}(10,2);\\
+\ind\kw{SET} @desc = @precio * @porcentaje / 100;\\
+\ind\kw{RETURN} @precio - @desc;\\
+\kw{END};\\
+\dentro{\kw{GO}}\\[2pt]
+\kw{SELECT} dbo.aplicar\_porcentaje(120, 10) \kw{AS} a\_pagar;
+\end{sqlmicro}
+\end{columns}
+\vspace{0.05cm}
+\npieza{4}\ \small Comprueba que \texttt{a\_pagar} sea \textbf{108.00}.\quad\footnotesize\gris{Código en \texttt{ejemplos/cupones/2\_delimiter\_*.sql}. En SQL Server, \texttt{GO} hace de \texttt{DELIMITER}.}
+\end{frame}
+% ---------------------------------------------------------------------
+% =======================================================================
+\seccion{Procedimientos almacenados}
+\begin{frame}{¿Dónde se escribe el SQL?}
+\small El panel web y la app del celular desactivan cupones. Hay dos formas de hacerlo:
+\vspace{0.3cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{En cada aplicación}\\[6pt]
+\begin{tikzpicture}
+  \tikzset{ap/.style={caja,font=\scriptsize,text width=2.9cm,align=left,inner sep=4pt}}
+  \node[ap] (a) at (0,0.75) {\textbf{Panel web}\\[1pt]{\ttfamily\tiny\kw{UPDATE} cupon \kw{SET} estado = \ldots}};
+  \node[ap] (b) at (0,-0.75) {\textbf{App del celular}\\[1pt]{\ttfamily\tiny\kw{UPDATE} cupon \kw{SET} estado = \ldots}};
+  \node[cylinder,shape border rotate=90,aspect=0.25,draw=utpRojo!75,very thick,fill=utpRojo!7,minimum width=1.4cm,minimum height=1.2cm,font=\scriptsize] (d) at (3.3,0) {base};
+  \draw[flecha] (a.east) -- (d); \draw[flecha] (b.east) -- (d);
+\end{tikzpicture}\\[6pt]
+\raggedright\footnotesize El mismo SQL está \textbf{dos veces}. Si la regla cambia, hay que cambiar las dos, y es fácil olvidar una.
+\column{.48\textwidth}
+\centering\etiqueta{En la base, como procedimiento}\\[6pt]
+\begin{tikzpicture}
+  \tikzset{ap/.style={caja,font=\scriptsize,text width=2.9cm,align=left,inner sep=4pt}}
+  \node[ap] (a) at (0,0.75) {\textbf{Panel web}\\[1pt]{\ttfamily\tiny\kw{CALL} desactivar\_cupon(\ldots)}};
+  \node[ap] (b) at (0,-0.75) {\textbf{App del celular}\\[1pt]{\ttfamily\tiny\kw{CALL} desactivar\_cupon(\ldots)}};
+  \node[cylinder,shape border rotate=90,aspect=0.25,draw=utpRojo!75,very thick,fill=yellow!45,minimum width=1.4cm,minimum height=1.2cm,font=\scriptsize,align=center] (d) at (3.3,0) {base\\[-1pt]{\tiny\kw{UPDATE}}};
+  \draw[flecha] (a.east) -- (d); \draw[flecha] (b.east) -- (d);
+\end{tikzpicture}\\[6pt]
+\raggedright\footnotesize El SQL está \textbf{una vez}, en la base. Las aplicaciones solo lo llaman por su nombre.
+\end{columns}
+\vspace{0.3cm}
+\concepto{Procedimiento almacenado}{\small Instrucciones con \textbf{nombre}, guardadas \textbf{en la base}. Cualquier aplicación conectada las ejecuta con \texttt{CALL}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Cuándo conviene un procedimiento?}
+\begin{columns}[T,onlytextwidth]
+\column{.5\textwidth}
+\centering\etiqueta{Úsalo cuando\ldots}\\[6pt]
+\raggedright\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{@{}p{.06\textwidth}p{.84\textwidth}@{}}
+\si & \textbf{cambias datos} con una regla\newline{\footnotesize\gris{\texttt{desactivar\_cupon}}} \\
+\si & son \textbf{varios pasos} que van juntos\newline{\footnotesize\gris{\texttt{registrar\_venta}, con su transacción}} \\
+\si & \textbf{varias pantallas o aplicaciones} piden lo mismo\newline{\footnotesize\gris{\texttt{cupones\_vigentes}}} \\
+\si & es una \textbf{tarea que se repite}\newline{\footnotesize\gris{\texttt{cerrar\_cupones\_vencidos}, cada noche}} \\
+\end{tabular}
+\column{.48\textwidth}
+\centering\etiqueta{No hace falta cuando\ldots}\\[6pt]
+\raggedright\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{@{}p{.06\textwidth}p{.84\textwidth}@{}}
+\no & solo \textbf{calculas un valor}\newline{\footnotesize\gris{mejor una función: \texttt{precio\_final}}} \\
+\no & es un \texttt{SELECT} sencillo de \textbf{una sola pantalla}\newline{\footnotesize\gris{puede quedarse en la aplicación}} \\
+\no & la base es \textbf{SQLite}\newline{\footnotesize\gris{no tiene procedimientos}} \\
+\end{tabular}
+\end{columns}
+\vspace{0.4cm}
+\concepto{La pregunta clave}{\small ¿Esto debe hacerse \textbf{siempre igual}, venga de la aplicación que venga? Entonces va en la base, como procedimiento.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Las piezas de un procedimiento}
+\small Este procedimiento recibe un código y desactiva ese cupón.
+\vspace{0.35cm}
+\begin{center}
+\renewcommand{\piezax}{6.1}
+\begin{tikzpicture}
+  \pieza{0}{\kw{CREATE PROCEDURE}}{crea algo con nombre y lo \textbf{guarda en la base}}
+  \pieza{-0.85}{desactivar\_cupon}{su \textbf{nombre}: con él lo vas a usar}
+  \pieza{-1.7}{(p\_codigo \kw{VARCHAR}(255))}{el \textbf{parámetro}: el dato que recibe}
+  \pieza{-2.55}{\kw{UPDATE} cupon \kw{SET} estado = 'inactivo'}{lo que \textbf{hace} cada vez que lo usas}
+  \pieza{-3.4}{\kw{WHERE} codigo = p\_codigo;}{usa el parámetro para elegir \textbf{la fila}}
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+{\centering\footnotesize\gris{\texttt{p\_} es solo una costumbre: así no se confunde el parámetro \texttt{p\_codigo} con la columna \texttt{codigo}.}\par}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{En Workbench, paso 1: una pestaña nueva}
+\begin{center}
+\begin{tikzpicture}
+  \wbventana{\iconobase cupones\\\iconobase sys}{\lineas{1 & \\}}{Output}{}
+  \senal{sqlmas}{1}
+\end{tikzpicture}
+\end{center}
+\vspace{0.05cm}
+\npieza{1}\ \small El primer ícono de arriba, \sqlmas, abre una pestaña nueva: \textbf{Query 1}. También está en \textbf{File → New Query Tab}.\\[4pt]
+\hspace*{6.2mm}\footnotesize\gris{¿Por qué? En la pestaña escribes las instrucciones. Nada se ejecuta hasta que tú lo pidas.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{En Workbench, paso 2: elige la base \texttt{cupones}}
+\begin{center}
+\begin{tikzpicture}
+  \wbventana{\iconobase\textbf{cupones}\\\iconobase sys}{\lineas{1 & \kw{USE} cupones; \\}}{Output}{}
+  \senal{arbol}{1}
+  \senal{editor}{2}
+\end{tikzpicture}
+\end{center}
+\vspace{0.05cm}
+\npieza{1}\ \small En el \textbf{Navigator}, haz \textbf{doble clic} sobre \texttt{cupones}: queda en \textbf{negrita}. Esa es la base elegida.\\[3pt]
+\npieza{2}\ \small Otra forma: escribe \texttt{USE cupones;} y ejecútalo.\\[4pt]
+\hspace*{6.2mm}\footnotesize\gris{¿Por qué? El procedimiento se guarda en la base elegida. Sin ella, Workbench responde \textit{Error Code: 1046. No database selected}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{En Workbench, paso 3: escribe el procedimiento}
+\begin{center}
+\begin{tikzpicture}
+  \wbventana{\iconobase\textbf{cupones}\\\iconobase sys}{\lineas{
+    1 & \kw{CREATE PROCEDURE} desactivar\_cupon(p\_codigo \kw{VARCHAR}(255)) \\
+    2 & \kw{UPDATE} cupon \kw{SET} estado = 'inactivo' \\
+    3 & \kw{WHERE} codigo = p\_codigo; \\}}{Output}{}
+  \senal{editor}{1}
+\end{tikzpicture}
+\end{center}
+\vspace{0.05cm}
+\npieza{1}\ \small Las tres líneas son \textbf{una sola instrucción}: empieza en \texttt{CREATE} y termina en el único \texttt{;}.\\[4pt]
+\hspace*{6.2mm}\footnotesize\gris{Escribirlo todavía no crea nada: falta ejecutarlo.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{En Workbench, paso 4: ejecútalo con el rayo}
+\begin{center}
+\begin{tikzpicture}
+  \wbventana{\iconobase\textbf{cupones}\\\iconobase sys}{\lineas{
+    1 & \kw{CREATE PROCEDURE} desactivar\_cupon(p\_codigo \kw{VARCHAR}(255)) \\
+    2 & \kw{UPDATE} cupon \kw{SET} estado = 'inactivo' \\
+    3 & \kw{WHERE} codigo = p\_codigo; \\}}{Output}{}
+  \senal{rayo}{1}
+\end{tikzpicture}
+\end{center}
+\vspace{0.05cm}
+\npieza{1}\ \small El \textbf{rayo} \rayo\ ejecuta todo lo que hay en la pestaña. Si seleccionas algunas líneas, ejecuta solo esas. Atajo: \textbf{Ctrl+Shift+Enter}.\\[4pt]
+\hspace*{6.2mm}\footnotesize\gris{Ojo: esto todavía \textbf{no} desactiva el cupón. Solo guarda el procedimiento en la base.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{En Workbench, paso 5: lee el panel Output}
+\begin{center}
+\begin{tikzpicture}
+  \wbventana{\iconobase\textbf{cupones}\\\iconobase sys}{\lineas{
+    1 & \kw{CREATE PROCEDURE} desactivar\_cupon(p\_codigo \kw{VARCHAR}(255)) \\
+    2 & \kw{UPDATE} cupon \kw{SET} estado = 'inactivo' \\
+    3 & \kw{WHERE} codigo = p\_codigo; \\}}{Output}{\salida{
+    \okwb & 1 & CREATE PROCEDURE desactivar\_cupon(p\_codigo\ldots & 0 row(s) affected \\}}
+  \senal{panel}{1}
+\end{tikzpicture}
+\end{center}
+\vspace{0.05cm}
+\npieza{1}\ \small Una fila por cada instrucción ejecutada. El \textbf{visto verde} \okwb\ dice que el procedimiento se creó.\\[4pt]
+\hspace*{6.2mm}\footnotesize\gris{\textit{0 row(s) affected}: ningún cupón cambió todavía. Si sale una X roja \errwb, el mensaje dice qué falló.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{En Workbench, paso 6: búscalo en el Navigator}
+\begin{center}
+\begin{tikzpicture}
+  \wbventana{\arbolcupones{%
+    \hspace*{8pt}\abierto Stored Procedures\\
+    \hspace*{22pt}\dentro{desactivar\_cupon}\\
+    \hspace*{8pt}\abierto Functions\\
+    \hspace*{22pt}aplicar\_porcentaje\\
+    \hspace*{22pt}precio\_final\\
+    \hspace*{22pt}situacion\_cupon}}{\lineas{
+    1 & \kw{CREATE PROCEDURE} desactivar\_cupon(p\_codigo \kw{VARCHAR}(255)) \\
+    2 & \kw{UPDATE} cupon \kw{SET} estado = 'inactivo' \\
+    3 & \kw{WHERE} codigo = p\_codigo; \\}}{Output}{\salida{
+    \okwb & 1 & CREATE PROCEDURE desactivar\_cupon(p\_codigo\ldots & 0 row(s) affected \\}}
+  \senal{refrescar}{1}
+  \senalabajo{arbol}{2}
+\end{tikzpicture}
+\end{center}
+\vspace{0.05cm}
+\npieza{1}\ \small ¿No aparece? Pulsa \textbf{refrescar} \refrescar, junto a \textbf{SCHEMAS}.\quad
+\npieza{2}\ \small Abre \texttt{cupones} → \textbf{Stored Procedures}.\\[4pt]
+\hspace*{6.2mm}\footnotesize\gris{¿Por qué está ahí? Quedó guardado en la base, junto a las funciones. Sigue ahí aunque cierres Workbench.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{En Workbench, paso 7: úsalo con \texttt{CALL}}
+\begin{center}
+\begin{tikzpicture}
+  \wbventana{\arbolcupones{%
+    \hspace*{8pt}\abierto Stored Procedures\\
+    \hspace*{22pt}desactivar\_cupon}}{\lineas{
+    1 & \kw{CREATE PROCEDURE} desactivar\_cupon(p\_codigo \kw{VARCHAR}(255)) \\
+    2 & \kw{UPDATE} cupon \kw{SET} estado = 'inactivo' \\
+    3 & \kw{WHERE} codigo = p\_codigo; \\
+    4 & \\
+    5 & \dentro{\kw{CALL} desactivar\_cupon('VERANO15');} \\}}{Output}{\salida{
+    \okwb & 1 & CREATE PROCEDURE desactivar\_cupon(p\_codigo\ldots & 0 row(s) affected \\
+    \okwb & 2 & CALL desactivar\_cupon('VERANO15') & \textbf{1 row(s) affected} \\}}
+  \senal{rayoc}{1}
+  \senal{panel}{2}
+\end{tikzpicture}
+\end{center}
+\vspace{0.05cm}
+\npieza{1}\ \small Deja el cursor en la línea 5 y pulsa el rayo con cursor \rayocursor\ (\textbf{Ctrl+Enter}): ejecuta \textbf{solo esa línea}.\\[3pt]
+\npieza{2}\ \small \textit{1 row(s) affected}: ahora sí cambió un cupón.\\[3pt]
+\hspace*{6.2mm}\footnotesize\gris{¿Por qué no el rayo de siempre? Ejecutaría también el \texttt{CREATE}, y ese nombre ya está ocupado.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{En Workbench, paso 8: comprueba el cambio}
+\begin{center}
+\begin{tikzpicture}
+  \wbventana{\arbolcupones{%
+    \hspace*{8pt}\abierto Stored Procedures\\
+    \hspace*{22pt}desactivar\_cupon}}{\lineas{
+    5 & \kw{CALL} desactivar\_cupon('VERANO15'); \\
+    6 & \\
+    7 & \dentro{\kw{SELECT} codigo, estado \kw{FROM} cupon \kw{WHERE} codigo = 'VERANO15';} \\}}{Result Grid}{\grilla{|l|l|}{codigo & estado}{VERANO15 & inactivo \\}}
+  \senal{panel}{1}
+\end{tikzpicture}
+\end{center}
+\vspace{0.05cm}
+\npieza{1}\ \small Ejecuta el \texttt{SELECT} con \rayocursor. Las filas salen en el \textbf{Result Grid}: \texttt{VERANO15} quedó \textbf{inactivo}.\\[4pt]
+\hspace*{6.2mm}\footnotesize\gris{El procedimiento hizo el \texttt{UPDATE} por ti. Tú solo escribiste el código del cupón.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Si lo creas dos veces: \textit{Error 1304}}
+\begin{center}
+\begin{tikzpicture}
+  \wbventana{\arbolcupones{%
+    \hspace*{8pt}\abierto Stored Procedures\\
+    \hspace*{22pt}desactivar\_cupon}}{\lineas{
+    1 & \kw{CREATE PROCEDURE} desactivar\_cupon(p\_codigo \kw{VARCHAR}(255)) \\
+    2 & \kw{UPDATE} cupon \kw{SET} estado = 'inactivo' \\
+    3 & \kw{WHERE} codigo = p\_codigo; \\}}{Output}{\salida{
+    \errwb & 3 & CREATE PROCEDURE desactivar\_cupon(p\_codigo\ldots & \textcolor{utpRojo}{\begin{tabular}[t]{@{}l@{}}Error Code: 1304. PROCEDURE\\desactivar\_cupon already exists\end{tabular}} \\}}
+  \senal{panel}{1}
+\end{tikzpicture}
+\end{center}
+\vspace{0.05cm}
+\npieza{1}\ \small Al pulsar otra vez el rayo, el \texttt{CREATE} falla: ya hay un procedimiento con ese nombre.\\[4pt]
+\hspace*{6.2mm}\footnotesize\gris{Pasa cuando quieres corregir el procedimiento y lo vuelves a ejecutar. La solución, en la siguiente diapositiva.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Para corregirlo: bórralo y créalo de nuevo}
+\begin{center}
+\begin{tikzpicture}
+  \wbventana{\arbolcupones{%
+    \hspace*{8pt}\abierto Stored Procedures\\
+    \hspace*{22pt}desactivar\_cupon}}{\lineas{
+    1 & \dentro{\kw{DROP PROCEDURE IF EXISTS} desactivar\_cupon;} \\
+    2 & \kw{CREATE PROCEDURE} desactivar\_cupon(p\_codigo \kw{VARCHAR}(255)) \\
+    3 & \kw{UPDATE} cupon \kw{SET} estado = 'inactivo' \\
+    4 & \kw{WHERE} codigo = p\_codigo; \\}}{Output}{\salida{
+    \okwb & 4 & DROP PROCEDURE IF EXISTS desactivar\_cupon & 0 row(s) affected \\
+    \okwb & 5 & CREATE PROCEDURE desactivar\_cupon(p\_codigo\ldots & 0 row(s) affected \\}}
+  \senal{editor}{1}
+  \senal{panel}{2}
+\end{tikzpicture}
+\end{center}
+\vspace{0.05cm}
+\npieza{1}\ \small \texttt{DROP PROCEDURE} borra el procedimiento. Con \texttt{IF EXISTS}, no falla si todavía no existe.\\[3pt]
+\npieza{2}\ \small Ahora el rayo ejecuta las dos instrucciones, en orden: primero borra y luego crea.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Con varias instrucciones, el \texttt{;} corta antes de tiempo}
+\small Queremos que, además, \textbf{muestre un mensaje}. Son dos instrucciones: van entre \texttt{BEGIN} y \texttt{END}.
+\begin{center}
+\begin{tikzpicture}
+  \wbventana{\arbolcupones{}}{\lineas{
+    1 & \kw{CREATE PROCEDURE} desactivar\_cupon(p\_codigo \kw{VARCHAR}(255)) \\
+    2 & \kw{BEGIN} \\
+    3 & \ind\kw{UPDATE} cupon \kw{SET} estado = 'inactivo' \kw{WHERE} codigo = p\_codigo\mal{;} \\
+    4 & \ind\kw{SELECT} 'Cupón desactivado' \kw{AS} mensaje; \\
+    5 & \kw{END} \\}}{Output}{\salida{
+    \errwb & 1 & CREATE PROCEDURE desactivar\_cupon(p\_codigo\ldots & \textcolor{utpRojo}{\begin{tabular}[t]{@{}l@{}}Error Code: 1064. You have an error\\in your SQL syntax\ldots\end{tabular}} \\}}
+  \senal{panel}{1}
+\end{tikzpicture}
+\end{center}
+\vspace{0.05cm}
+\npieza{1}\ \small Workbench separa las instrucciones en cada \texttt{;}. Aquí corta en el \texttt{;} de la línea 3 y envía un \texttt{CREATE} \textbf{a medias}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{La solución: \texttt{DELIMITER}}
+\begin{columns}[c,onlytextwidth]
+\column{.55\textwidth}
+\begin{sqlcode}[\col]
+\dentro{\kw{DELIMITER} \$\$}\hfill\npieza{1}\\[4pt]
+\kw{CREATE PROCEDURE} desactivar\_cupon(\\
+\ind p\_codigo \kw{VARCHAR}(255))\\
+\dentro{\kw{BEGIN}}\hfill\npieza{2}\\
+\ind\kw{UPDATE} cupon \kw{SET} estado = 'inactivo'\\
+\ind\kw{WHERE} codigo = p\_codigo;\\
+\ind\kw{SELECT} 'Cupón desactivado' \kw{AS} mensaje;\\
+\dentro{\kw{END}\$\$}\hfill\npieza{3}\\[4pt]
+\dentro{\kw{DELIMITER} ;}\hfill\npieza{4}
+\end{sqlcode}
+\column{.42\textwidth}
+\small\raggedright
+\npieza{1} Desde aquí, una instrucción termina en \texttt{\$\$}, no en \texttt{;}.\\[7pt]
+\npieza{2} \texttt{BEGIN} y \texttt{END} agrupan las instrucciones del procedimiento. Sus \texttt{;} ya no cortan nada.\\[7pt]
+\npieza{3} \texttt{\$\$} termina el \texttt{CREATE}.\\[7pt]
+\npieza{4} Vuelve al \texttt{;} de siempre.
+\end{columns}
+\vspace{0.3cm}
+{\centering\footnotesize\gris{Selecciona desde \texttt{DELIMITER \$\$} hasta \texttt{DELIMITER ;} y pulsa el rayo \rayo. Si ya existía, antes ejecuta \texttt{DROP PROCEDURE IF EXISTS}.}\par}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Con variables e \texttt{IF}: avisar si el cupón no existe}
+\small Con un código mal escrito (\texttt{'VERANO1'}), el \texttt{UPDATE} no cambia nada y \textbf{no avisa}.
+\begin{columns}[T,onlytextwidth]
+\column{.58\textwidth}
+\begin{sqlmini}[\col]
+\kw{DELIMITER} \$\$\\
+\kw{CREATE PROCEDURE} desactivar\_cupon(p\_codigo \kw{VARCHAR}(255))\\
+\kw{BEGIN}\\
+\ind\dentro{\kw{DECLARE} v\_cantidad \kw{INT};}\hfill\npieza{1}\\[1.5pt]
+\ind\kw{SELECT} \kw{COUNT}(*) \kw{INTO} v\_cantidad\\
+\ind\kw{FROM} cupon \kw{WHERE} codigo = p\_codigo;\hfill\npieza{2}\\[1.5pt]
+\ind\dentro{\kw{IF} v\_cantidad = 0 \kw{THEN}}\hfill\npieza{3}\\
+\ind\ind\kw{SELECT} 'El cupón no existe' \kw{AS} mensaje;\\
+\ind\kw{ELSE}\\
+\ind\ind\kw{UPDATE} cupon \kw{SET} estado = 'inactivo'\\
+\ind\ind\kw{WHERE} codigo = p\_codigo;\\
+\ind\ind\kw{SELECT} 'Cupón desactivado' \kw{AS} mensaje;\\
+\ind\kw{END IF};\\
+\kw{END}\$\$\\
+\kw{DELIMITER} ;
+\end{sqlmini}
+\column{.39\textwidth}
+\small\raggedright
+\vspace{0.3cm}
+\npieza{1} Una variable para guardar un número.\\[7pt]
+\npieza{2} Cuenta los cupones con ese código: \textbf{0} o \textbf{1}.\\[7pt]
+\npieza{3} Si es 0, avisa. Si no, lo desactiva y lo dice.\\[10pt]
+\footnotesize\gris{Lo mismo que en las funciones: \texttt{DECLARE}, \texttt{SELECT \ldots{} INTO} e \texttt{IF}.}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Pruébalo: un \texttt{CALL}, un mensaje}
+\small Ejecuta cada \texttt{CALL} con \rayocursor. El mensaje sale en el \textbf{Result Grid}, como cualquier \texttt{SELECT}.
+\vspace{0.4cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[caja,font=\ttfamily\footnotesize] (a) at (0,0) {\kw{CALL} desactivar\_cupon('VERANO1');};
+  \node[caja,font=\ttfamily\footnotesize] (b) at (7,0) {\kw{CALL} desactivar\_cupon('VERANO15');};
+  \node[anchor=north] (ga) at (0,-1.1) {\grilla{|l|}{mensaje}{El cupón no existe \\}};
+  \node[anchor=north] (gb) at (7,-1.1) {\grilla{|l|}{mensaje}{Cupón desactivado \\}};
+  \draw[flecha] (a)--(ga);
+  \draw[flecha] (b)--(gb);
+  \node[font=\footnotesize,text=utpGris,align=center] at (0,-2.5) {no hay ningún \texttt{VERANO1}:\\camino del \texttt{IF}};
+  \node[font=\footnotesize,text=utpGris,align=center] at (7,-2.5) {sí existe:\\camino del \texttt{ELSE}};
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\concepto{Por qué sirve}{\small Antes, un código mal escrito no hacía nada y nadie se enteraba. Ahora el procedimiento \textbf{responde}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Un procedimiento que muestra un resultado}
+\small La tienda pregunta: con una compra de S/ 120, ¿cuánto pagaría con cada cupón \textbf{vigente}?
+\vspace{0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+\begin{sqlmini}[\col]
+\kw{CREATE PROCEDURE} cupones\_vigentes(\\
+\ind p\_precio \kw{DECIMAL}(10,2), p\_fecha \kw{DATETIME})\\
+\kw{SELECT} codigo,\\
+\ind\dentro{precio\_final(p\_precio, id)} \kw{AS} a\_pagar\\
+\kw{FROM} cupon\\
+\kw{WHERE} \dentro{situacion\_cupon(id, p\_fecha)} = 'vigente'\\
+\kw{ORDER BY} id;
+\end{sqlmini}
+\column{.4\textwidth}
+\small\raggedright
+\npieza{1} Recibe \textbf{dos} parámetros: el precio y la fecha.\\[7pt]
+\npieza{2} Por dentro es un \texttt{SELECT} que usa las \textbf{funciones} de la sesión 28.\\[7pt]
+\footnotesize\gris{Una sola instrucción, sin \texttt{BEGIN}: no necesita \texttt{DELIMITER}.}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{En Workbench: su resultado sale en el Result Grid}
+\begin{center}
+\begin{tikzpicture}
+  \wbventana{\arbolcupones{%
+    \hspace*{8pt}\abierto Stored Procedures\\
+    \hspace*{22pt}cupones\_vigentes\\
+    \hspace*{22pt}desactivar\_cupon}}{\lineas{
+    1 & \dentro{\kw{CALL} cupones\_vigentes(120, '2026-11-10');} \\}}{Result Grid}{\grilla{|l|r|}{codigo & a\_pagar}{BIENVENIDA10 & 108.00 \\ NOVIEMBRE20 & 100.00 \\}}
+  \senal{editor}{1}
+  \senal{panel}{2}
+\end{tikzpicture}
+\end{center}
+\vspace{0.05cm}
+\npieza{1}\ \small Los parámetros van en orden, separados por coma: primero el precio, luego la fecha.\\[3pt]
+\npieza{2}\ \small Salen solo los cupones vigentes ese día, con lo que pagaría el cliente.\\[3pt]
+\hspace*{6.2mm}\footnotesize\gris{¿Por qué un procedimiento? La tienda ya no escribe la consulta: solo hace un \texttt{CALL}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Lo mismo en SQL Server (SSMS): \texttt{EXEC}}
+\begin{columns}[T,onlytextwidth]
+\column{.47\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlmini}[\col]
+\kw{CREATE PROCEDURE} desactivar\_cupon(\\
+\ind p\_codigo \kw{VARCHAR}(255))\\
+\kw{UPDATE} cupon \kw{SET} estado = 'inactivo'\\
+\kw{WHERE} codigo = p\_codigo;\\[6pt]
+\dentro{\kw{CALL}} desactivar\_cupon('VERANO15');
+\end{sqlmini}
+\column{.5\textwidth}
+\centering\etiqueta{SQL Server}
+\begin{sqlmini}[\col]
+\kw{CREATE OR ALTER PROCEDURE} dbo.desactivar\_cupon(\\
+\ind @codigo \kw{NVARCHAR}(255))\\
+\kw{AS}\\
+\kw{BEGIN}\\
+\ind\kw{UPDATE} cupon \kw{SET} estado = 'inactivo'\\
+\ind\kw{WHERE} codigo = @codigo;\\
+\kw{END};\\
+\kw{GO}\\[4pt]
+\dentro{\kw{EXEC}} dbo.desactivar\_cupon 'VERANO15';
+\end{sqlmini}
+\end{columns}
+\vspace{0.1cm}
+\begin{center}
+\scriptsize
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}>{\bfseries}p{2.5cm}>{\raggedright}p{4.3cm}>{\raggedright\arraybackslash}p{5.6cm}@{}}
+\toprule
+ & \bfseries MySQL (Workbench) & \bfseries SQL Server (SSMS) \\
+\midrule
+Crear & \texttt{CREATE PROCEDURE} & \texttt{CREATE OR ALTER PROCEDURE}: si existe, lo cambia \\
+Varias instrucciones & \texttt{DELIMITER} y \texttt{BEGIN}\ldots\texttt{END} & \texttt{AS BEGIN}\ldots\texttt{END} y \texttt{GO} \\
+Usarlo & \texttt{CALL nombre('VERANO15');} & \texttt{EXEC dbo.nombre 'VERANO15';} (sin paréntesis) \\
+Dónde verlo & Navigator → Stored Procedures & Object Explorer → Programmability → Stored Procedures \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Procedimientos, uso 1: un botón que cambia datos}
+\small En el panel, el responsable de promociones pulsa \textbf{Desactivar} junto a \texttt{VERANO15}:
+\vspace{0.35cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[draw=utpNegro,very thick,fill=white,minimum width=4.4cm,minimum height=2.3cm] (w) at (0,0) {};
+  \node[anchor=north,fill=utpNegro,text=white,minimum width=4.4cm,minimum height=.45cm,font=\scriptsize\bfseries] (b) at (w.north) {Panel de cupones};
+  \foreach \c/\y in {BIENVENIDA10/0.25, NOVIEMBRE20/-0.25, VERANO15/-0.75}
+    \node[anchor=west,font=\ttfamily\scriptsize] at (-2,\y) {\c};
+  \foreach \y in {0.25,-0.25}
+    \node[draw=utpGrisMedio,rounded corners=1pt,font=\tiny,inner sep=2pt,text=utpGris] at (1.35,\y) {Desactivar};
+  \node[draw=utpRojo,fill=utpRojo,text=white,rounded corners=1pt,font=\tiny\bfseries,inner sep=2pt] (btn) at (1.35,-0.75) {Desactivar};
+  \node[caja,cajanaranja,font=\ttfamily\footnotesize,align=left,inner sep=6pt,anchor=west] (proc) at (7.3,-0.75)
+    {\textrm{\textbf{en la base:} desactivar\_cupon}\\[3pt]\kw{UPDATE} cupon\\\kw{SET} estado = 'inactivo'\\\kw{WHERE} codigo = p\_codigo;};
+  \draw[flecha] (btn.east) -- node[above=3pt,font=\ttfamily\scriptsize,fill=utpGrisClaro,inner sep=3pt]{\kw{CALL} desactivar\_cupon('VERANO15');} (proc.west);
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\concepto{Se usa para}{\small Acciones con una regla: activar o desactivar, cambiar un precio, anular una venta. La aplicación \textbf{no escribe el} \texttt{UPDATE}: solo dice \textbf{qué} cupón.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Procedimientos, uso 2: varios pasos que van juntos}
+\small Si la feria usara MySQL, el botón \textbf{Pagar} haría \textbf{un solo} \texttt{CALL}, y los pasos irían en la base:
+\vspace{0.35cm}
+\begin{center}
+\begin{tikzpicture}
+  \tikzset{inst/.append style={minimum width=2.2cm}}
+  \node[caja,font=\scriptsize\bfseries,minimum width=1.8cm,minimum height=.8cm] (p) at (0,0) {Pagar};
+  \node[fill=utpGrisClaro,font=\ttfamily\scriptsize,inner sep=3pt,anchor=west] (c) at (1.4,0) {\kw{CALL} registrar\_venta(dni, nombre, correo, pago);};
+  \draw[flecha] (p)--(c);
+  % La base con el procedimiento
+  \node[draw=utpRojo!75,very thick,fill=utpRojo!7,rounded corners=3pt,minimum width=12.4cm,minimum height=1.9cm] (bd) at (5.4,-2) {};
+  \node[anchor=north west,font=\scriptsize\bfseries] at (bd.north west) {en la base: registrar\_venta};
+  \node[inst,fill=utpNegro,text=white] (s1) at (0.7,-2.15) {\textbf{START}\\\textbf{TRANSACTION}};
+  \node[inst] (s2) at (3.8,-2.15) {\kw{UPDATE} entrada\\disponibles - 1};
+  \node[inst] (s3) at (6.9,-2.15) {\kw{INSERT INTO}\\venta \ldots};
+  \node[inst,fill=yellow!45] (s4) at (10,-2.15) {\kw{COMMIT};};
+  \foreach \a/\b in {s1/s2,s2/s3,s3/s4} \draw[flecha] (\a)--(\b);
+  \draw[flecha] (c.south) -- ++(0,-0.55);
+\end{tikzpicture}
+\end{center}
+\vspace{0.3cm}
+\concepto{Se usa para}{\small Operaciones de varios cambios que deben quedar \textbf{todos o ninguno}: vender, transferir, cerrar un pedido. La transacción queda \textbf{dentro} del procedimiento.}
+\vspace{0.1cm}
+{\centering\footnotesize\gris{La feria usa SQLite, que no tiene procedimientos: por eso estos pasos están en \texttt{src/db.js}.}\par}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Procedimientos, uso 3: una consulta compartida}
+\small La página del carrito y la página de pago muestran los cupones vigentes. Las dos hacen \textbf{el mismo} \texttt{CALL}:
+\vspace{0.35cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[caja,font=\scriptsize,minimum width=2.6cm,minimum height=.7cm] (a) at (0,0.6) {Página del carrito};
+  \node[caja,font=\scriptsize,minimum width=2.6cm,minimum height=.7cm] (b) at (0,-0.6) {Página de pago};
+  \node[fill=utpGrisClaro,font=\ttfamily\scriptsize,inner sep=4pt] (c) at (5.3,0) {\kw{CALL} cupones\_vigentes(120, '2026-11-10');};
+  \draw[flecha] (a.east) -- (c.west);
+  \draw[flecha] (b.east) -- (c.west);
+  \node (g) at (10.6,0) {\grilla{|l|r|}{codigo & a\_pagar}{BIENVENIDA10 & 108.00 \\ NOVIEMBRE20 & 100.00 \\}};
+  \draw[flecha] (c.east) -- (g.west);
+\end{tikzpicture}
+\end{center}
+\vspace{0.35cm}
+\concepto{Se usa para}{\small Reportes y listas con parámetros: ventas del día, cupones vigentes, citas de un empleado. Si la consulta cambia, se cambia \textbf{una vez}, en la base, y todas las pantallas lo ven.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Procedimientos, uso 4: una tarea que se repite cada día}
+\small Cada noche hay que desactivar los cupones que ya vencieron. Un procedimiento lo hace con \textbf{un} \texttt{CALL}:
+\vspace{0.1cm}
+\begin{columns}[c,onlytextwidth]
+\column{.56\textwidth}
+\begin{sqlcode}[\col]
+\kw{CREATE PROCEDURE} cerrar\_cupones\_vencidos(\\
+\ind p\_fecha \kw{DATETIME})\\
+\kw{UPDATE} cupon \kw{SET} estado = 'inactivo'\\
+\kw{WHERE} estado = 'activo'\\
+\ind\kw{AND} vigente\_hasta <= p\_fecha;\\[6pt]
+\dentro{\kw{CALL} cerrar\_cupones\_vencidos('2026-11-10');}\\
+\com{-- 1 row(s) affected}
+\end{sqlcode}
+\column{.4\textwidth}
+\res{ll}{\cab{codigo} & \cab{estado}}{BIENVENIDA10 & activo \\ NOVIEMBRE20 & activo \\ \fila VERANO15 & inactivo \\ NAVIDAD25 & activo \\ PRUEBA50 & inactivo \\}
+\par\vspace{4pt}
+{\centering\normalfont\scriptsize\gris{\texttt{VERANO15} venció el 2026-04-01.}\par}
+\end{columns}
+\vspace{0.3cm}
+\concepto{Se usa para}{\small Mantenimiento: cerrar lo vencido, borrar datos de prueba, preparar el reporte del mes. Se programa para que se ejecute solo, a la misma hora.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Qué puede hacer cada uno?}
+\vspace{-0.2cm}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.35}
+\newcommand{\Si}{\textcolor{green!45!black}{\textbf{sí}}}
+\newcommand{\No}{\textcolor{utpRojo}{\textbf{no}}}
+\begin{tabular}{@{}>{\raggedright}p{6.4cm}>{\centering}p{3cm}>{\centering\arraybackslash}p{3.4cm}@{}}
+\toprule
+ & \bfseries Función & \bfseries Procedimiento \\
+\midrule
+Recibir parámetros & \Si & \Si \\
+Usar variables e \texttt{IF} & \Si & \Si \\
+\filagris Ir \textbf{dentro} de un \texttt{SELECT} o un \texttt{WHERE} & \Si & \No \\
+\filagris Mostrar filas con un \texttt{SELECT} & \No & \Si \\
+\filagris Cambiar datos: \texttt{INSERT}, \texttt{UPDATE}, \texttt{DELETE} & \No\,* & \Si \\
+\filagris Usar una transacción: \texttt{COMMIT}, \texttt{ROLLBACK} & \No & \Si \\
+\midrule
+Cómo se ejecuta & \texttt{\footnotesize SELECT f(\ldots);} & \texttt{\footnotesize CALL p(\ldots);}\newline{\scriptsize\gris{SQL Server: \texttt{EXEC p \ldots;}}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{-2pt}
+{\centering\scriptsize\gris{* SQL Server no lo permite. MySQL sí, pero no se hace: una función solo debe calcular.}\par}
+\vspace{0.05cm}
+\concepto{Regla práctica}{\small ¿Necesitas \textbf{un valor} para usarlo en una consulta? \textbf{Función}. ¿Necesitas que \textbf{pase algo} en la base? \textbf{Procedimiento}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 3} Procedimientos de los cupones}
+\small Sobre la base \texttt{cupones} de la práctica 1, en MySQL Workbench. Antes ejecuta \texttt{Sesion28/ejemplos/cupones/2\_variables\_if\_mysql.sql}: crea \texttt{precio\_final} y \texttt{situacion\_cupon}.\\[6pt]
+\npieza{1}\ \textbf{File → Open SQL Script\ldots} y abre \texttt{ejemplos/cupones/3\_procedimientos\_mysql.sql}.\\[2pt]
+\hspace*{6.2mm}\footnotesize\gris{En SQL Server: \texttt{3\_procedimientos\_sqlserver.sql} en SSMS.}\\[5pt]
+\small\npieza{2}\ Ejecútalo \textbf{por partes}: selecciona las líneas de una parte (1, 2, 3\ldots) y pulsa el rayo \rayo. Mira el Output.\\[5pt]
+\npieza{3}\ Pulsa refrescar \refrescar\ en el Navigator: en \textbf{Stored Procedures} deben estar \texttt{cupones\_vigentes} y \texttt{desactivar\_cupon}.\\[5pt]
+\npieza{4}\ Comprueba: \texttt{CALL desactivar\_cupon('VERANO1');} responde \textbf{El cupón no existe} y\\
+\hspace*{6.2mm}\texttt{CALL cupones\_vigentes(120, '2026-11-10');} muestra \textbf{2 filas}.\\[5pt]
+\npieza{5}\ \textbf{Reto:} crea \texttt{activar\_cupon(p\_codigo)}, igual a \texttt{desactivar\_cupon} pero con \texttt{'activo'}.\\
+\hspace*{6.2mm}Activa \texttt{PRUEBA50} y vuelve a llamar a \texttt{cupones\_vigentes}: ahora salen \textbf{3 filas}, con \texttt{PRUEBA50} en \textbf{70.00}.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+\begin{frame}{Cierre}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\raggedright\bfseries}p{3.6cm}>{\raggedright\arraybackslash}p{9.4cm}}
+\toprule
+Función & \textbf{Calcula} y devuelve un valor. Va dentro de un \texttt{SELECT} o un \texttt{WHERE}: precios, etiquetas, formatos. \\
+Procedimiento almacenado & \textbf{Hace} algo: cambia datos, agrupa pasos con su transacción, arma un reporte o hace una tarea diaria. \\
+¿Cuándo, en la base? & Cuando debe hacerse siempre igual, venga de la aplicación que venga. \\
+\texttt{DROP \ldots{} IF EXISTS} & Borra el procedimiento para crearlo de nuevo sin el \textit{Error 1304}. \\
+\texttt{DELIMITER} & En Workbench, cambia el final de instrucción para crear un procedimiento con \texttt{BEGIN}\ldots\texttt{END}. \\
+\texttt{CALL} / \texttt{EXEC} & Ejecutan un procedimiento: \texttt{CALL} en MySQL, \texttt{EXEC} en SQL Server. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Referencias}
+\footnotesize
+\begin{itemize}\setlength\itemsep{7pt}
+\item Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2014). \textit{Fundamentos de bases de datos} (6.ª ed.). McGraw-Hill.
+\item Oracle. MySQL Reference Manual: \href{https://dev.mysql.com/doc/refman/8.0/en/create-procedure.html}{\textit{CREATE PROCEDURE and CREATE FUNCTION}}, \href{https://dev.mysql.com/doc/refman/8.0/en/call.html}{\textit{CALL Statement}} y \href{https://dev.mysql.com/doc/refman/8.0/en/if.html}{\textit{IF Statement}}.
+\item Microsoft. Transact-SQL: \href{https://learn.microsoft.com/sql/t-sql/statements/create-function-transact-sql}{\textit{CREATE FUNCTION}}, \href{https://learn.microsoft.com/sql/t-sql/statements/create-procedure-transact-sql}{\textit{CREATE PROCEDURE}} y \href{https://learn.microsoft.com/sql/t-sql/language-elements/if-else-transact-sql}{\textit{IF...ELSE}}.
+\end{itemize}
+\end{frame}
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}
