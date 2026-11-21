@@ -1,0 +1,34 @@
+// @visual table=entrada x=170 y=120
+Table entrada {
+  id integer [pk, default: 1, check: `id = 1`, note: 'Una sola entrada para toda la feria.']
+  nombre text [not null, check: `trim(nombre) <> ''`]
+  descripcion text
+  precio decimal(18,2) [not null, check: `precio > 0`, note: 'En soles.']
+  disponibles integer [not null, default: 0, check: `disponibles >= 0`, note: 'Entradas que aún se pueden vender; cada venta descuenta una.']
+  venta_activa integer [not null, default: 1, check: `venta_activa IN (0, 1)`]
+}
+
+// @visual table=venta x=560 y=120
+Table venta {
+  id integer [pk, increment]
+  entrada_id integer [not null, default: 1]
+  dni varchar(8) [unique, not null, note: 'Exactamente 8 dígitos. Una entrada por DNI.']
+  nombre varchar(255) [not null, check: `trim(nombre) <> ''`]
+  correo varchar(254) [not null, check: `correo LIKE '%_@_%._%'`, note: 'Correo al que se envía el comprobante.']
+  precio decimal(18,2) [not null, check: `precio > 0`, note: 'Precio al pagar, en soles.']
+  referencia_pago varchar(255) [unique, not null, check: `trim(referencia_pago) <> ''`, note: 'Orden de la pasarela (Lemon Squeezy simulado).']
+  fecha_venta datetime [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+// @visual table=administrador x=170 y=420
+Table administrador {
+  id integer [pk, default: 1, check: `id = 1`]
+  usuario varchar(255) [unique, not null]
+  contrasena text [not null, note: 'Contraseña almacenada de forma muy segura.']
+}
+
+// @relation-meta
+// sourceLabel="se vende en"
+// targetLabel="es de"
+// ownsForeignKey="true"
+Ref: entrada.id <? venta.entrada_id

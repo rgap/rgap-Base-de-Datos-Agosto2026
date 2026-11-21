@@ -1,0 +1,34 @@
+// @visual table=entrada x=170 y=120
+Table entrada {
+  id integer [pk]
+  nombre varchar(255)
+  descripcion varchar(255)
+  precio varchar(255)
+  disponibles varchar(255)
+  venta_activa varchar(255)
+}
+
+// @visual table=venta x=560 y=120
+Table venta {
+  id integer [pk]
+  entrada_id integer [not null]
+  dni varchar(255)
+  nombre varchar(255)
+  correo varchar(255)
+  precio varchar(255)
+  referencia_pago varchar(255)
+  fecha_venta varchar(255)
+}
+
+// @visual table=administrador x=170 y=420
+Table administrador {
+  id integer [pk]
+  usuario varchar(255)
+  contrasena varchar(255)
+}
+
+// @relation-meta
+// sourceLabel="se vende en"
+// targetLabel="es de"
+// ownsForeignKey="true"
+Ref: entrada.id <? venta.entrada_id
