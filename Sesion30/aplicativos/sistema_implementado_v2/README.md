@@ -6,7 +6,7 @@ Todos los formularios tienen un botón **«Datos demo»** que los completa con d
 
 Es el mismo sistema que `55_venta_de_entradas_para_feria_gastronomica`, pero lo central aquí es **dónde vive la regla de la compra**. Cuando la venta abre, muchos visitantes pagan a la vez; si dos compras leen al mismo tiempo que queda una entrada, ambas podrían registrarse (sobreventa). Eso no lo resuelve la aplicación sino MySQL:
 
-- La compra se registra con `CALL comprar_entrada(...)`, un procedimiento almacenado. Bloquea la entrada con `SELECT ... FOR UPDATE`, comprueba la venta abierta, el DNI, la referencia del pago y las entradas disponibles, descuenta una y guarda la venta. Si algo falla hace `ROLLBACK`.
+- La compra se registra con `CALL comprar_entrada(...)`, un procedimiento almacenado. Descuenta una entrada con un `UPDATE` que solo cambia la fila si la venta está abierta y quedan entradas (y la bloquea hasta el `COMMIT`), y guarda la venta. Los `UNIQUE` de `venta` impiden repetir el DNI o la referencia del pago. Si algo falla hace `ROLLBACK`.
 - La configuración de la entrada (`configurar_entrada`) y el inicio de sesión (`credencial_valida`) también pasan por rutinas de la base.
 
 Por eso este caso usa MySQL y no SQLite: SQLite no tiene procedimientos almacenados. En `57_venta_de_entradas_con_usuario_y_permisos` se agrega además un usuario de MySQL para la aplicación que solo puede leer y llamar a las rutinas.
@@ -46,11 +46,11 @@ mysql -u root -p feria_entrada
 CALL comprar_entrada('70123456', 'Luis Rojas', 'luis@correo.com', 'orden-1', @id, @fecha, @entrada, @precio);
 SELECT @id, @fecha, @entrada, @precio;
 
--- El mismo DNI otra vez: lo rechaza el procedimiento y no descuenta nada.
+-- El mismo DNI otra vez: el INSERT falla por el UNIQUE de dni y el procedimiento deshace el descuento.
 CALL comprar_entrada('70123456', 'Luis Rojas', 'luis@correo.com', 'orden-2', @id, @fecha, @entrada, @precio);
 ```
 
-Para ver el bloqueo, abre dos sesiones. Deja la entrada con una sola disponible (`CALL configurar_entrada(45, 1, 1);`) y llama a `comprar_entrada` con DNI distintos en las dos a la vez. Una compra se registra y la otra recibe «Ya no quedan entradas disponibles.».
+Para ver el bloqueo, abre dos sesiones. Deja la entrada con una sola disponible (`CALL configurar_entrada(45, 1, 1);`) y llama a `comprar_entrada` con DNI distintos en las dos a la vez. Una compra se registra y la otra recibe «Venta cerrada o entradas agotadas.».
 
 Para empezar de cero basta el pie «Reiniciar datos» de la aplicación.
 
@@ -116,7 +116,7 @@ Tres tablas y tres rutinas, todo en `specs/modelo_fisico.sql`:
 - `entrada` — una sola fila (`CHECK id = 1`) con `precio` (`DECIMAL(10,2)`), `disponibles` y `venta_activa`.
 - `venta` — el `dni` (8 dígitos, `UNIQUE`: una entrada por persona), el `nombre`, el `correo` para el comprobante, el `precio` al pagar, la `referencia_pago` (`UNIQUE`: un pago no se registra dos veces) y la `fecha_venta` en UTC.
 - `administrador` — la credencial única (usuario y hash de la contraseña).
-- `comprar_entrada` (procedimiento) — bloquea la entrada (`SELECT ... FOR UPDATE`), comprueba venta abierta, DNI nuevo, referencia nueva y al menos una entrada disponible, descuenta una, inserta la venta y confirma. Ante cualquier error hace `ROLLBACK`. Devuelve el id, la fecha, la entrada y el precio por parámetros `OUT`.
+- `comprar_entrada` (procedimiento) — descuenta una entrada solo si la venta está abierta y queda al menos una (el `UPDATE` bloquea la fila), inserta la venta (los `UNIQUE` rechazan un DNI o una referencia repetidos) y confirma. Ante cualquier error hace `ROLLBACK`. Devuelve el id, la fecha, la entrada y el precio por parámetros `OUT`.
 - `configurar_entrada` (procedimiento) — fija precio, disponibles y estado; rechaza un precio con más de dos decimales.
 - `credencial_valida` (función) — devuelve si el usuario (distinguiendo mayúsculas) y el hash coinciden.
 

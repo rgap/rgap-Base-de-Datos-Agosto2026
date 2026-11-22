@@ -104,76 +104,43 @@ export function updateEntrada({ precio, disponibles, ventaActiva }) {
 // la pasarela al aprobar el pago: el identificador de la orden. Aquí ya no se
 // cobra nada; solo se registra la compra asociada a ese pago.
 export function registrarCompra({ dni, nombre, correo, referenciaPago }) {
-  // Toma el bloqueo de escritura desde el inicio, para que nadie más escriba
-  // entre las comprobaciones y el registro de la compra.
+  // Toma el bloqueo de escritura desde el inicio: las compras se registran de
+  // a una y dos compras a la vez no venden más entradas de las que hay.
   database.exec("BEGIN IMMEDIATE TRANSACTION");
 
   try {
-    // 1. Lee la entrada: su nombre y precio vigente (para guardarlos en la
-    //    compra) y si la venta está abierta (RN-05).
+    // 1. Descuenta una entrada solo si la venta está abierta y queda al menos
+    //    una (RN-05). RETURNING devuelve el nombre y el precio vigente para
+    //    guardarlos en la compra; si no cambia ninguna fila, no devuelve nada.
     const entrada = database.prepare(`
-      SELECT nombre, precio, disponibles, venta_activa
-      FROM entrada
-      WHERE id = 1
-    `).get();
-
-    if (!entrada.venta_activa) {
-      throw new ReglaError(409, "La venta de entradas está cerrada.");
-    }
-
-    // 2. Comprueba que este DNI no tenga ya una entrada comprada (RN-04).
-    const dniYaCompro = database.prepare(`
-      SELECT 1 FROM venta WHERE dni = ?
-    `).get(dni);
-
-    if (dniYaCompro) {
-      throw new ReglaError(409, "Este DNI ya tiene una entrada comprada. Solo se permite una entrada por persona.");
-    }
-
-    // 3. Comprueba que este pago no se haya registrado antes (RN-07): la
-    //    referencia es la orden que devolvió la pasarela.
-    const pagoRepetido = database.prepare(`
-      SELECT 1 FROM venta WHERE referencia_pago = ?
-    `).get(referenciaPago);
-
-    if (pagoRepetido) {
-      throw new ReglaError(409, "Este pago ya fue registrado.");
-    }
-
-    // 4. Descuenta una entrada solo si la venta sigue abierta y queda al menos
-    //    una (RN-05); si no cambia ninguna fila, es que se agotaron.
-    const descuento = database.prepare(`
       UPDATE entrada
       SET disponibles = disponibles - 1
       WHERE id = 1 AND venta_activa = 1 AND disponibles >= 1
-    `).run();
+      RETURNING nombre, precio
+    `).get();
 
-    if (descuento.changes === 0) {
-      throw new ReglaError(409, "Ya no quedan entradas disponibles.");
+    if (!entrada) {
+      throw new ReglaError(409, "Venta cerrada o entradas agotadas.");
     }
 
-    // 5. Registra la compra con los datos del comprador, el precio vigente
+    // 2. Registra la compra con los datos del comprador, el precio vigente
     //    (RN-08) y la referencia de la pasarela, para poder ubicar el pago
-    //    (por ejemplo, ante un reclamo).
-    const insercion = database.prepare(`
+    //    (por ejemplo, ante un reclamo). Un DNI que ya compró (RN-04) o un pago
+    //    ya registrado (RN-07) los rechazan los UNIQUE de venta.
+    //    RETURNING devuelve el id y la fecha que la base asignó, para el recibo.
+    const venta = database.prepare(`
       INSERT INTO venta (entrada_id, dni, nombre, correo, precio, referencia_pago)
       VALUES (1, ?, ?, ?, ?, ?)
-    `).run(dni, nombre, correo, entrada.precio, referenciaPago);
-
-    const ventaId = Number(insercion.lastInsertRowid);
-
-    // 6. Recupera la fecha y hora que la base asignó a la compra, para el recibo.
-    const { fecha_venta: fechaVenta } = database.prepare(`
-      SELECT fecha_venta FROM venta WHERE id = ?
-    `).get(ventaId);
+      RETURNING id, fecha_venta
+    `).get(dni, nombre, correo, entrada.precio, referenciaPago);
 
     // Todo salió bien: el descuento y la compra quedan guardados juntos.
     database.exec("COMMIT");
 
     return {
-      id: ventaId,
+      id: venta.id,
       referencia_pago: referenciaPago,
-      fecha_venta: fechaVenta,
+      fecha_venta: venta.fecha_venta,
       dni,
       nombre,
       correo,
@@ -183,6 +150,14 @@ export function registrarCompra({ dni, nombre, correo, referenciaPago }) {
   } catch (error) {
     // Algo falló: se deshace todo, ni se descuenta la entrada ni se guarda la compra.
     database.exec("ROLLBACK");
+
+    // El mensaje de SQLite nombra la columna repetida.
+    if (error.message?.includes("UNIQUE constraint failed: venta.dni")) {
+      throw new ReglaError(409, "Este DNI ya tiene una entrada comprada. Solo se permite una entrada por persona.");
+    }
+    if (error.message?.includes("UNIQUE constraint failed: venta.referencia_pago")) {
+      throw new ReglaError(409, "Este pago ya fue registrado.");
+    }
     throw error;
   }
 }

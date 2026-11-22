@@ -57,9 +57,9 @@ La aplicación se conecta con el usuario de `DATABASE_URL` (por defecto `root`).
 
 `comprar_entrada` abre su propia transacción:
 
-1. Bloquea la fila de `entrada` con `SELECT ... FOR UPDATE` y lee su nombre, precio, entradas disponibles y estado. Una segunda compra simultánea espera en este paso hasta que la primera confirme, y entonces ve las entradas ya descontadas.
-2. Comprueba que la venta esté abierta, que el DNI no haya comprado, que la referencia de pago sea nueva y que quede al menos una entrada. Si algo falla lanza `SIGNAL SQLSTATE '45000'` con el mensaje.
-3. Descuenta una entrada, inserta la venta con el precio vigente y confirma.
+1. Descuenta una entrada con `UPDATE entrada SET disponibles = disponibles - 1 WHERE id = 1 AND disponibles > 0 AND venta_activa = 1`. El `UPDATE` bloquea la fila hasta el `COMMIT`: una segunda compra simultánea espera en este paso y luego ve las entradas ya descontadas.
+2. Si `ROW_COUNT()` es 0, la venta está cerrada o no quedan entradas: lanza `SIGNAL SQLSTATE '45000'` con el mensaje.
+3. Lee el nombre y el precio vigente, inserta la venta y confirma. Si el DNI ya compró o la referencia de pago ya existe, el `INSERT` falla por el `UNIQUE` (error 1062) y la API responde `409` con un mensaje según la clave repetida.
 
 Ante cualquier error hace `ROLLBACK` y vuelve a lanzar el error: no se descuenta la entrada ni se guarda la venta. Devuelve el id, la fecha, el nombre de la entrada y el precio por parámetros `OUT` (`CALL comprar_entrada(?, ?, ?, ?, @venta_id, @fecha_venta, @entrada, @precio)` y luego `SELECT` de esas variables en la misma conexión).
 

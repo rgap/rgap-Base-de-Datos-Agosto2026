@@ -99,7 +99,7 @@ Debe mostrarse en la página principal el nombre, la descripción, el precio, la
 
 ### Requisito 2. Comprar con la pasarela simulada
 
-Debe ofrecerse en la página principal un formulario de compra (DNI, nombre y correo) y un pago en una ventana que simula el checkout overlay de Lemon Squeezy en modo de prueba. Con el pago aprobado, la compra se registra llamando al procedimiento almacenado `comprar_entrada`, que de forma atómica descuenta una de las entradas disponibles y guarda la compra con el DNI, el nombre, el correo, el precio y la referencia del pago. Cada DNI compra una sola entrada.
+Debe ofrecerse en la página principal un formulario de compra (DNI, nombre y correo) y un pago en una ventana que simula el checkout overlay de Lemon Squeezy en modo de prueba. Con el pago aprobado, la compra se registra de forma atómica: se descuenta una de las entradas disponibles y se guarda la compra con el DNI, el nombre, el correo, el precio y la referencia del pago. Cada DNI compra una sola entrada.
 
 ### Requisito 3. Configurar la entrada
 
@@ -145,7 +145,7 @@ Solo se puede comprar con la venta abierta y al menos una entrada disponible; la
 
 ### Regla 6. Compra atómica
 
-Descontar la entrada disponible y guardar la compra se hace en una sola transacción, dentro del procedimiento `comprar_entrada`: o se aplica todo o nada. El procedimiento bloquea la entrada mientras compra, de modo que dos compras simultáneas nunca venden la misma entrada disponible.
+Descontar la entrada disponible y guardar la compra se hace en una sola transacción: o se aplica todo o nada.
 
 ### Regla 7. Referencia de pago única
 

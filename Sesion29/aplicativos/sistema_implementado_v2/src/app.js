@@ -48,8 +48,10 @@ const files = {
 };
 
 // Códigos de MySQL que indican que la base rechazó los datos: SIGNAL de un
-// procedimiento (SQLSTATE 45000) o un CHECK incumplido (error 3819).
+// procedimiento (SQLSTATE 45000), un UNIQUE repetido (error 1062) o un CHECK
+// incumplido (error 3819).
 const RECHAZO_PROCEDIMIENTO = "45000";
+const UNIQUE_REPETIDO = 1062;
 const CHECK_VIOLADO = 3819;
 
 // Vistas de administración: exigen una sesión activa (RN-09).
@@ -175,7 +177,7 @@ export async function handleRequest(request, response) {
     // pasarela real, aquí se verificaría el pago (webhook firmado o consulta de
     // la orden) antes de llamar a registrarCompra. Las reglas de la compra
     // (venta abierta, un DNI, pago nuevo, entradas disponibles) las comprueba
-    // el procedimiento comprar_entrada dentro de la base.
+    // la base: el procedimiento comprar_entrada y los UNIQUE de venta.
     if (request.method === "POST" && url.pathname === "/api/compras") {
       const validation = validateCompra(await readJson(request));
       if (validation.error) return json(response, 400, { error: validation.error });
@@ -183,9 +185,17 @@ export async function handleRequest(request, response) {
       try {
         return json(response, 201, await registrarCompra(validation.value));
       } catch (error) {
-        // comprar_entrada rechazó la compra con SIGNAL: conflicto con el estado
-        // actual (409). Un CHECK incumplido son datos inválidos (400).
+        // comprar_entrada rechazó la compra con SIGNAL, o el DNI o el pago ya
+        // estaban en venta (UNIQUE): conflicto con el estado actual (409).
+        // Un CHECK incumplido son datos inválidos (400).
         if (error.sqlState === RECHAZO_PROCEDIMIENTO) return json(response, 409, { error: error.sqlMessage });
+        if (error.errno === UNIQUE_REPETIDO) {
+          // El mensaje de MySQL nombra la clave: "... for key 'venta.dni'".
+          const mensaje = error.sqlMessage.includes("venta.dni")
+            ? "Este DNI ya tiene una entrada comprada. Solo se permite una entrada por persona."
+            : "Este pago ya fue registrado.";
+          return json(response, 409, { error: mensaje });
+        }
         if (error.errno === CHECK_VIOLADO) return json(response, 400, { error: "Datos de la compra no válidos." });
         throw error;
       }

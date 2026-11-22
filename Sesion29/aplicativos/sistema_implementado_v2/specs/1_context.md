@@ -1,12 +1,10 @@
-# Caso de estudio: venta de entradas para una feria gastronómica con procedimiento almacenado
+# Caso de estudio: venta de entradas para una feria gastronómica
 
 ## 1. Problema
 
 Una feria gastronómica de tres días necesita vender su entrada en línea. Hay una sola entrada, válida para toda la feria (no se vende por día), con un precio y una cantidad limitada de entradas a la venta.
 
 Se requiere una aplicación que permita al visitante comprar su entrada desde la página principal, pagando con tarjeta, y que la compra quede registrada a nombre de la persona identificada por su DNI y su nombre, con un correo al que se le envía el comprobante. Cada persona (DNI) puede comprar una sola entrada. El administrador fija el precio y cuántas entradas hay a la venta, abre o cierra la venta y consulta las ventas.
-
-Cuando la venta abre, muchos visitantes pagan al mismo tiempo. Si dos compras leen a la vez que queda una entrada, ambas podrían registrarse y se venderían entradas que no existen (sobreventa). Por eso la compra no la arma la aplicación con varias consultas sueltas: la base de datos la realiza completa en un procedimiento almacenado que bloquea la entrada mientras compra.
 
 ## 2. Alcance y supuestos
 

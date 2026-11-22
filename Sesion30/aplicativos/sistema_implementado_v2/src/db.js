@@ -104,9 +104,10 @@ export async function updateEntrada({ precio, disponibles, ventaActiva }) {
 // ---------------------------------------------------------------------------
 
 // Registra una compra pagada llamando al procedimiento almacenado (Requisito 2).
-// Si la venta está cerrada, el DNI ya compró, el pago ya se registró o no
-// quedan entradas, comprar_entrada lanza SIGNAL SQLSTATE '45000' con el mensaje
-// y deshace todo; src/app.js lo traduce a 409.
+// Si la venta está cerrada o no quedan entradas, comprar_entrada lanza SIGNAL
+// SQLSTATE '45000'; si el DNI ya compró o el pago ya se registró, el INSERT
+// falla por un UNIQUE (error 1062). En ambos casos deshace todo y src/app.js
+// lo traduce a 409.
 //
 // PASARELA DE PAGO: cuando se llama a esta función, el cobro ya ocurrió en la
 // pasarela (simulada en public/checkout.js). referenciaPago es lo que devolvió

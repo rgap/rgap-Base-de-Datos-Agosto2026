@@ -71,4 +71,4 @@ Las vistas `/admin` y sus operaciones exigen una sesión iniciada en `/login`. C
 
 Tres tablas: `entrada` (una sola fila, `CHECK id = 1`, con `precio`, `disponibles` y `venta_activa`), `venta` y `administrador`. `venta` guarda el `dni` (8 dígitos, `UNIQUE`: una entrada por persona), el `nombre`, el `correo` para el comprobante, el `precio` al pagar y la `referencia_pago` (`UNIQUE`: un pago no se registra dos veces).
 
-La compra es una transacción: comprueba que la venta esté abierta, que el DNI no haya comprado y que la referencia sea nueva, descuenta una entrada disponible con `UPDATE entrada SET disponibles = disponibles - 1 WHERE id = 1 AND venta_activa = 1 AND disponibles >= 1` (si no cambia ninguna fila, no quedan entradas disponibles) e inserta la venta.
+La compra es una transacción: descuenta una entrada con `UPDATE entrada SET disponibles = disponibles - 1 WHERE id = 1 AND venta_activa = 1 AND disponibles >= 1` (si no cambia ninguna fila, la venta está cerrada o no quedan entradas) e inserta la venta. Los `UNIQUE` de `dni` y `referencia_pago` rechazan un DNI que ya compró o un pago repetido, y el `ROLLBACK` deshace el descuento.
