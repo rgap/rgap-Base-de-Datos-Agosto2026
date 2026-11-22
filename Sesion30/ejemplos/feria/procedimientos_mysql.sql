@@ -117,8 +117,9 @@ DELIMITER //
 
 -- PROCEDIMIENTO ALMACENADO: comprar_entrada
 -- Registra la compra de una entrada en una sola transacción.
--- Comprueba que la venta esté abierta, que el DNI y la referencia de pago no
--- se repitan y que queden entradas; descuenta una y guarda la venta.
+-- Descuenta una entrada solo si la venta está abierta y quedan entradas, y
+-- guarda la venta. Que el DNI y la referencia de pago no se repitan lo
+-- aseguran los UNIQUE de venta: el INSERT falla y se deshace el descuento.
 -- Devuelve el id y la fecha de la venta, el nombre de la entrada y el precio pagado.
 CREATE PROCEDURE comprar_entrada(
     IN p_dni CHAR(8),
@@ -130,11 +131,7 @@ CREATE PROCEDURE comprar_entrada(
     OUT p_entrada VARCHAR(255),
     OUT p_precio DECIMAL(10, 2)
 )
-MODIFIES SQL DATA
 BEGIN
-    DECLARE v_disponibles INT;
-    DECLARE v_venta_activa TINYINT;
-
     -- Ante cualquier error se deshace todo.
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -144,41 +141,32 @@ BEGIN
 
     START TRANSACTION;
 
-    -- FOR UPDATE bloquea la entrada hasta el COMMIT: dos compras a la vez no
-    -- venden más entradas de las que hay.
-    SELECT nombre, precio, disponibles, venta_activa
-    INTO p_entrada, p_precio, v_disponibles, v_venta_activa
-    FROM entrada
+    -- El UPDATE bloquea la entrada hasta el COMMIT: dos compras a la vez no
+    -- venden más entradas de las que hay. Si no cambia ninguna fila,
+    -- la venta está cerrada o no quedan entradas.
+    UPDATE entrada
+    SET disponibles = disponibles - 1
     WHERE id = 1
-    FOR UPDATE;
+      AND disponibles > 0
+      AND venta_activa = 1;
 
-    IF v_venta_activa = 0 THEN
+    IF ROW_COUNT() = 0 THEN
         SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'La venta de entradas está cerrada.';
+            SET MESSAGE_TEXT = 'Venta cerrada o entradas agotadas.';
     END IF;
 
-    IF EXISTS (SELECT 1 FROM venta WHERE dni = p_dni) THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Este DNI ya tiene una entrada comprada. Solo se permite una entrada por persona.';
-    END IF;
-
-    IF EXISTS (SELECT 1 FROM venta WHERE referencia_pago = p_referencia_pago) THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Este pago ya fue registrado.';
-    END IF;
-
-    IF v_disponibles < 1 THEN
-        SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'Ya no quedan entradas disponibles.';
-    END IF;
-
-    UPDATE entrada SET disponibles = disponibles - 1 WHERE id = 1;
+    SELECT nombre, precio
+    INTO p_entrada, p_precio
+    FROM entrada
+    WHERE id = 1;
 
     INSERT INTO venta (entrada_id, dni, nombre, correo, precio, referencia_pago)
     VALUES (1, p_dni, TRIM(p_nombre), TRIM(p_correo), p_precio, TRIM(p_referencia_pago));
 
-    SET p_venta_id = LAST_INSERT_ID();
-    SELECT fecha_venta INTO p_fecha_venta FROM venta WHERE id = p_venta_id;
+    SELECT id, fecha_venta
+    INTO p_venta_id, p_fecha_venta
+    FROM venta
+    WHERE id = LAST_INSERT_ID();
 
     COMMIT;
 END //
@@ -190,7 +178,8 @@ CALL comprar_entrada('70123456', 'Luis Rojas', 'luis.rojas@example.com', 'PAGO-0
                      @venta_id, @fecha_venta, @entrada, @precio);
 SELECT @venta_id AS venta_id, @fecha_venta AS fecha_venta, @entrada AS entrada, @precio AS precio;
 
--- Luis intenta comprar otra con el mismo DNI: el procedimiento hace ROLLBACK.
+-- Luis intenta comprar otra con el mismo DNI: el UNIQUE rechaza el INSERT
+-- y el procedimiento hace ROLLBACK (se deshace el descuento).
 CALL comprar_entrada('70123456', 'Luis Rojas', 'luis.rojas@example.com', 'PAGO-0002',
                      @venta_id, @fecha_venta, @entrada, @precio);
 

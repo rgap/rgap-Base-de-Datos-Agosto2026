@@ -521,6 +521,37 @@ Se ejecuta \textbf{un solo} camino: el primero que se cumple.\\[10pt]
 \vspace{0.1cm}
 {\centering\footnotesize\gris{\texttt{IF EXISTS}: si no existe, no da error. Por eso los scripts empiezan cada parte con un \texttt{DROP}.}\par}
 \end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{MySQL: decir qué hace con los datos}
+\small Después de los parámetros se puede escribir una línea que \textbf{describe} el procedimiento. Es \textbf{opcional}.
+\vspace{0.05cm}
+\begin{columns}[c,onlytextwidth]
+\column{.4\textwidth}
+\begin{sqlchico}[\col]
+\kw{CREATE PROCEDURE} ver\_entrada()\\
+\dentro{\kw{READS SQL DATA}}\\
+\kw{SELECT} nombre, precio, disponibles\\
+\kw{FROM} entrada;
+\end{sqlchico}
+\column{.57\textwidth}
+\scriptsize
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}>{\ttfamily}l>{\raggedright\arraybackslash}p{4.5cm}@{}}
+\toprule
+\normalfont\bfseries Línea & \bfseries Qué dice \\
+\midrule
+NO SQL & No tiene instrucciones SQL. \\
+CONTAINS SQL & Tiene SQL, pero no lee ni cambia tablas. Es la que vale si no escribes ninguna. \\
+\filagris READS SQL DATA & Solo \textbf{lee} tablas: \texttt{ver\_entrada}. \\
+\filagris MODIFIES SQL DATA & \textbf{Cambia} datos: \texttt{cambiar\_disponibles}. \\
+\midrule
+DETERMINISTIC & Con los mismos datos de entrada, siempre da el mismo resultado. \\
+\bottomrule
+\end{tabular}
+\end{columns}
+\vspace{0.1cm}
+\concepto{Opcional en procedimientos}{\small MySQL \textbf{no} lo comprueba: un procedimiento con \texttt{NO SQL} que hace un \texttt{UPDATE} funciona igual. En \textbf{funciones} sí se pide: \texttt{DETERMINISTIC}, \texttt{NO SQL} o \texttt{READS SQL DATA}. Sin ninguna, da \errlinea{Error Code: 1418}.}
+\end{frame}
 % =======================================================================
 \seccion{Procedimientos en SQL Server}
 \begin{frame}{SQL Server: crear un procedimiento y usarlo}
@@ -705,6 +736,39 @@ Lo que cambia frente a MySQL:\\[8pt]
 {\centering\footnotesize\gris{\texttt{BREAK} sale del bucle. \texttt{CONTINUE} salta a la siguiente vuelta.}\par}
 \end{frame}
 % ---------------------------------------------------------------------
+\begin{frame}{SQL Server: otras formas de repetir, con \texttt{WHILE}}
+\small No hay \texttt{REPEAT} ni \texttt{LOOP}. Lo mismo se hace con \texttt{WHILE 1 = 1}, que repite sin condición, y \texttt{BREAK}:
+\vspace{0.2cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{Como REPEAT}
+\begin{sqlchico}[\col]
+\kw{DECLARE} @i \kw{INT} = 1;\\
+\dentro{\kw{WHILE} 1 = 1}\\
+\kw{BEGIN}\\
+\ind\kw{INSERT INTO} venta \ldots;\\
+\ind\kw{SET} @i = @i + 1;\\
+\ind\dentro{\kw{IF} @i > @cantidad \kw{BREAK};}\\
+\kw{END};
+\end{sqlchico}
+\raggedright\small Primero hace una vuelta, después pregunta: el \texttt{IF} va \textbf{al final}.\\[4pt]
+\footnotesize\gris{Siempre da al menos una vuelta.}
+\column{.48\textwidth}
+\centering\etiqueta{Como LOOP}
+\begin{sqlchico}[\col]
+\kw{DECLARE} @i \kw{INT} = 1;\\
+\dentro{\kw{WHILE} 1 = 1}\\
+\kw{BEGIN}\\
+\ind\dentro{\kw{IF} @i > @cantidad \kw{BREAK};}\\
+\ind\kw{INSERT INTO} venta \ldots;\\
+\ind\kw{SET} @i = @i + 1;\\
+\kw{END};
+\end{sqlchico}
+\raggedright\small \texttt{BREAK} sale del bucle, como \texttt{LEAVE}. El bucle no necesita nombre.\\[4pt]
+\footnotesize\gris{\texttt{CONTINUE} salta a la siguiente vuelta, como \texttt{ITERATE}.}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
 \begin{frame}{SQL Server: devolver un dato, \texttt{OUTPUT}}
 \small Pedir el precio actual de la entrada.
 \vspace{0.2cm}
@@ -786,6 +850,66 @@ Lo que cambia frente a MySQL:\\[8pt]
 \end{columns}
 \end{frame}
 % ---------------------------------------------------------------------
+\begin{frame}{SQL Server: borrar un procedimiento}
+\small Si creas \texttt{dbo.ver\_entrada} dos veces:
+\vspace{0.1cm}
+\begin{center}\errlinea{\footnotesize Msg 2714, Level 16, State 3, Procedure ver\_entrada, Line 1\\There is already an object named 'ver\_entrada' in the database.}\end{center}
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{Borrar y crear}
+\begin{sqlchico}[\col]
+\dentro{\kw{DROP PROCEDURE IF EXISTS}}\\
+\ind\dentro{dbo.ver\_entrada;}\\
+\dentro{\kw{GO}}\\
+\kw{CREATE PROCEDURE} dbo.ver\_entrada\\
+\kw{AS}\\
+\kw{SELECT} nombre, precio, disponibles\\
+\kw{FROM} entrada;\\
+\kw{GO}
+\end{sqlchico}
+\raggedright\footnotesize\gris{El \texttt{GO} es necesario: \texttt{CREATE PROCEDURE} debe ir primero en su bloque.}
+\column{.48\textwidth}
+\centering\etiqueta{Crear o reemplazar}
+\begin{sqlchico}[\col]
+\dentro{\kw{CREATE OR ALTER PROCEDURE}}\\
+\ind dbo.ver\_entrada\\
+\kw{AS}\\
+\kw{SELECT} nombre, precio, disponibles\\
+\kw{FROM} entrada;\\
+\kw{GO}
+\end{sqlchico}
+\raggedright\small Si no existe, lo crea. Si existe, lo reemplaza.\\[4pt]
+\footnotesize\gris{Los scripts de SQL Server de esta sesión usan esta forma.}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{SQL Server: decir qué hace con los datos}
+\small En SQL Server \textbf{no existen} las líneas \texttt{READS SQL DATA}, \texttt{MODIFIES SQL DATA} y las demás. No se escribe nada.
+\vspace{0.25cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlchico}[\col]
+\kw{CREATE PROCEDURE} ver\_entrada()\\
+\dentro{\kw{READS SQL DATA}}\\
+\kw{SELECT} nombre, precio, disponibles\\
+\kw{FROM} entrada;
+\end{sqlchico}
+\column{.48\textwidth}
+\centering\etiqueta{SQL Server}
+\begin{sqlchico}[\col]
+\kw{CREATE OR ALTER PROCEDURE} dbo.ver\_entrada\\
+\kw{AS}\\
+\kw{SELECT} nombre, precio, disponibles\\
+\kw{FROM} entrada;\\
+\kw{GO}
+\end{sqlchico}
+\end{columns}
+\vspace{0.3cm}
+\concepto{Ni en funciones}{\small En MySQL, una función pide \texttt{DETERMINISTIC}, \texttt{NO SQL} o \texttt{READS SQL DATA}. En SQL Server no: la función \texttt{dbo.credencial\_valida} del Ejemplo 4 va sin esa línea.}
+\end{frame}
+% ---------------------------------------------------------------------
 \begin{frame}{MySQL y SQL Server: lo que cambia}
 \vspace{-0.15cm}
 \begin{center}
@@ -805,6 +929,8 @@ Repetir & WHILE \ldots{} DO \ldots{} END WHILE; & WHILE \ldots{} BEGIN \ldots{} 
 Error propio & SIGNAL SQLSTATE '45000' & THROW 50000, N'\ldots', 1; \\
 Si algo falla & DECLARE EXIT HANDLER & BEGIN TRY \ldots{} BEGIN CATCH \\
 Ejecutar & CALL p(300); & EXEC dbo.p 300; \\
+Borrar & DROP PROCEDURE IF EXISTS p; & DROP PROCEDURE IF EXISTS dbo.p; \\
+Qué hace con los datos & READS SQL DATA \normalfont\gris{(opcional)} & \normalfont\gris{no existe} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1065,7 +1191,7 @@ SQL Server (SSMS) & \texttt{sqlserver/practica\_1\_modelo\_fisico.sql} & \texttt
 \concepto{Por qué DECIMAL(20, 6)}{\small Con \texttt{DECIMAL(10, 2)}, \texttt{45.555} llegaría ya \textbf{redondeado} a \texttt{45.56} y el \texttt{IF} no lo vería.}
 \end{frame}
 % ---------------------------------------------------------------------
-\begin{frame}{Ejemplo 6 (1 de 4): los parámetros de \texttt{comprar\_entrada}}
+\begin{frame}{Ejemplo 6 (1 de 3): los parámetros de \texttt{comprar\_entrada}}
 \small Vende una entrada en \textbf{una sola transacción}. Recibe 4 datos y devuelve 4.
 \vspace{0.05cm}
 \begin{columns}[T,onlytextwidth]
@@ -1083,7 +1209,6 @@ SQL Server (SSMS) & \texttt{sqlserver/practica\_1\_modelo\_fisico.sql} & \texttt
 \ind\dentro{\kw{OUT}} p\_entrada \kw{VARCHAR}(255),\\
 \ind\dentro{\kw{OUT}} p\_precio \kw{DECIMAL}(10, 2)\\
 )\\
-\kw{MODIFIES SQL DATA}\\
 \kw{BEGIN}
 \end{sqlmini}
 \column{.48\textwidth}
@@ -1116,137 +1241,83 @@ DNI, nombre, correo, referencia del pago & id y fecha de la venta, nombre de la 
 \end{center}
 \end{frame}
 % ---------------------------------------------------------------------
-\begin{frame}{Ejemplo 6 (2 de 4): abrir la transacción y leer}
+\begin{frame}{Ejemplo 6 (2 de 3): descontar una entrada, si se puede}
 \begin{columns}[T,onlytextwidth]
 \column{.48\textwidth}
 \centering\etiqueta{MySQL}
 \begin{sqlmicro}[\col]
-\kw{DECLARE} v\_disponibles \kw{INT};\hfill\npieza{1}\\
-\kw{DECLARE} v\_venta\_activa \kw{TINYINT};\\[3pt]
-\com{-- Ante cualquier error se deshace todo.}\\
-\dentro{\kw{DECLARE EXIT HANDLER FOR SQLEXCEPTION}}\hfill\npieza{2}\\
+\dentro{\kw{DECLARE EXIT HANDLER FOR SQLEXCEPTION}}\hfill\npieza{1}\\
 \kw{BEGIN}\\
 \ind\kw{ROLLBACK};\\
 \ind\kw{RESIGNAL};\\
-\kw{END};\\[3pt]
-\dentro{\kw{START TRANSACTION};}\hfill\npieza{3}\\[3pt]
-\com{-- FOR UPDATE bloquea la entrada hasta el COMMIT}\\
-\kw{SELECT} nombre, precio, disponibles,\hfill\npieza{4}\\
-\ind\ind venta\_activa\\
-\kw{INTO} p\_entrada, p\_precio, v\_disponibles,\\
-\ind\ind v\_venta\_activa\\
-\kw{FROM} entrada\\
+\kw{END};\\[1pt]
+\dentro{\kw{START TRANSACTION};}\hfill\npieza{2}\\[1pt]
+\kw{UPDATE} entrada\hfill\npieza{3}\\
+\kw{SET} disponibles = disponibles - 1\\
 \kw{WHERE} id = 1\\
-\dentro{\kw{FOR UPDATE}};
-\end{sqlmicro}
-\column{.48\textwidth}
-\centering\etiqueta{SQL Server}
-\begin{sqlmicro}[\col]
-\kw{DECLARE} @disponibles \kw{INT};\hfill\npieza{1}\\
-\kw{DECLARE} @venta\_activa \kw{TINYINT};\\[3pt]
-\dentro{\kw{BEGIN TRY}}\hfill\npieza{2}\\
-\ind\dentro{\kw{BEGIN TRANSACTION};}\hfill\npieza{3}\\[3pt]
-\ind\com{-- UPDLOCK bloquea la entrada hasta el COMMIT}\\
-\ind\kw{SELECT} @entrada = nombre,\hfill\npieza{4}\\
-\ind\ind\ind @precio = precio,\\
-\ind\ind\ind @disponibles = disponibles,\\
-\ind\ind\ind @venta\_activa = venta\_activa\\
-\ind\kw{FROM} entrada \dentro{\kw{WITH} (UPDLOCK)}\\
-\ind\kw{WHERE} id = 1;
-\end{sqlmicro}
-\end{columns}
-\vspace{0.05cm}
-\footnotesize\npieza{1}\ variables\quad \npieza{2}\ si algo falla (el \texttt{CATCH} va al final)\quad \npieza{3}\ abrir la transacción\quad \npieza{4}\ leer y \textbf{bloquear} la entrada
-\end{frame}
-% ---------------------------------------------------------------------
-\begin{frame}{Ejemplo 6 (3 de 4): las cuatro comprobaciones}
-\begin{columns}[T,onlytextwidth]
-\column{.48\textwidth}
-\centering\etiqueta{MySQL}
-\begin{sqlmicro}[\col]
-\kw{IF} v\_venta\_activa = 0 \kw{THEN}\\
+\ind\dentro{\kw{AND} disponibles > 0}\\
+\ind\dentro{\kw{AND} venta\_activa = 1};\\[1pt]
+\kw{IF} \dentro{\kw{ROW\_COUNT}() = 0} \kw{THEN}\hfill\npieza{4}\\
 \ind\kw{SIGNAL SQLSTATE} '45000' \kw{SET MESSAGE\_TEXT} =\\
-\ind\ind'La venta de entradas está cerrada.';\\
-\kw{END IF};\\[1pt]
-\kw{IF} \dentro{\kw{EXISTS} (\kw{SELECT} 1 \kw{FROM} venta}\\
-\ind\ind\dentro{\kw{WHERE} dni = p\_dni)} \kw{THEN}\\
-\ind\kw{SIGNAL SQLSTATE} '45000' \kw{SET MESSAGE\_TEXT} =\\
-\ind\ind'Este DNI ya tiene una entrada comprada.\\
-\ind\ind Solo se permite una entrada por persona.';\\
-\kw{END IF};\\[1pt]
-\kw{IF} \kw{EXISTS} (\kw{SELECT} 1 \kw{FROM} venta\\
-\ind\ind\kw{WHERE} referencia\_pago = p\_referencia\_pago)\\
-\ind\ind\kw{THEN}\\
-\ind\kw{SIGNAL SQLSTATE} '45000' \kw{SET MESSAGE\_TEXT} =\\
-\ind\ind'Este pago ya fue registrado.';\\
-\kw{END IF};\\[1pt]
-\kw{IF} v\_disponibles < 1 \kw{THEN}\\
-\ind\kw{SIGNAL SQLSTATE} '45000' \kw{SET MESSAGE\_TEXT} =\\
-\ind\ind'Ya no quedan entradas disponibles.';\\
+\ind\ind'Venta cerrada o entradas agotadas.';\\
 \kw{END IF};
 \end{sqlmicro}
 \column{.48\textwidth}
 \centering\etiqueta{SQL Server}
 \begin{sqlmicro}[\col]
-\ind\kw{IF} @venta\_activa = 0\\
+\dentro{\kw{BEGIN TRY}}\hfill\npieza{1}\\
+\ind\dentro{\kw{BEGIN TRANSACTION};}\hfill\npieza{2}\\[1pt]
+\ind\kw{UPDATE} entrada\hfill\npieza{3}\\
+\ind\kw{SET} disponibles = disponibles - 1\\
+\ind\kw{WHERE} id = 1\\
+\ind\ind\dentro{\kw{AND} disponibles > 0}\\
+\ind\ind\dentro{\kw{AND} venta\_activa = 1};\\[1pt]
+\ind\kw{IF} \dentro{@@ROWCOUNT = 0}\hfill\npieza{4}\\
 \ind\ind\kw{THROW} 50000,\\
-\ind\ind\ind N'La venta de entradas está cerrada.', 1;\\[1pt]
-\ind\kw{IF} \dentro{\kw{EXISTS} (\kw{SELECT} 1 \kw{FROM} venta}\\
-\ind\ind\ind\dentro{\kw{WHERE} dni = @dni)}\\
-\ind\ind\kw{THROW} 50000,\\
-\ind\ind\ind N'Este DNI ya tiene una entrada comprada.\\
-\ind\ind\ind Solo se permite una entrada por persona.', 1;\\[1pt]
-\ind\kw{IF} \kw{EXISTS} (\kw{SELECT} 1 \kw{FROM} venta\\
-\ind\ind\ind\kw{WHERE} referencia\_pago = @referencia\_pago)\\
-\ind\ind\kw{THROW} 50000,\\
-\ind\ind\ind N'Este pago ya fue registrado.', 1;\\[1pt]
-\ind\kw{IF} @disponibles < 1\\
-\ind\ind\kw{THROW} 50000,\\
-\ind\ind\ind N'Ya no quedan entradas disponibles.', 1;
+\ind\ind\ind N'Venta cerrada o entradas agotadas.', 1;
 \end{sqlmicro}
 \end{columns}
 \vspace{0.05cm}
-\footnotesize Si una falla, salta al \textbf{handler} (MySQL) o al \textbf{\texttt{CATCH}} (SQL Server): \texttt{ROLLBACK}, y el mensaje llega a la aplicación.
+\footnotesize\npieza{1}\ si algo falla (el \texttt{CATCH} va al final)\quad \npieza{2}\ abrir la transacción\quad \npieza{4}\ ¿ninguna fila cambió? Error.\\[2pt]
+\npieza{3}\ descuenta solo si la venta está abierta y quedan entradas, y \textbf{bloquea} la entrada hasta el \texttt{COMMIT}.
 \end{frame}
 % ---------------------------------------------------------------------
-\begin{frame}{Ejemplo 6 (4 de 4): guardar y confirmar}
+\begin{frame}{Ejemplo 6 (3 de 3): guardar la venta y confirmar}
 \begin{columns}[T,onlytextwidth]
 \column{.48\textwidth}
 \centering\etiqueta{MySQL}
 \begin{sqlmicro}[\col]
-\kw{UPDATE} entrada\\
-\kw{SET} disponibles = disponibles - 1\\
-\kw{WHERE} id = 1;\\[3pt]
-\kw{INSERT INTO} venta (entrada\_id, dni, nombre,\\
+\kw{SELECT} nombre, precio\hfill\npieza{1}\\
+\kw{INTO} p\_entrada, p\_precio\\
+\kw{FROM} entrada \kw{WHERE} id = 1;\\[1pt]
+\dentro{\kw{INSERT INTO} venta} (entrada\_id, dni, nombre,\hfill\npieza{2}\\
 \ind\ind correo, precio, referencia\_pago)\\
 \kw{VALUES} (1, p\_dni, \kw{TRIM}(p\_nombre),\\
 \ind\ind \kw{TRIM}(p\_correo), p\_precio,\\
-\ind\ind \kw{TRIM}(p\_referencia\_pago));\\[3pt]
-\kw{SET} p\_venta\_id = \dentro{\kw{LAST\_INSERT\_ID}()};\\
-\kw{SELECT} fecha\_venta \kw{INTO} p\_fecha\_venta\\
-\kw{FROM} venta \kw{WHERE} id = p\_venta\_id;\\[3pt]
+\ind\ind \kw{TRIM}(p\_referencia\_pago));\\[1pt]
+\kw{SELECT} id, fecha\_venta\hfill\npieza{3}\\
+\kw{INTO} p\_venta\_id, p\_fecha\_venta\\
+\kw{FROM} venta \kw{WHERE} id = \dentro{\kw{LAST\_INSERT\_ID}()};\\[1pt]
 \dentro{\kw{COMMIT};}\\
-\kw{END} //\\[3pt]
+\kw{END} //\\[1pt]
 \kw{DELIMITER} ;
 \end{sqlmicro}
 \column{.48\textwidth}
 \centering\etiqueta{SQL Server}
 \begin{sqlmicro}[\col]
-\ind\kw{UPDATE} entrada\\
-\ind\kw{SET} disponibles = disponibles - 1\\
-\ind\kw{WHERE} id = 1;\\[3pt]
-\ind\kw{INSERT INTO} venta (entrada\_id, dni, nombre,\\
+\ind\kw{SELECT} @entrada = nombre, @precio = precio\hfill\npieza{1}\\
+\ind\kw{FROM} entrada \kw{WHERE} id = 1;\\[1pt]
+\ind\dentro{\kw{INSERT INTO} venta} (entrada\_id, dni, nombre,\hfill\npieza{2}\\
 \ind\ind\ind correo, precio, referencia\_pago)\\
 \ind\kw{VALUES} (1, @dni, \kw{TRIM}(@nombre),\\
 \ind\ind\ind \kw{TRIM}(@correo), @precio,\\
-\ind\ind\ind \kw{TRIM}(@referencia\_pago));\\[3pt]
-\ind\kw{SET} @venta\_id = \dentro{\kw{SCOPE\_IDENTITY}()};\\
-\ind\kw{SELECT} @fecha\_venta = fecha\_venta\\
-\ind\kw{FROM} venta \kw{WHERE} id = @venta\_id;\\[3pt]
+\ind\ind\ind \kw{TRIM}(@referencia\_pago));\\[1pt]
+\ind\kw{SELECT} @venta\_id = id,\hfill\npieza{3}\\
+\ind\ind\ind @fecha\_venta = fecha\_venta\\
+\ind\kw{FROM} venta \kw{WHERE} id = \dentro{\kw{SCOPE\_IDENTITY}()};\\[1pt]
 \ind\dentro{\kw{COMMIT};}\\
 \kw{END TRY}\\
 \dentro{\kw{BEGIN CATCH}}\\
-\ind\com{-- Ante cualquier error se deshace todo.}\\
 \ind\kw{IF} @@TRANCOUNT > 0\\
 \ind\ind\kw{ROLLBACK};\\
 \ind\kw{THROW};\\
@@ -1254,8 +1325,8 @@ DNI, nombre, correo, referencia del pago & id y fecha de la venta, nombre de la 
 \kw{END};\ \kw{GO}
 \end{sqlmicro}
 \end{columns}
-\vspace{0.05cm}
-\footnotesize \texttt{LAST\_INSERT\_ID()} y \texttt{SCOPE\_IDENTITY()} dan el \texttt{id} que se acaba de generar para la venta.
+\vspace{0.02cm}
+\scriptsize\npieza{1}\ para el comprobante\quad \npieza{2}\ ¿DNI o pago repetidos? Un \texttt{UNIQUE} lo rechaza y se deshace todo.\quad \npieza{3}\ id y fecha de la venta
 \end{frame}
 % ---------------------------------------------------------------------
 \begin{frame}{Ejemplo 6: Luis compra su entrada}
@@ -1322,7 +1393,7 @@ DNI, nombre, correo, referencia del pago & id y fecha de la venta, nombre de la 
 \ind @venta\_id, @fecha\_venta, @entrada, @precio);
 \end{sqlmini}
 \vspace{-4pt}
-\raggedright\errlinea{Error Code: 1644. Este DNI ya tiene una entrada comprada. Solo se permite una entrada por persona.}
+{\scriptsize\raggedright\errlinea{Error Code: 1062. Duplicate entry '70123456' for key 'venta.dni'}\par}
 \column{.48\textwidth}
 \centering\etiqueta{SQL Server}
 \begin{sqlmini}[\col]
@@ -1333,9 +1404,9 @@ DNI, nombre, correo, referencia del pago & id y fecha de la venta, nombre de la 
 \ind @precio \kw{OUTPUT};
 \end{sqlmini}
 \vspace{-4pt}
-\raggedright\errlinea{Msg 50000, Level 16, State 1, Procedure dbo.comprar\_entrada, Line 39\\Este DNI ya tiene una entrada comprada. Solo se permite una entrada por persona.}
+{\scriptsize\raggedright\errlinea{Msg 2627, Level 14, State 1, Procedure dbo.comprar\_entrada, Line 42\\Violation of UNIQUE KEY constraint 'UQ\_\_venta\_\_D87608A7\ldots'. Cannot insert duplicate key in object 'dbo.venta'. The duplicate key value is (70123456).}\par}
 \end{columns}
-\vspace{0.2cm}
+\vspace{0.02cm}
 \begin{columns}[T,onlytextwidth]
 \column{.6\textwidth}
 \centering
@@ -1344,8 +1415,8 @@ DNI, nombre, correo, referencia del pago & id y fecha de la venta, nombre de la 
 \centering
 \tabla{contar\_ventas}{r}{\cab{total}}{\fila 1 \\}
 \end{columns}
-\vspace{0.15cm}
-{\centering\small La comprobación del DNI detuvo el procedimiento y se hizo \texttt{ROLLBACK}: no cambió nada.\par}
+\vspace{0.05cm}
+{\centering\footnotesize El \texttt{UNIQUE} de \texttt{dni} rechazó el \texttt{INSERT} y se hizo \texttt{ROLLBACK}: el descuento se deshizo.\par}
 \end{frame}
 % ---------------------------------------------------------------------
 \begin{frame}{\ins{Práctica 2} Los procedimientos de la feria}
@@ -1367,7 +1438,7 @@ SQL Server (SSMS) & \texttt{procedimientos\_sqlserver.sql} \\
 \npieza{2}\ \small Ejecútalo \textbf{por partes}, del 1 al 6: selecciona una parte y ejecútala (\rayo{} o \textbf{Execute}). Lee el resultado de cada una.\\[5pt]
 \npieza{3}\ Comprueba al final: \textbf{499} entradas disponibles, \textbf{1} venta, y el segundo intento de Luis rechazado.\\[5pt]
 \npieza{4}\ \textbf{Reto:} cierra la venta con \texttt{configurar\_entrada(45.00, 499, 0)} y compra con otro DNI\\
-\hspace*{6.2mm}(\texttt{'70123457'}, \texttt{'PAGO-0003'}). Debe responder \textbf{La venta de entradas está cerrada.}
+\hspace*{6.2mm}(\texttt{'70123457'}, \texttt{'PAGO-0003'}). Debe responder \textbf{Venta cerrada o entradas agotadas.}
 \end{frame}
 % ---------------------------------------------------------------------
 \seccion{Triggers}

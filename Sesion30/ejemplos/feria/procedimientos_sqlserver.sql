@@ -113,8 +113,9 @@ GO
 
 -- PROCEDIMIENTO ALMACENADO: comprar_entrada
 -- Registra la compra de una entrada en una sola transacción.
--- Comprueba que la venta esté abierta, que el DNI y la referencia de pago no
--- se repitan y que queden entradas; descuenta una y guarda la venta.
+-- Descuenta una entrada solo si la venta está abierta y quedan entradas, y
+-- guarda la venta. Que el DNI y la referencia de pago no se repitan lo
+-- aseguran los UNIQUE de venta: el INSERT falla y se deshace el descuento.
 -- Devuelve el id y la fecha de la venta, el nombre de la entrada y el precio pagado.
 CREATE OR ALTER PROCEDURE dbo.comprar_entrada
     @dni CHAR(8),
@@ -127,38 +128,31 @@ CREATE OR ALTER PROCEDURE dbo.comprar_entrada
     @precio DECIMAL(10, 2) OUTPUT
 AS
 BEGIN
-    DECLARE @disponibles INT;
-    DECLARE @venta_activa TINYINT;
-
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        -- UPDLOCK bloquea la entrada hasta el COMMIT: dos compras a la vez no
-        -- venden más entradas de las que hay.
-        SELECT @entrada = nombre, @precio = precio,
-               @disponibles = disponibles, @venta_activa = venta_activa
-        FROM entrada WITH (UPDLOCK)
+        -- El UPDATE bloquea la entrada hasta el COMMIT: dos compras a la vez no
+        -- venden más entradas de las que hay. Si no cambia ninguna fila,
+        -- la venta está cerrada o no quedan entradas.
+        UPDATE entrada
+        SET disponibles = disponibles - 1
+        WHERE id = 1
+          AND disponibles > 0
+          AND venta_activa = 1;
+
+        IF @@ROWCOUNT = 0
+            THROW 50000, N'Venta cerrada o entradas agotadas.', 1;
+
+        SELECT @entrada = nombre, @precio = precio
+        FROM entrada
         WHERE id = 1;
-
-        IF @venta_activa = 0
-            THROW 50000, N'La venta de entradas está cerrada.', 1;
-
-        IF EXISTS (SELECT 1 FROM venta WHERE dni = @dni)
-            THROW 50000, N'Este DNI ya tiene una entrada comprada. Solo se permite una entrada por persona.', 1;
-
-        IF EXISTS (SELECT 1 FROM venta WHERE referencia_pago = @referencia_pago)
-            THROW 50000, N'Este pago ya fue registrado.', 1;
-
-        IF @disponibles < 1
-            THROW 50000, N'Ya no quedan entradas disponibles.', 1;
-
-        UPDATE entrada SET disponibles = disponibles - 1 WHERE id = 1;
 
         INSERT INTO venta (entrada_id, dni, nombre, correo, precio, referencia_pago)
         VALUES (1, @dni, TRIM(@nombre), TRIM(@correo), @precio, TRIM(@referencia_pago));
 
-        SET @venta_id = SCOPE_IDENTITY();
-        SELECT @fecha_venta = fecha_venta FROM venta WHERE id = @venta_id;
+        SELECT @venta_id = id, @fecha_venta = fecha_venta
+        FROM venta
+        WHERE id = SCOPE_IDENTITY();
 
         COMMIT;
     END TRY
@@ -178,7 +172,8 @@ EXEC dbo.comprar_entrada '70123456', N'Luis Rojas', 'luis.rojas@example.com', 'P
 SELECT @venta_id AS venta_id, @fecha_venta AS fecha_venta, @entrada AS entrada, @precio AS precio;
 GO
 
--- Luis intenta comprar otra con el mismo DNI: el procedimiento hace ROLLBACK.
+-- Luis intenta comprar otra con el mismo DNI: el UNIQUE rechaza el INSERT
+-- y el procedimiento hace ROLLBACK (se deshace el descuento).
 DECLARE @venta_id INT, @fecha_venta DATETIME, @entrada NVARCHAR(255), @precio DECIMAL(10, 2);
 EXEC dbo.comprar_entrada '70123456', N'Luis Rojas', 'luis.rojas@example.com', 'PAGO-0002',
      @venta_id OUTPUT, @fecha_venta OUTPUT, @entrada OUTPUT, @precio OUTPUT;
