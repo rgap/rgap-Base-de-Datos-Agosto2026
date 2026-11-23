@@ -101,9 +101,10 @@
     \node[anchor=center,inner sep=0pt] at (current page.center) {%
       \includegraphics[width=\paperwidth,height=\paperheight]{utp-cover-bg.jpeg}%
     };
-    \node[anchor=north,align=center,text=utpNegro,inner sep=0pt,
+    % Anclado por abajo: un título de dos líneas crece hacia arriba y no pisa el subtítulo.
+    \node[anchor=south,align=center,text=utpNegro,inner sep=0pt,
       text width=145mm,font=\usebeamerfont{title}]
-      at ([yshift=-25.2mm]current page.north) {\inserttitle};
+      at ([yshift=-34.5mm]current page.north) {\inserttitle};
     \node[anchor=north,align=center,text=utpNegro,inner sep=0pt,
       text width=142mm,font=\usebeamerfont{subtitle}]
       at ([yshift=-38.2mm]current page.north) {\insertsubtitle};
