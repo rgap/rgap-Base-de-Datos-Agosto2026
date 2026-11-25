@@ -1,0 +1,9 @@
+- generic [ref=e4]:
+  - generic [ref=e10]:
+    - heading "Acceso restringido" [level=1] [ref=e11]
+    - paragraph [ref=e12]: Escribe la clave para entrar a esta página.
+  - textbox "Clave" [active] [ref=e13]
+  - generic [ref=e14]:
+    - link "Ir al inicio" [ref=e15] [cursor=pointer]:
+      - /url: /
+    - button "Entrar" [disabled] [ref=e16]

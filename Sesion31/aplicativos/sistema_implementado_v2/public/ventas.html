@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1d2b20" />
+    <title>Ventas | Fogón</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22%3E%3Ctext%20x=%2250%22%20y=%22.9em%22%20text-anchor=%22middle%22%20font-size=%2290%22%3E%F0%9F%8D%B2%3C/text%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body class="management-page">
+    <aside class="sidebar">
+      <a class="admin-brand" href="/admin">
+        <span class="admin-brand-mark" aria-hidden="true">F</span>
+        <span><strong>Fogón</strong><small>Panel de administración</small></span>
+      </a>
+      <nav class="admin-nav" aria-label="Navegación de administración">
+        <a href="/admin"><span aria-hidden="true">≡</span>Entrada</a>
+        <a class="active" href="/admin/ventas" aria-current="page"><span aria-hidden="true">S/</span>Ventas</a>
+      </nav>
+      <p class="sidebar-note">Espacio del administrador: fija el precio y las entradas disponibles, abre o cierra la venta y revisa las compras.</p>
+    </aside>
+
+    <main class="admin-workspace">
+      <header class="mobile-admin-header">
+        <a class="admin-brand" href="/admin">
+          <span class="admin-brand-mark" aria-hidden="true">F</span>
+          <span><strong>Fogón</strong><small>Administración</small></span>
+        </a>
+        <nav class="mobile-admin-nav" aria-label="Navegación de administración">
+          <a href="/admin">Entrada</a>
+          <a class="active" href="/admin/ventas" aria-current="page">Ventas</a>
+        </nav>
+      </header>
+
+      <p id="mensaje" class="message" role="alert" hidden></p>
+      <section class="admin-view">
+        <div class="admin-heading">
+          <div>
+            <p class="eyebrow">Compras registradas</p>
+            <h1>Ventas</h1>
+            <p>Compras pagadas con la pasarela simulada de Lemon Squeezy, de la más reciente a la más antigua.</p>
+          </div>
+          <div class="heading-actions">
+            <a class="heading-link" href="/">Ver portada <span aria-hidden="true">→</span></a>
+            <button type="button" class="heading-link heading-logout" data-cerrar-sesion>Cerrar sesión</button>
+          </div>
+        </div>
+
+        <div class="stock-toolbar">
+          <label>Buscar<input id="filtro-texto" type="search" placeholder="DNI, nombre, correo o referencia" /></label>
+          <p id="ventas-conteo" class="result-count">0 compras</p>
+        </div>
+
+        <div class="sales-summary sales-summary-2" aria-live="polite">
+          <div class="summary-tile"><small>Entradas vendidas</small><strong id="resumen-entradas">0</strong></div>
+          <div class="summary-tile"><small>Recaudado</small><strong id="resumen-total">S/ 0.00</strong></div>
+        </div>
+
+        <div id="ventas-lista">
+          <p class="loading-state">Cargando ventas…</p>
+        </div>
+      </section>
+    </main>
+
+    <script src="/admin-common.js"></script>
+    <script src="/ventas.js"></script>
+    <script src="/reset.js"></script>
+  </body>
+</html>

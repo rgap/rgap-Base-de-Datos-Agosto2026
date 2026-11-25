@@ -1,0 +1,1042 @@
+% Motor: XeLaTeX, fijado en .latexmkrc y en la receta del editor.
+\documentclass[aspectratio=169,10pt,c]{beamer}
+% Sin atajos de babel: así las comillas " del código se ven tal cual.
+\PassOptionsToPackage{es-noshorthands}{babel}
+
+\input{header.tex}
+\usepackage{colortbl}
+\usetikzlibrary{decorations.pathreplacing}
+
+\title{Base de Datos}
+\subtitle{Usos comunes, triggers y seguridad de la base de datos}
+\date{Semana 16 - Sesión 31}
+\author{Rel Guzman}
+
+% Nombre de tabla, siempre en naranja
+\newcommand{\tbl}[1]{\textcolor{utpNaranja}{\texttt{#1}}}
+% Palabra reservada de SQL dentro de un bloque de código
+\newcommand{\kw}[1]{\textcolor{utpRojo}{\textbf{#1}}}
+% Comentario dentro de un bloque de código
+\newcommand{\com}[1]{\textcolor{utpGrisMedio}{#1}}
+% Texto de apoyo en gris
+\newcommand{\gris}[1]{\textcolor{utpGris}{#1}}
+% Insignia de práctica
+\newcommand{\ins}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner xsep=5pt,inner ysep=2.5pt] {#1};}}
+% Etiqueta oscura: nombre de un operador o de un gestor
+\newcommand{\etiqueta}[1]{\tikz[baseline=-0.5ex]{\node[rounded corners=2pt,fill=utpNegro,text=white,
+  font=\bfseries\scriptsize,inner xsep=6pt,inner ysep=3pt] {#1};}}
+% Número de paso
+\newcommand{\npieza}[1]{\tikz[baseline=-0.6ex]{\node[circle,fill=utpRojo,text=white,
+  font=\bfseries\scriptsize,inner sep=1.6pt,minimum size=4.2mm] {#1};}}
+% Celda o texto resaltado en rojo claro
+\newcommand{\mal}[1]{{\setlength{\fboxsep}{1.2pt}\colorbox{utpRojo!18}{#1}}}
+% Lo importante, resaltado en amarillo dentro de un bloque de código
+\newcommand{\dentro}[1]{{\setlength{\fboxsep}{1.5pt}\colorbox{yellow!45}{#1}}}
+% Fila de una tabla resaltada
+\newcommand{\fila}{\rowcolor{yellow!45}}
+\newcommand{\filagris}{\rowcolor{utpGrisClaro}}
+% Marcas de sí y no
+\newcommand{\si}{$\checkmark$}
+\newcommand{\no}{\textcolor{utpRojo}{$\times$}}
+% Bloques de código sobre fondo gris: normal, chico y mínimo
+\newsavebox{\sqlbuf}
+\newenvironment{sqlcode}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\footnotesize\vspace{6pt}\raggedright}
+  {\vspace{6pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+\newenvironment{sqlchico}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\scriptsize\vspace{5pt}\raggedright}
+  {\vspace{5pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+\newenvironment{sqlmini}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\fontsize{7}{8.3}\selectfont\vspace{4pt}\raggedright}
+  {\vspace{4pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+\newenvironment{sqlmicro}[1][.86\textwidth]
+  {\begin{center}\begin{lrbox}{\sqlbuf}\begin{minipage}{#1}\ttfamily\fontsize{6.4}{7.5}\selectfont\vspace{4pt}\raggedright}
+  {\vspace{4pt}\end{minipage}\end{lrbox}\colorbox{utpGrisClaro}{\usebox{\sqlbuf}}\end{center}}
+% Ancho de una columna menos el borde del bloque de código
+\newcommand{\col}{\dimexpr\textwidth-2\fboxsep\relax}
+% Sangría dentro de un bloque de código
+\newcommand{\ind}{\hspace*{1.2em}}
+% Mensaje de error dentro de un bloque de código
+\newcommand{\err}[1]{\textcolor{utpRojo}{#1}}
+% Anatomía de una instrucción: cada pieza del código con su pregunta al lado
+\tikzset{
+  pieza/.style={fill=utpGrisClaro,font=\ttfamily\footnotesize,anchor=west,inner sep=5pt,
+    minimum height=0.62cm},
+  para/.style={font=\small,anchor=west,text=utpNegro}
+}
+\newcommand{\piezax}{7.6}
+\newcommand{\pieza}[3]{%
+  \node[pieza] at (0,#1) {#2};
+  \node[para] at (\piezax,#1) {\textcolor{utpRojo}{$\blacktriangleleft$}\ #3};}
+% Diapositiva de sección: una palabra bien grande
+\newcommand{\seccion}[2][1]{%
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt] at (current page.center)
+      {\resizebox{100mm}{!}{\bfseries\color{utpNegro}#2}};
+    \ifnum#1=1
+    \node[anchor=north,inner sep=0pt] at ([yshift=-11mm]current page.center)
+      {\color{utpRojo}\rule{100mm}{1.6pt}};
+    \fi
+  \end{tikzpicture}
+\end{frame}}
+% Cabecera de columna dentro de una tabla en monoespaciado
+\newcommand{\cab}[1]{\normalfont\bfseries #1}
+% Resultado de una consulta: \res{columnas}{cabecera}{filas}
+\newcommand{\res}[3]{%
+  \centering{\scriptsize\color{utpGris}resultado}\\[3pt]
+  \footnotesize\ttfamily
+  \begin{tabular}{#1}
+  \toprule
+  #2 \\
+  \midrule
+  #3
+  \bottomrule
+  \end{tabular}}
+% Lo mismo, cuando debajo sigue más contenido del frame
+\newcommand{\resg}[3]{{\res{#1}{#2}{#3}\par}}
+% Tabla pequeña con su nombre arriba: \mini{nombre}{columnas}{cabecera}{filas}
+\newcommand{\mini}[4]{%
+  \begin{tabular}{@{}c@{}}
+  \tbl{#1}\\[3pt]
+  {\scriptsize\ttfamily
+  \begin{tabular}{#2}
+  \toprule
+  #3 \\
+  \midrule
+  #4
+  \bottomrule
+  \end{tabular}}
+  \end{tabular}}
+% Una tabla con título gris, alineada arriba: \tabla{título}{columnas}{cabecera}{filas}
+\newcommand{\tabla}[4]{%
+  \begin{tabular}[t]{@{}c@{}}
+  {\scriptsize\color{utpGris}#1}\\[3pt]
+  {\footnotesize\ttfamily
+  \begin{tabular}[t]{#2}
+  \toprule
+  #3 \\
+  \midrule
+  #4
+  \bottomrule
+  \end{tabular}}
+  \end{tabular}}
+% La pregunta del frame, en una caja naranja centrada
+\newcommand{\preg}[1]{{\centering\tikz\node[caja,cajanaranja,font=\normalsize,inner sep=6pt]{#1};\par}\vspace{4pt}}
+% Forma de lo que devuelve una consulta: celdas con borde
+\newcommand{\forma}[2]{{\ttfamily\footnotesize\renewcommand{\arraystretch}{1.25}%
+  \begin{tabular}{#1}\hline #2\end{tabular}}}
+% Estilos de los diagramas de esta sesión
+\tikzset{
+  codigo/.style={font=\ttfamily\footnotesize,inner sep=3pt},
+  sub/.style={codigo,draw=utpRojo,very thick,fill=yellow!45,rounded corners=2pt},
+  decision/.style={diamond,aspect=2.6,draw=utpRojo,very thick,fill=utpRojo!7,
+    font=\scriptsize,align=center,inner sep=1.5pt},
+  paso/.style={caja,font=\scriptsize,minimum height=.6cm,inner sep=4pt},
+  % Una instrucción en un diagrama de pasos y lo que queda debajo
+  inst/.style={draw=utpNegro,thick,rounded corners=1.5pt,fill=utpGrisClaro,font=\ttfamily\scriptsize,
+    minimum height=.8cm,minimum width=2.2cm,align=center,inner sep=3pt},
+  valor/.style={font=\footnotesize,align=center,text width=2.5cm},
+  carril/.style={font=\small\bfseries,anchor=east}
+}
+\newcommand{\rayo}{\tikz[baseline=-0.35ex]\fill[yellow!85!orange,draw=orange!70!black,line width=.3pt]
+  (0.07,0.17)--(-0.06,-0.01)--(0.01,-0.01)--(-0.04,-0.17)--(0.09,0.04)--(0.02,0.04)--cycle;}
+% Mensaje de error de Workbench o de SSMS, en rojo y en monoespaciado
+\newcommand{\errlinea}[1]{{\ttfamily\scriptsize\color{utpRojo}#1}}
+\newcommand{\bq}{\textasciigrave{}}
+\newcommand{\errchico}[1]{{\ttfamily\fontsize{6}{7}\selectfont\color{utpRojo}#1}}
+% Regla de un sistema del curso, citada de sus requisitos: \regla{sistema}{texto}
+\newlength{\reglaw}
+\newcommand{\regla}[2]{{\noindent\settowidth{\reglaw}{\etiqueta{#1}}\etiqueta{#1}\hspace{6pt}%
+  \begin{minipage}[t]{\dimexpr\linewidth-\reglaw-6pt\relax}\small\itshape «#2»\end{minipage}\par}}
+% Tabla pequeña con título gris, en letra chica: \tablita{título}{columnas}{cabecera}{filas}
+\newcommand{\tablita}[4]{%
+  \begin{tabular}[t]{@{}c@{}}
+  {\scriptsize\color{utpGris}#1}\\[2pt]
+  {\scriptsize\ttfamily
+  \begin{tabular}[t]{#2}
+  \toprule
+  #3 \\
+  \midrule
+  #4
+  \bottomrule
+  \end{tabular}}
+  \end{tabular}}
+\begin{document}
+{\setbeamertemplate{footline}{}\maketitle}
+\begin{frame}[c]
+\begin{block}{Logro de la sesión}
+Al finalizar, podrás escribir \textbf{triggers} en \textbf{MySQL} y en \textbf{SQL Server} para que una regla se cumpla siempre; y proteger la base con \textbf{copias de seguridad}, \textbf{usuarios} y \textbf{permisos}.
+\end{block}
+\end{frame}
+% =======================================================================
+% Revisión de la sesión anterior
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión: procedimientos almacenados}
+\small Un bloque de SQL con nombre, guardado en la base. Se ejecuta cuando la aplicación lo \textbf{llama}.
+\vspace{0.1cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[caja,cajanaranja,minimum width=2.3cm,minimum height=1.1cm] (a) at (0,0) {\textbf{aplicación}};
+  \node[caja,align=left,font=\footnotesize] (p) at (8,0)
+    {\textbf{procedimiento} \texttt{comprar\_entrada}\\[3pt]
+     \npieza{1} \texttt{\kw{UPDATE} entrada} \ldots\\[2pt]
+     \npieza{2} \texttt{\kw{INSERT INTO} venta} \ldots};
+  \draw[flecha] (a) -- node[above,font=\ttfamily\scriptsize]{\kw{CALL} comprar\_entrada(\ldots)} (p);
+  \node[font=\scriptsize,text=utpRojo,anchor=west] at (p.east) {todo o nada};
+\end{tikzpicture}
+\end{center}
+\vspace{-0.65cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\begin{sqlmini}[\col]
+{\normalfont\bfseries MySQL}\\[2pt]
+\kw{DELIMITER} //\\
+\kw{CREATE PROCEDURE} p(\kw{IN} p\_x \kw{INT})\\
+\kw{BEGIN}\\
+\ind\com{-- los pasos}\\
+\kw{END} //\\
+\kw{DELIMITER} ;\\[3pt]
+\kw{CALL} p(1);
+\end{sqlmini}
+\column{.48\textwidth}
+\begin{sqlmini}[\col]
+{\normalfont\bfseries SQL Server}\\[2pt]
+\kw{CREATE PROCEDURE} dbo.p @x \kw{INT}\\
+\kw{AS}\\
+\kw{BEGIN}\\
+\ind\com{-- los pasos}\\
+\kw{END};\\
+\kw{GO}\\[3pt]
+\kw{EXEC} dbo.p 1;
+\end{sqlmini}
+\end{columns}
+\vspace{-0.4cm}
+\begin{center}
+\begin{tikzpicture}
+  \begin{scope}[uso/.style={caja,cajanaranja,font=\footnotesize,text width=3.55cm,minimum height=1.1cm,
+                            execute at begin node={\hyphenpenalty=10000}}]
+  \node[font=\footnotesize\bfseries,align=right,anchor=east] at (-0.1,0) {Se usa\\para:};
+  \node[uso] at (2,0) {\textbf{Varios cambios que van juntos}\\[1pt]\scriptsize\gris{descontar la entrada y guardar la venta}};
+  \node[uso] at (6.1,0) {\textbf{Revisar los datos antes de guardar}\\[1pt]\scriptsize\gris{rechazar un precio mal escrito}};
+  \node[uso] at (10.2,0) {\textbf{Proteger las tablas}\\[1pt]\scriptsize\gris{la aplicación no puede escribir: solo hace \texttt{CALL}}};
+  \end{scope}
+\end{tikzpicture}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión: ¿qué son los triggers?}
+\small Un bloque de SQL unido a una tabla. Se ejecuta \textbf{solo} cuando la tabla cambia.\par
+\vspace{0.2cm}
+{\footnotesize\textbf{Ejemplo, la agenda:} la fecha de registro no puede ser futura. En MySQL,
+\mal{\texttt{\kw{CHECK} (fecha\_registro <= \kw{CURRENT\_DATE})}} da el error 3814; por eso la regla va en un trigger.\par}
+\vspace{0.05cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[caja,font=\ttfamily\footnotesize,align=left] (i) at (0,0) {\kw{INSERT INTO} contacto \ldots\\fecha\_registro = \mal{'2027-01-15'}};
+  \node[caja,cajanaranja,minimum height=1cm] (t) at (5.4,0) {\textbf{trigger} de \tbl{contacto}\\[-1pt]{\scriptsize ¿la fecha es futura?}};
+  \node[caja,draw=utpRojo,align=left,font=\ttfamily\scriptsize,text=utpRojo] (e) at (10,0) {Error Code: 1644.\\La fecha de registro\\no puede ser futura.};
+  \draw[flecha] (i) -- node[above,font=\scriptsize]{dispara} (t);
+  \draw[flecha] (t) -- node[above,font=\scriptsize]{sí} (e);
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}[ficha/.style={caja,minimum width=3.8cm,minimum height=2.05cm,text width=3.5cm,align=center,execute at begin node={\hyphenpenalty=10000}}]
+  \node[ficha] at (0,0) {\textbf{Nombre}\\[4pt]\footnotesize\textit{trigger} = gatillo\\en español: \textbf{disparador}};
+  \node[ficha,minimum width=8cm,text width=7.6cm] at (6.3,0) {\textbf{Origen y para qué}\\[4pt]\footnotesize Varios programas usan la misma base. Con un trigger, la regla se escribe \textbf{una vez}, en la base, y se cumple \textbf{siempre}, venga de donde venga el cambio.};
+\end{tikzpicture}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Revisión: un uso muy común, el historial de cambios}
+\small Guardar \textbf{qué cambió y cuándo} es uno de los usos más comunes de un trigger (se llama \textbf{auditoría}).\par
+\vspace{0.7cm}
+\begin{center}
+\begin{tikzpicture}[ficha/.style={caja,minimum height=2.6cm,align=center,execute at begin node={\hyphenpenalty=10000}}]
+  \node[ficha,minimum width=4.1cm,text width=3.8cm] at (0,0) {\large\textbf{Cuándo}\\[8pt]\small\texttt{AFTER UPDATE}:\\\textbf{después} de cambiar la fila};
+  \node[ficha,minimum width=7.9cm,text width=7.4cm] at (6.4,0) {\large\textbf{¿Por qué es tan común?}\\[8pt]\small Casi todo sistema necesita saber qué cambió y cuándo. Con un trigger, el historial se guarda \textbf{siempre}.};
+\end{tikzpicture}
+\end{center}
+\vspace{0.7cm}
+\concepto{Hoy}{\small Los triggers: sus usos, paso a paso y su sintaxis. Al final: copias de seguridad, usuarios y permisos.}
+\end{frame}
+% =======================================================================
+\begin{frame}{Cuatro cosas que se guardan en la base}
+\small Las cuatro se escriben en SQL y quedan guardadas en la base, con un nombre. Son \textbf{objetos de la base de datos}, como las tablas.
+\vspace{0.05cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{@{}>{\bfseries\raggedright}p{1.95cm}>{\raggedright}p{2.5cm}>{\raggedright}p{2.55cm}>{\raggedright}p{2.75cm}>{\raggedright\arraybackslash}p{2.5cm}@{}}
+\toprule
+ & Vista & Función & Procedimiento & Trigger \\
+\midrule
+\filagris ¿Qué es? & Una consulta con nombre. & Un cálculo que devuelve \textbf{un valor}. & Instrucciones que hacen una \textbf{acción}. & Instrucciones unidas a una \textbf{tabla}. \\
+¿Cómo se crea? & \texttt{CREATE VIEW v AS}\newline\texttt{SELECT \ldots;} & \texttt{CREATE FUNCTION}\newline\texttt{f(\ldots) RETURNS \ldots} & \texttt{CREATE PROCEDURE}\newline\texttt{p(\ldots)} & \texttt{CREATE TRIGGER t}\newline\texttt{\ldots{} ON tabla \ldots} \\
+\filagris ¿Cómo se usa? & \texttt{SELECT * FROM v;} & \texttt{SELECT f(\ldots);} & \texttt{CALL p(\ldots);}\newline\texttt{EXEC dbo.p \ldots;} & Nadie lo llama: se ejecuta \textbf{solo}. \\
+¿Qué devuelve? & Filas. & Un valor.\newline{\scriptsize\gris{Según el gestor, también una tabla.}} & Filas, o datos con \texttt{OUT}.\newline{\scriptsize\gris{Según el gestor, también un código de estado.}} & Nada. \\
+\filagris ¿Cuándo se vio? & Sesión 16 & Sesiones 28 y 29 & Sesiones 29 y 30 & \textbf{Hoy} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+% =======================================================================
+\seccion{Triggers}
+\begin{frame}{\ins{Práctica 1} Crea la base de la feria}
+\small Los triggers de hoy van sobre \texttt{feria\_entrada}, la base de la sesión 30. Ejecuta los dos scripts de \texttt{ejemplos/practicas/}, en orden:
+\vspace{0.2cm}
+\begin{center}
+\scriptsize
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\bfseries Gestor & \bfseries 1. Modelo físico & \bfseries 2. Registros \\
+\midrule
+MySQL (Workbench) & \texttt{mysql/practica\_1\_modelo\_fisico.sql} & \texttt{mysql/practica\_1\_registros.sql} \\
+SQL Server (SSMS) & \texttt{sqlserver/practica\_1\_modelo\_fisico.sql} & \texttt{sqlserver/practica\_1\_registros.sql} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\small Al crearla trae:
+\vspace{0.05cm}
+\begin{center}
+\mini{entrada}{rlrrr}{\cab{id} & \cab{nombre} & \cab{precio} & \cab{disponibles} & \cab{venta\_activa}}{1 & Entrada Fogón 2026 & 45.00 & 500 & 1 \\}
+\hspace{0.2cm}
+\mini{venta}{lllll}{\cab{dni} & \cab{nombre} & \cab{correo} & \cab{precio} & \cab{referencia\_pago}}{\multicolumn{5}{c}{\normalfont\gris{vacía}} \\}
+\end{center}
+\vspace{-0.1cm}
+{\centering\footnotesize\gris{Para empezar de cero, ejecuta otra vez los dos scripts: borran la base, y con ella sus triggers.}\par}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{En la feria: el historial de precios}
+\small En la base que acabas de crear, la entrada cuesta \textbf{45.00}. Si alguien cambia el precio, la base debe anotar \textbf{sola} el precio anterior y el nuevo, en la tabla \tbl{cambio\_precio}.\par
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}
+  \node[caja,font=\ttfamily\footnotesize,align=left] (i) at (0,0) {\kw{UPDATE} entrada\\\kw{SET} precio = 50.00 \ldots};
+  \node[caja,cajanaranja,minimum height=1cm] (t) at (4.75,0) {\textbf{trigger} de \tbl{entrada}\\[-1pt]{\scriptsize ¿cambió el precio?}};
+  \node[caja,font=\ttfamily\footnotesize,align=left] (e) at (9.55,0) {\kw{INSERT INTO} cambio\_precio\\(precio\_anterior, precio\_nuevo)\\\kw{VALUES} (\dentro{OLD}.precio, \dentro{NEW}.precio)};
+  \node[font=\scriptsize,anchor=north,align=center] at (e.south) {\texttt{OLD}: la fila \textbf{antes} del cambio \gris{(45.00)}\\\texttt{NEW}: la fila \textbf{después} \gris{(50.00)}};
+  \draw[flecha] (i) -- node[above,font=\scriptsize]{dispara} (t);
+  \draw[flecha] (t) -- node[above,font=\scriptsize]{sí} (e);
+\end{tikzpicture}
+\end{center}
+\vspace{0.45cm}
+\begin{center}
+\tablita{\tbl{entrada}, después del \texttt{UPDATE}}{lr}{\cab{nombre} & \cab{precio}}{Entrada Fogón 2026 & 50.00 \\}
+\hspace{1cm}
+\tablita{\tbl{cambio\_precio}, sin que nadie lo escriba}{rr}{\cab{precio\_anterior} & \cab{precio\_nuevo}}{\fila 45.00 & 50.00 \\}
+\end{center}
+\vspace{-0.1cm}
+\concepto{Paso a paso}{\small Lo construimos en el paso 3. Antes, en los pasos 1 y 2, dos triggers más simples sobre \tbl{venta}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Paso 1: completar los datos antes de guardar}
+\small El correo se guarda en minúsculas y el precio es el de la entrada, escriba lo que escriba quien inserta.
+\vspace{0.05cm}
+\begin{columns}[T,onlytextwidth]
+\column{.55\textwidth}
+\begin{sqlmini}[\col]
+\kw{DELIMITER} //\\
+\kw{CREATE TRIGGER} venta\_completa\_datos\\
+\dentro{\kw{BEFORE INSERT}} \kw{ON} venta\hfill\npieza{1}\\
+\kw{FOR EACH ROW}\\
+\kw{BEGIN}\\
+\ind\kw{SET} \dentro{NEW.correo} = \kw{LOWER}(\kw{TRIM}(NEW.correo));\hfill\npieza{2}\\
+\ind\kw{SET} \dentro{NEW.precio} = (\kw{SELECT} precio \kw{FROM} entrada\\
+\ind\ind\kw{WHERE} id = NEW.entrada\_id);\\
+\kw{END} //\\
+\kw{DELIMITER} ;
+\end{sqlmini}
+\column{.42\textwidth}
+\footnotesize\raggedright
+\vspace{4pt}
+\npieza{1} \textbf{Antes} de guardar: la fila todavía se puede cambiar.\\[3pt]
+\npieza{2} \texttt{SET NEW.columna}: cambia lo que se va a guardar.\\[3pt]
+{\scriptsize\gris{Dos instrucciones: van \texttt{BEGIN}\ldots\texttt{END} y \texttt{DELIMITER}.}\par}
+\begin{sqlmicro}[\col]
+\kw{INSERT INTO} venta (dni, nombre, correo,\\
+\ind precio, referencia\_pago)\\
+\kw{VALUES} ('70123457', 'María Torres',\\
+\ind\mal{'Maria.Torres@Example.com'}, \mal{1.00},\\
+\ind'PAGO-0002');
+\end{sqlmicro}
+\end{columns}
+\vspace{-0.1cm}
+\begin{center}
+\tablita{\texttt{SELECT dni, nombre, correo, precio FROM venta;}}{llrr}{\cab{dni} & \cab{nombre} & \cab{correo} & \cab{precio}}{\fila 70123457 & María Torres & maria.torres@example.com & 45.00 \\}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Paso 2: detener una operación}
+\small Una venta no se borra: queda como registro de lo que se cobró.
+\vspace{0.15cm}
+\begin{columns}[T,onlytextwidth]
+\column{.52\textwidth}
+\begin{sqlchico}[\col]
+\kw{DELIMITER} //\\
+\kw{CREATE TRIGGER} venta\_no\_se\_borra\\
+\dentro{\kw{BEFORE DELETE}} \kw{ON} venta\\
+\kw{FOR EACH ROW}\\
+\kw{BEGIN}\\
+\ind\dentro{\kw{SIGNAL SQLSTATE} '45000'}\\
+\ind\ind\kw{SET MESSAGE\_TEXT} =\\
+\ind\ind'Una venta no se puede borrar.';\\
+\kw{END} //\\
+\kw{DELIMITER} ;
+\end{sqlchico}
+\column{.45\textwidth}
+\begin{sqlchico}[\col]
+\kw{DELETE FROM} venta\\
+\kw{WHERE} dni = '70123457';
+\end{sqlchico}
+\vspace{-4pt}
+{\centering\errlinea{\footnotesize Error Code: 1644. Una venta no se puede borrar.}\par}
+\vspace{6pt}
+\begin{sqlchico}[\col]
+\kw{SELECT} \kw{COUNT}(*) \kw{AS} ventas \kw{FROM} venta;
+\end{sqlchico}
+\resg{r}{\cab{ventas}}{1 \\}
+\end{columns}
+\vspace{0.2cm}
+\concepto{SIGNAL en un trigger BEFORE}{\small Cancela la operación: la fila queda como estaba. Es la regla del flujo de caja: \textit{«Un movimiento anotado no se puede editar ni eliminar»}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Paso 3: el historial de precios, \texttt{OLD} y \texttt{NEW}}
+\small Cada vez que cambia el precio de la entrada, se anota el precio anterior y el nuevo.
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.55\textwidth}
+\begin{sqlmini}[\col]
+\kw{DELIMITER} //\\
+\kw{CREATE TRIGGER} entrada\_guarda\_cambio\_precio\\
+\dentro{\kw{AFTER UPDATE}} \kw{ON} entrada\\
+\kw{FOR EACH ROW}\\
+\kw{BEGIN}\\
+\ind\kw{IF} \dentro{OLD}.precio <> \dentro{NEW}.precio \kw{THEN}\\
+\ind\ind\kw{INSERT INTO} cambio\_precio\\
+\ind\ind\ind(precio\_anterior, precio\_nuevo)\\
+\ind\ind\kw{VALUES} (OLD.precio, NEW.precio);\\
+\ind\kw{END IF};\\
+\kw{END} //\\
+\kw{DELIMITER} ;
+\end{sqlmini}
+\small\raggedright
+\texttt{OLD}: la fila \textbf{antes} del \texttt{UPDATE}.\\
+\texttt{NEW}: la fila \textbf{después}.\\[3pt]
+{\footnotesize El \texttt{IF}: si el \texttt{UPDATE} cambia otra columna, como \texttt{disponibles}, no se anota nada.\par}
+\column{.42\textwidth}
+\footnotesize La tabla del historial:
+\begin{sqlmicro}[\col]
+\kw{CREATE TABLE} cambio\_precio (\\
+\ind id \kw{INT AUTO\_INCREMENT PRIMARY KEY},\\
+\ind precio\_anterior \kw{DECIMAL}(10, 2) \kw{NOT NULL},\\
+\ind precio\_nuevo \kw{DECIMAL}(10, 2) \kw{NOT NULL},\\
+\ind fecha \kw{DATETIME NOT NULL}\\
+\ind\ind\kw{DEFAULT} (\kw{UTC\_TIMESTAMP}())\\
+);
+\end{sqlmicro}
+\begin{sqlmini}[\col]
+\kw{UPDATE} entrada \kw{SET} precio = 50.00\\
+\kw{WHERE} id = 1;\\[2pt]
+\kw{SELECT} precio\_anterior, precio\_nuevo\\
+\kw{FROM} cambio\_precio;
+\end{sqlmini}
+\resg{rr}{\cab{precio\_anterior} & \cab{precio\_nuevo}}{45.00 & 50.00 \\}
+\end{columns}
+\end{frame}
+% =======================================================================
+\seccion{Sintaxis de triggers}
+\begin{frame}{MySQL: las piezas de un trigger}
+\vspace{-0.1cm}
+\begin{center}
+\renewcommand{\piezax}{6.4}
+\begin{tikzpicture}
+  \pieza{0}{\kw{CREATE TRIGGER} venta\_completa\_datos}{su \textbf{nombre}: la tabla y lo que hace}
+  \pieza{-0.75}{\kw{BEFORE}}{\textbf{cuándo}: \texttt{BEFORE} (antes) o \texttt{AFTER} (después)}
+  \pieza{-1.5}{\kw{INSERT}}{\textbf{ante qué}: \texttt{INSERT}, \texttt{UPDATE} o \texttt{DELETE}}
+  \pieza{-2.25}{\kw{ON} venta}{\textbf{en qué tabla}}
+  \pieza{-3}{\kw{FOR EACH ROW}}{una vez \textbf{por cada fila}; en MySQL, \textbf{obligatorio}}
+  \pieza{-3.75}{\kw{BEGIN} \ldots{} \kw{END}}{lo que \textbf{hace}; con una sola instrucción, sin \texttt{BEGIN}}
+\end{tikzpicture}
+\end{center}
+\vspace{0.2cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}l>{\ttfamily}c>{\ttfamily}c>{\ttfamily}c@{}}
+\toprule
+ & \normalfont\bfseries INSERT & \normalfont\bfseries UPDATE & \normalfont\bfseries DELETE \\
+\midrule
+\bfseries BEFORE & venta\_completa\_datos & \normalfont\gris{---} & venta\_no\_se\_borra \\
+\bfseries AFTER & \normalfont\gris{---} & entrada\_guarda\_cambio\_precio & \normalfont\gris{---} \\
+\bottomrule
+\end{tabular}
+\end{center}
+{\centering\scriptsize\gris{Seis combinaciones posibles. Los tres triggers de hoy, cada uno en la suya.}\par}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Por qué \texttt{FOR EACH ROW}?}
+\small Un \texttt{INSERT} puede guardar \textbf{varias} filas: el trigger se ejecuta \textbf{una vez por cada una}.
+\vspace{0.05cm}
+\begin{sqlmini}[.9\textwidth]
+\kw{INSERT INTO} venta (dni, nombre, correo, referencia\_pago)\\
+\kw{VALUES} \dentro{('70123461', 'Ana Ruiz', 'Ana.Ruiz@Example.com', 'PAGO-0011')},\\
+\ind\ind\dentro{('70123462', 'Jorge Soto', 'JORGE.SOTO@EXAMPLE.COM', 'PAGO-0012')},\\
+\ind\ind\dentro{('70123463', 'Lucía Vega', ' Lucia.Vega@Example.com ', 'PAGO-0013')};
+\end{sqlmini}
+\vspace{-0.25cm}
+\begin{columns}[c,onlytextwidth]
+\column{.42\textwidth}
+\centering
+\begin{tikzpicture}[node distance=.15cm,
+  f/.style={caja,font=\scriptsize,minimum width=1.3cm,minimum height=.55cm},
+  t/.style={caja,cajanaranja,font=\ttfamily\scriptsize,minimum height=.55cm}]
+  \node[f] (f1) {fila 1};
+  \node[f,below=of f1] (f2) {fila 2};
+  \node[f,below=of f2] (f3) {fila 3};
+  \node[t,right=.6cm of f1] (t1) {venta\_completa\_datos};
+  \node[t,right=.6cm of f2] (t2) {venta\_completa\_datos};
+  \node[t,right=.6cm of f3] (t3) {venta\_completa\_datos};
+  \draw[flecha] (f1)--(t1); \draw[flecha] (f2)--(t2); \draw[flecha] (f3)--(t3);
+\end{tikzpicture}\\[3pt]
+\small Un \texttt{INSERT}, 3 filas: \textbf{3 veces}.
+\column{.55\textwidth}
+\begin{sqlmini}[\col]
+\kw{SELECT} dni, correo, precio \kw{FROM} venta\\
+\kw{WHERE} dni > '70123460';
+\end{sqlmini}
+\resg{llr}{\cab{dni} & \cab{correo} & \cab{precio}}{70123461 & ana.ruiz@example.com & 50.00 \\ 70123462 & jorge.soto@example.com & 50.00 \\ 70123463 & lucia.vega@example.com & 50.00 \\}
+\end{columns}
+\vspace{0.05cm}
+\concepto{¿Por qué así?}{\small Cada fila tiene su propio \texttt{NEW}: su correo, su precio. Así el trigger completa \textbf{cada una}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{MySQL: \texttt{BEFORE} o \texttt{AFTER}, \texttt{NEW} y \texttt{OLD}}
+\begin{columns}[T,onlytextwidth]
+\column{.46\textwidth}
+\centering\etiqueta{BEFORE}\par\vspace{4pt}
+\raggedright\small La fila \textbf{todavía no} se guardó.\\[4pt]
+\npieza{1} Completarla con \texttt{SET NEW.\ldots} \gris{(paso 1)}.\\[3pt]
+\npieza{2} Detener la operación con \texttt{SIGNAL} \gris{(paso 2)}.\par\vspace{12pt}
+\centering\etiqueta{AFTER}\par\vspace{4pt}
+\raggedright La fila \textbf{ya} se guardó.\\[4pt]
+\npieza{1} Cambiar \textbf{otra} tabla \gris{(paso 3)}.
+\column{.5\textwidth}
+\centering\etiqueta{NEW y OLD}\par\vspace{4pt}
+\footnotesize
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{@{}>{\ttfamily\bfseries}l>{\raggedright}p{2cm}>{\raggedright\arraybackslash}p{2cm}@{}}
+\toprule
+ & \texttt{OLD} & \texttt{NEW} \\
+\midrule
+INSERT & \gris{no existe} & la fila nueva \\
+UPDATE & la fila antes & la fila después \\
+DELETE & la fila que se borra & \gris{no existe} \\
+\bottomrule
+\end{tabular}\\[8pt]
+\small\raggedright Se usan con el nombre de la columna: \texttt{NEW.precio}, \texttt{OLD.precio}.
+\end{columns}
+\vspace{0.4cm}
+\concepto{Regla práctica}{\small ¿Revisar o completar la \textbf{misma} fila? \texttt{BEFORE}. ¿Cambiar \textbf{otra} tabla? \texttt{AFTER}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{SQL Server: las piezas de un trigger}
+\begin{columns}[c,onlytextwidth]
+\column{.62\textwidth}
+\renewcommand{\piezax}{5.3}
+\begin{tikzpicture}
+  \pieza{0}{\kw{CREATE OR ALTER TRIGGER}}{crea o reemplaza}
+  \pieza{-0.72}{dbo.entrada\_guarda\_cambio\_precio}{su \textbf{nombre}}
+  \pieza{-1.44}{\kw{ON} entrada}{\textbf{en qué tabla}}
+  \pieza{-2.16}{\kw{AFTER UPDATE}}{\textbf{cuándo} y \textbf{ante qué}}
+  \pieza{-2.88}{\kw{AS}}{aquí empieza}
+  \pieza{-3.6}{\kw{BEGIN} \ldots{} \kw{END};}{lo que \textbf{hace}}
+  \pieza{-4.32}{\kw{GO}}{aquí termina}
+\end{tikzpicture}
+\column{.36\textwidth}
+\small\raggedright
+Lo que cambia frente a MySQL:\\[6pt]
+\npieza{1} \texttt{ON entrada} va \textbf{antes} del momento.\\[5pt]
+\npieza{2} No hay \texttt{BEFORE}: hay \texttt{AFTER} e \texttt{INSTEAD OF}.\\[5pt]
+\npieza{3} No hay \texttt{FOR EACH ROW}: se ejecuta \textbf{una vez por instrucción}.\\[5pt]
+\npieza{4} No hay \texttt{NEW} ni \texttt{OLD}: hay dos tablas, \texttt{inserted} y \texttt{deleted}.
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{SQL Server: el historial de precios}
+\small El paso 3: \texttt{deleted} tiene el precio de antes; \texttt{inserted}, el de después.
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlmini}[\col]
+\kw{CREATE TRIGGER} entrada\_guarda\_cambio\_precio\\
+\kw{AFTER UPDATE ON} entrada\\
+\kw{FOR EACH ROW}\\
+\kw{BEGIN}\\
+\ind\kw{IF} \dentro{OLD.precio <> NEW.precio} \kw{THEN}\\
+\ind\ind\kw{INSERT INTO} cambio\_precio\\
+\ind\ind\ind(precio\_anterior, precio\_nuevo)\\
+\ind\ind\kw{VALUES} (OLD.precio, NEW.precio);\\
+\ind\kw{END IF};\\
+\kw{END} //
+\end{sqlmini}
+\resg{rr}{\cab{precio\_anterior} & \cab{precio\_nuevo}}{45.00 & 50.00 \\}
+\par\vspace{3pt}
+{\centering\scriptsize\gris{Mismo resultado en los dos gestores.}\par}
+\column{.48\textwidth}
+\centering\etiqueta{SQL Server}
+\begin{sqlmini}[\col]
+\kw{CREATE OR ALTER TRIGGER}\\
+\ind dbo.entrada\_guarda\_cambio\_precio\\
+\kw{ON} entrada \kw{AFTER UPDATE}\\
+\kw{AS}\\
+\kw{BEGIN}\\
+\ind\kw{SET NOCOUNT ON};\\
+\ind\kw{INSERT INTO} cambio\_precio\\
+\ind\ind(precio\_anterior, precio\_nuevo)\\
+\ind\kw{SELECT} d.precio, i.precio\\
+\ind\kw{FROM} \dentro{deleted d}\\
+\ind\kw{JOIN} \dentro{inserted i} \kw{ON} i.id = d.id\\
+\ind\kw{WHERE} \dentro{d.precio <> i.precio};\\
+\kw{END};\\
+\kw{GO}
+\end{sqlmini}
+\raggedright\footnotesize En vez del \texttt{IF}, un \texttt{WHERE}: guarda solo las filas cuyo precio cambió, sean una o muchas.
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{SQL Server: \texttt{INSTEAD OF}, en lugar de la instrucción}
+\small No hay \texttt{BEFORE}: para detener una operación, el trigger se ejecuta \textbf{en lugar} de ella. El paso 2:
+\vspace{0cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{MySQL}
+\begin{sqlmini}[\col]
+\kw{CREATE TRIGGER} venta\_no\_se\_borra\\
+\dentro{\kw{BEFORE DELETE}} \kw{ON} venta\\
+\kw{FOR EACH ROW}\\
+\kw{BEGIN}\\
+\ind\dentro{\kw{SIGNAL SQLSTATE} '45000'}\\
+\ind\ind\kw{SET MESSAGE\_TEXT} =\\
+\ind\ind'Una venta no se puede borrar.';\\
+\kw{END} //
+\end{sqlmini}
+\column{.48\textwidth}
+\centering\etiqueta{SQL Server}
+\begin{sqlmini}[\col]
+\kw{CREATE OR ALTER TRIGGER} dbo.venta\_no\_se\_borra\\
+\kw{ON} venta\\
+\dentro{\kw{INSTEAD OF DELETE}}\\
+\kw{AS}\\
+\kw{BEGIN}\\
+\ind\dentro{\kw{THROW} 50000,}\\
+\ind\ind N'Una venta no se puede borrar.', 1;\\
+\kw{END};\\
+\kw{GO}
+\end{sqlmini}
+\raggedright\scriptsize\texttt{DELETE FROM venta WHERE dni = '70123457';}\\[2pt]
+\errlinea{Msg 50000, Level 16, State 1, Procedure venta\_no\_se\_borra, Line 12\\Una venta no se puede borrar.}
+\end{columns}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{MySQL y SQL Server: lo que cambia}
+\vspace{-0.15cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}>{\bfseries}p{3.1cm}>{\raggedright}p{4.9cm}>{\raggedright\arraybackslash}p{5.2cm}@{}}
+\toprule
+ & MySQL & SQL Server \\
+\midrule
+Crear & \texttt{CREATE TRIGGER t} & \texttt{CREATE OR ALTER TRIGGER dbo.t} \\
+Tabla y momento & \texttt{BEFORE INSERT ON venta} & \texttt{ON venta AFTER INSERT} \\
+Momentos & \texttt{BEFORE}, \texttt{AFTER} & \texttt{AFTER}, \texttt{INSTEAD OF} \\
+Cuántas veces & Una por \textbf{fila}: \texttt{FOR EACH ROW} & Una por \textbf{instrucción} \\
+La fila que cambia & \texttt{NEW.columna}, \texttt{OLD.columna} & Tablas \texttt{inserted} y \texttt{deleted} \\
+Completar un dato & \texttt{BEFORE} con \texttt{SET NEW.precio = \ldots} & \texttt{INSTEAD OF} que hace el \texttt{INSERT} \\
+Detener & \texttt{SIGNAL SQLSTATE '45000'} & \texttt{THROW 50000, N'\ldots', 1;} \\
+Cuerpo & \texttt{DELIMITER //} \ldots{} \texttt{BEGIN} \ldots{} \texttt{END //} & \texttt{AS BEGIN} \ldots{} \texttt{END; GO} \\
+Ver & \texttt{SHOW TRIGGERS;} & \texttt{SELECT name FROM sys.triggers;} \\
+Borrar & \texttt{DROP TRIGGER IF EXISTS t;} & \texttt{DROP TRIGGER IF EXISTS dbo.t;} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 2} Los triggers de la feria}
+\small Sobre la base \texttt{feria\_entrada} de la práctica 1.\\[6pt]
+\npieza{1}\ Abre el script de tu gestor, en \texttt{ejemplos/feria/}:
+\vspace{0.05cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\bfseries Gestor & \bfseries Script \\
+\midrule
+MySQL (Workbench) & \texttt{triggers\_mysql.sql} \\
+SQL Server (SSMS) & \texttt{triggers\_sqlserver.sql} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\npieza{2}\ \small Ejecútalo \textbf{por partes}, del 1 al 7: selecciona una parte y ejecútala (\rayo{} o \textbf{Execute}).\\[5pt]
+\npieza{3}\ Comprueba: \textbf{3} ventas, precio \textbf{50.00}, \textbf{una} fila en \tbl{cambio\_precio}, y la venta de Rosa rechazada.\\[5pt]
+\npieza{4}\ \textbf{Reto:} crea \texttt{venta\_no\_se\_cambia}, que detenga todo \texttt{UPDATE} en \tbl{venta} con el mensaje\\
+\hspace*{6.2mm}\textbf{Una venta no se puede cambiar.} \gris{(MySQL: \texttt{BEFORE UPDATE}. SQL Server: \texttt{INSTEAD OF UPDATE}.)}\\[3pt]
+\hspace*{6.2mm}Pruébalo con: \texttt{UPDATE venta SET precio = 1.00 WHERE dni = '70123456';}
+\end{frame}
+% =======================================================================
+\seccion{Copias de seguridad}
+\begin{frame}{¿Qué es una copia de seguridad?}
+\small Marco guarda en la base \texttt{agenda\_contactos} sus contactos, sus grupos y quién está en cada uno. Si esos datos se borran, solo se recuperan si hay una copia.\par
+\vspace{0.15cm}
+\concepto{Copia de seguridad (\textit{backup})}{\small Un \textbf{archivo} con todo lo necesario para volver a crear la base: las tablas, los datos y los triggers.}
+\vspace{0.1cm}
+\begin{center}
+\begin{tikzpicture}[
+  rbd/.style={cylinder,shape border rotate=90,aspect=0.25,draw=utpRojo!75,very thick,fill=utpRojo!7,
+              minimum width=2.4cm,minimum height=1.2cm,align=center,font=\ttfamily\scriptsize},
+  arch/.style={caja,font=\ttfamily\scriptsize,minimum height=1cm,minimum width=2.8cm}]
+  \node[rbd] (b) {agenda\_contactos};
+  \node[arch,right=2.2cm of b] (c) {agenda\_contactos.sql};
+  \node[rbd,right=2.2cm of c,fill=yellow!30] (r) {agenda\_contactos\\\normalfont\scriptsize otra vez};
+  \draw[flecha] (b.east) -- node[above,font=\scriptsize]{sacar la copia} (c.west);
+  \draw[flecha] (c.east) -- node[above,font=\scriptsize]{volver a la copia} (r.west);
+\end{tikzpicture}
+\end{center}
+\vspace{-0.15cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}>{\raggedright}p{4.8cm}>{\raggedright\arraybackslash}p{8.2cm}@{}}
+\toprule
+\bfseries ¿Cómo se pierden los datos? & \bfseries En la agenda \\
+\midrule
+Un error al escribir SQL & \texttt{DROP TABLE contacto\_grupo;} por equivocación: se pierde quién está en cada grupo. \\
+Se daña el disco & Se pierde la base entera. \\
+Una versión nueva de la aplicación con un error & Borra contactos que no debía. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{MySQL: sacar la copia con \texttt{mysqldump}}
+\small MySQL no tiene una instrucción \texttt{BACKUP}: la copia la saca \texttt{mysqldump}, un programa que viene con MySQL. Se ejecuta en \textbf{PowerShell}, no en Workbench, dentro de la carpeta \texttt{C:\textbackslash Program Files\textbackslash MySQL\textbackslash MySQL Server 8.4\textbackslash bin}:
+\vspace{0.15cm}
+\begin{sqlmicro}[\textwidth]
+mkdir \$HOME\textbackslash Desktop\textbackslash backups\\
+.\textbackslash mysqldump -u root -p --databases agenda\_contactos --result-file=\$HOME\textbackslash Desktop\textbackslash backups\textbackslash agenda\_contactos.sql
+\end{sqlmicro}
+\vspace{0.05cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}>{\ttfamily}l>{\raggedright\arraybackslash}p{6.6cm}@{}}
+\toprule
+\normalfont\bfseries Pieza & \bfseries Qué hace \\
+\midrule
+-u root -p & Entra como \texttt{root} y pide su contraseña. \\
+--databases agenda\_contactos & La base que se copia. \\
+--result-file=\ldots & El archivo de la copia, en la carpeta \texttt{backups} del Escritorio. \texttt{\$HOME} es tu carpeta de usuario. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.1cm}
+\concepto{¿Salió bien?}{\small Después de la contraseña no muestra nada: si no aparece un error, la copia ya está en \texttt{backups}. El \texttt{mkdir} solo hace falta la primera vez.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{¿Qué hay dentro de la copia?}
+\small Es un \textbf{script SQL}: se puede abrir con el Bloc de notas. Un resumen de \texttt{agenda\_contactos.sql}:
+\vspace{0.15cm}
+\begin{columns}[c,onlytextwidth]
+\column{.62\textwidth}
+\begin{sqlmicro}[\col]
+\kw{CREATE DATABASE} \ldots{} \bq agenda\_contactos\bq{} \ldots;\hfill\npieza{1}\\
+\kw{USE} \bq agenda\_contactos\bq;\\[4pt]
+\kw{DROP TABLE IF EXISTS} \bq contacto\bq;\hfill\npieza{2}\\
+\kw{CREATE TABLE} \bq contacto\bq{} ( \ldots{} );\\[4pt]
+\kw{INSERT INTO} \bq contacto\bq{} \kw{VALUES} (1,'Ana Torres',\ldots),\ldots;\hfill\npieza{3}\\[4pt]
+\ldots{} \kw{TRIGGER} \bq contacto\_fecha\_no\_futura\_al\_registrar\bq\hfill\npieza{4}\\
+\ind\kw{BEFORE INSERT ON} \bq contacto\bq{} \ldots\\[4pt]
+\com{-- y lo mismo con contacto\_grupo y grupo}
+\end{sqlmicro}
+\column{.35\textwidth}
+\small\raggedright
+\npieza{1} Crea la base, si no existe.\\[6pt]
+\npieza{2} Borra la tabla y la crea de nuevo.\\[6pt]
+\npieza{3} Vuelve a poner los datos.\\[6pt]
+\npieza{4} Vuelve a crear los triggers.
+\end{columns}
+\vspace{0.35cm}
+\concepto{Volver a la copia}{\small Es \textbf{ejecutar este script}. La base queda igual que cuando se sacó la copia.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{MySQL: volver a la copia}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\small \npieza{1} En Workbench, por error:
+\begin{sqlchico}[\col]
+\mal{\kw{DROP TABLE} contacto\_grupo;}\\
+\kw{SELECT} * \kw{FROM} contacto\_grupo;
+\end{sqlchico}
+\vspace{-6pt}
+{\raggedright\errlinea{Error Code: 1146. Table 'agenda\_contactos.contacto\_grupo' doesn't exist}\par}
+\column{.48\textwidth}
+\small \npieza{2} En PowerShell, en la misma carpeta \texttt{bin}:
+\begin{sqlmicro}[\col]
+.\textbackslash mysql -u root -p -e\\
+\ind"\dentro{source} \$HOME\textbackslash Desktop\textbackslash backups\textbackslash agenda\_contactos.sql"
+\end{sqlmicro}
+\vspace{-6pt}
+{\raggedright\footnotesize\texttt{source} ejecuta el script de la copia.\par}
+\end{columns}
+\vspace{0.2cm}
+\begin{columns}[c,onlytextwidth]
+\column{.48\textwidth}
+\small \npieza{3} En Workbench, otra vez:
+\begin{sqlchico}[\col]
+\kw{SELECT} * \kw{FROM} contacto\_grupo;
+\end{sqlchico}
+\column{.48\textwidth}
+\resg{rrl}{\cab{contacto\_id} & \cab{grupo\_id} & \cab{rol}}{1 & 1 & prima \\ 1 & 2 & compañera \\ 2 & 2 & jefe \\ 3 & 3 & NULL \\}
+\end{columns}
+\vspace{0.1cm}
+{\centering\scriptsize Tampoco hay \texttt{RESTORE}: volver a la copia es ejecutar su script. \gris{En Workbench: Server, Data Export y Data Import.}\par}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Lo que pasó después de la copia se pierde}
+\small La copia guarda la base \textbf{como estaba en ese momento}.
+\vspace{0.2cm}
+\begin{center}
+\begin{tikzpicture}[paso/.style={caja,font=\scriptsize,text width=2.4cm,minimum height=1.4cm,align=center,execute at begin node={\hyphenpenalty=10000}}]
+  \node[paso] (a) at (0,0) {\npieza{1}\\[2pt]Se saca la copia:\\\textbf{3} contactos};
+  \node[paso,cajanaranja] (b) at (3.3,0) {\npieza{2}\\[2pt]Marco registra\\a \textbf{Rosa Paz}};
+  \node[paso] (c) at (6.6,0) {\npieza{3}\\[2pt]Por error, se borra\\\tbl{contacto\_grupo}};
+  \node[paso] (d) at (9.9,0) {\npieza{4}\\[2pt]Se vuelve\\a la copia};
+  \draw[flecha] (a)--(b); \draw[flecha] (b)--(c); \draw[flecha] (c)--(d);
+\end{tikzpicture}
+\end{center}
+\vspace{0.05cm}
+\begin{columns}[c,onlytextwidth]
+\column{.5\textwidth}
+\begin{sqlchico}[\col]
+\kw{SELECT} id, nombre \kw{FROM} contacto;
+\end{sqlchico}
+\column{.46\textwidth}
+\resg{rl}{\cab{id} & \cab{nombre}}{1 & Ana Torres \\ 2 & Luis Ramos \\ 3 & Carla Díaz \\}
+\end{columns}
+\vspace{0.05cm}
+{\centering\small \tbl{contacto\_grupo} volvió, pero \textbf{Rosa ya no está}: se registró después de la copia.\par}
+\vspace{0.1cm}
+\concepto{Buenas costumbres}{\small Sacar la copia \textbf{seguido}, de forma automática; guardarla en \textbf{otro lugar} (otro disco o la nube); y \textbf{probar} que se puede volver a ella.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{MySQL y SQL Server: la copia}
+\small SQL Server tiene dos instrucciones: \texttt{BACKUP} y \texttt{RESTORE}. MySQL \textbf{no} las tiene: usa un programa y un script. La idea es la misma; cambia \textbf{cómo} se hace.
+\vspace{0.05cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}>{\bfseries\raggedright}p{2.6cm}>{\raggedright}p{5cm}>{\raggedright\arraybackslash}p{5cm}@{}}
+\toprule
+ & \bfseries MySQL & \bfseries SQL Server \\
+\midrule
+Sacar la copia & El programa \texttt{mysqldump}, en PowerShell & La instrucción \texttt{BACKUP DATABASE}, en SSMS \\
+Volver a la copia & Ejecutar su script, con \texttt{source} & La instrucción \texttt{RESTORE DATABASE} \\
+El archivo & \texttt{.sql}: un script, se lee con el Bloc de notas & \texttt{.bak}: solo SQL Server lo lee \\
+Qué guarda & Tablas, datos y triggers. Procedimientos y funciones, solo con \texttt{--routines} & Toda la base \\
+Con el mouse & Workbench: Server, Data Export y Data Import & SSMS: Tasks, Back Up\ldots{} y Restore \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{-0.1cm}
+\concepto{En los dos}{\small La copia se saca \textbf{seguido}, se guarda en \textbf{otro lugar} y se \textbf{prueba}.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{SQL Server: \texttt{BACKUP} y \texttt{RESTORE}}
+\small Si la agenda estuviera en SQL Server, la copia se saca con una instrucción, desde SSMS. El archivo es un \texttt{.bak}: no es un script, solo SQL Server lo puede leer.
+\vspace{0.15cm}
+\begin{columns}[T,onlytextwidth]
+\column{.46\textwidth}
+\centering\etiqueta{Sacar la copia}
+\begin{sqlchico}[\col]
+\dentro{\kw{BACKUP DATABASE}} agenda\_contactos\\
+\kw{TO DISK} = 'agenda\_contactos.bak'\\
+\kw{WITH INIT};
+\end{sqlchico}
+\raggedright\footnotesize
+\npieza{1} Sin ruta, el archivo va a la carpeta \texttt{Backup} de SQL Server.\\[3pt]
+\npieza{2} \texttt{WITH INIT}: reemplaza lo que ya tenía el archivo.
+\column{.5\textwidth}
+\centering\etiqueta{Volver a la copia}
+\begin{sqlchico}[\col]
+\kw{USE} master;\\
+\kw{GO}\\
+\kw{ALTER DATABASE} agenda\_contactos\\
+\ind\kw{SET SINGLE\_USER WITH ROLLBACK IMMEDIATE};\\
+\dentro{\kw{RESTORE DATABASE}} agenda\_contactos\\
+\kw{FROM DISK} = 'agenda\_contactos.bak'\\
+\kw{WITH REPLACE};
+\end{sqlchico}
+\raggedright\footnotesize
+\npieza{3} Desde \texttt{master}, sin nadie conectado a la base.\\[3pt]
+\npieza{4} \texttt{WITH REPLACE}: reemplaza la base que ya existe.
+\end{columns}
+\vspace{0.2cm}
+{\centering\footnotesize\gris{En SSMS: clic derecho en la base, Tasks, Back Up\ldots{} y Restore.}\par}
+\end{frame}
+% =======================================================================
+\seccion{Usuarios y permisos}
+\begin{frame}{¿Qué es un usuario? ¿Y un permiso?}
+\small Para entrar a MySQL hace falta un \textbf{usuario}: un nombre y una contraseña. Cada usuario tiene \textbf{permisos}: lo que puede hacer en la base.\par
+\vspace{0.2cm}
+La aplicación de la agenda entra hoy como \texttt{root}, el usuario que puede hacer \textbf{todo} (en \texttt{src/db.js}):
+\begin{sqlchico}[.7\textwidth]
+mysql://\mal{root}@localhost:3306/agenda\_contactos
+\end{sqlchico}
+\vspace{0.05cm}
+\begin{columns}[T,onlytextwidth]
+\column{.48\textwidth}
+\centering\etiqueta{Si entra como root}\par\vspace{4pt}
+\raggedright\small Un error en la aplicación o una contraseña robada pueden borrar la base entera: \texttt{DROP DATABASE agenda\_contactos;}
+\column{.48\textwidth}
+\centering\etiqueta{Si entra como app\_agenda}\par\vspace{4pt}
+\raggedright\small Solo puede leer, agregar, cambiar y borrar filas: lo que hace la aplicación. No puede borrar tablas ni la base.
+\end{columns}
+\vspace{0.3cm}
+\concepto{Mínimo privilegio}{\small Cada usuario recibe \textbf{solo} los permisos que necesita para su trabajo.}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Crear un usuario}
+\begin{sqlchico}[.82\textwidth]
+\kw{CREATE USER} 'app\_agenda'@'localhost' \kw{IDENTIFIED BY} 'Agenda2026';
+\end{sqlchico}
+\vspace{-0.05cm}
+{\centering\footnotesize\npieza{1} \texttt{'app\_agenda'}: el nombre\qquad
+\npieza{2} \texttt{'localhost'}: solo desde esta computadora\qquad
+\npieza{3} la contraseña\par}
+\vspace{0.25cm}
+\small Un usuario nuevo puede conectarse, pero \textbf{no puede hacer nada}. Conectado como \texttt{app\_agenda}:
+\vspace{0.1cm}
+\begin{columns}[T,onlytextwidth]
+\column{.38\textwidth}
+\begin{sqlchico}[\col]
+\kw{SHOW DATABASES};
+\end{sqlchico}
+\resg{l}{\cab{Database}}{information\_schema \\ performance\_schema \\}
+\vspace{3pt}
+{\centering\footnotesize No ve \texttt{agenda\_contactos}.\par}
+\column{.58\textwidth}
+\begin{sqlchico}[\col]
+\kw{SELECT} nombre \kw{FROM} agenda\_contactos.contacto;
+\end{sqlchico}
+\vspace{-6pt}
+{\raggedright\errlinea{Error Code: 1142. SELECT command denied to user 'app\_agenda'@'localhost' for table 'contacto'}\par}
+\end{columns}
+\vspace{0.2cm}
+{\centering\footnotesize\gris{Para conectarte como \texttt{app\_agenda}: en Workbench, una conexión nueva con ese \textbf{Username}.}\par}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{Dar permisos: \texttt{GRANT}}
+\small \texttt{GRANT} \textit{permisos} \texttt{ON} \textit{dónde} \texttt{TO} \textit{quién}. La aplicación necesita cuatro:
+\vspace{0.05cm}
+\begin{center}
+\footnotesize
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}>{\ttfamily}l>{\raggedright}p{2.6cm}>{\raggedright\arraybackslash}p{6cm}@{}}
+\toprule
+\normalfont\bfseries Permiso & \bfseries Deja\ldots & \bfseries En la agenda \\
+\midrule
+SELECT & leer filas & ver los contactos y los grupos \\
+INSERT & agregar filas & registrar un contacto o un grupo \\
+UPDATE & cambiar filas & editar un contacto, marcarlo como favorito \\
+DELETE & borrar filas & eliminar un contacto o un grupo \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{-0.1cm}
+\begin{sqlchico}[.97\textwidth]
+\kw{GRANT} \dentro{\kw{SELECT}, \kw{INSERT}, \kw{UPDATE}, \kw{DELETE}} \kw{ON} \dentro{agenda\_contactos.*} \kw{TO} 'app\_agenda'@'localhost';\\[3pt]
+\kw{SHOW GRANTS FOR} 'app\_agenda'@'localhost';
+\end{sqlchico}
+\vspace{-0.05cm}
+\begin{center}
+{\scriptsize\color{utpGris}resultado}\\[2pt]
+{\fontsize{6.5}{7.8}\selectfont\ttfamily
+\begin{tabular}{@{}l@{}}
+\toprule
+\cab{Grants for app\_agenda@localhost} \\
+\midrule
+GRANT USAGE ON *.* TO \bq app\_agenda\bq @\bq localhost\bq \\
+GRANT SELECT, INSERT, UPDATE, DELETE ON \bq agenda\_contactos\bq .* TO \bq app\_agenda\bq @\bq localhost\bq \\
+\bottomrule
+\end{tabular}\par}
+\vspace{2pt}
+{\scriptsize\gris{\texttt{agenda\_contactos.*}: todas las tablas de la base. \texttt{USAGE}: puede conectarse, nada más.}\par}
+\end{center}
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}{\ins{Práctica 3} Un usuario y una copia para la agenda}
+\small La agenda de contactos (proyecto 13) es un sistema en MySQL: esta práctica es en MySQL.\\[8pt]
+\npieza{1}\ En Workbench, como \texttt{root}, ejecuta \texttt{ejemplos/agenda/agenda\_mysql.sql}: crea la base.\\[6pt]
+\npieza{2}\ Abre \texttt{ejemplos/agenda/seguridad\_mysql.sql} y ejecútalo \textbf{por partes}, del 1 al 3.\\
+\hspace*{6.2mm}La parte 3 va en una \textbf{conexión nueva}: \textbf{Username} \texttt{app\_agenda}, contraseña \texttt{Agenda2026}.\\[6pt]
+\npieza{3}\ Comprueba: \texttt{app\_agenda} lee y registra contactos, pero no puede borrar la tabla ni la base.\\[6pt]
+\npieza{4}\ Parte 4, la copia: sácala en PowerShell, borra \tbl{contacto\_grupo} y vuelve a la copia.\\
+\hspace*{6.2mm}Comprueba que Ana sigue en Familia y en Trabajo.
+\end{frame}
+% ---------------------------------------------------------------------
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north west,font=\bfseries\fontsize{24}{28}\selectfont]
+      at ([xshift=12mm,yshift=-9mm]current page.north west) {Preguntas};
+    \node[anchor=north east,inner sep=0pt]
+      at ([xshift=-10mm,yshift=-8mm]current page.north east)
+      {\includegraphics[width=43mm]{utp-logo.png}};
+    \node[anchor=center,inner sep=0pt]
+      at ([yshift=-5mm]current page.center)
+      {\includegraphics[width=78mm]{preguntas-ilustracion.png}};
+  \end{tikzpicture}
+\end{frame}
+\begin{frame}{Cierre}
+\begin{center}
+\small
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{>{\raggedright\bfseries}p{3.4cm}>{\raggedright\arraybackslash}p{9.6cm}}
+\toprule
+Trigger & Se ejecuta solo cuando una tabla cambia: \texttt{INSERT}, \texttt{UPDATE} o \texttt{DELETE}. Sirve para completar datos, detener una operación o guardar un historial. \\
+MySQL & \texttt{BEFORE} o \texttt{AFTER}; \texttt{NEW} y \texttt{OLD}; una vez por fila (\texttt{FOR EACH ROW}). \\
+SQL Server & \texttt{AFTER} o \texttt{INSTEAD OF}; \texttt{inserted} y \texttt{deleted}; una vez por instrucción. \\
+Copia de seguridad & Un archivo para volver a crear la base: \texttt{mysqldump} y \texttt{source} en MySQL; \texttt{BACKUP} y \texttt{RESTORE} en SQL Server. Se saca seguido y se prueba. \\
+Usuarios y permisos & La aplicación no entra como \texttt{root}: tiene su usuario, con solo lo que necesita (\texttt{CREATE USER} y \texttt{GRANT}). \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Referencias}
+\footnotesize
+\begin{itemize}\setlength\itemsep{7pt}
+\item Silberschatz, A., Korth, H. F., \& Sudarshan, S. (2014). \textit{Fundamentos de bases de datos} (6.ª ed.). McGraw-Hill.
+\item Oracle. MySQL Reference Manual: \href{https://dev.mysql.com/doc/refman/8.4/en/create-trigger.html}{\textit{CREATE TRIGGER}}, \href{https://dev.mysql.com/doc/refman/8.4/en/mysqldump.html}{\textit{mysqldump}} y \href{https://dev.mysql.com/doc/refman/8.4/en/grant.html}{\textit{GRANT}}.
+\item Microsoft. Transact-SQL: \href{https://learn.microsoft.com/sql/t-sql/statements/create-trigger-transact-sql}{\textit{CREATE TRIGGER}} y \href{https://learn.microsoft.com/sql/t-sql/statements/backup-transact-sql}{\textit{BACKUP}}.
+\end{itemize}
+\end{frame}
+% Cierre UTP
+{
+  \setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight]{gracias-final.pdf}%
+  }
+  \setbeamertemplate{footline}{}
+  \begin{frame}[plain]
+  \end{frame}
+}
+
+\end{document}
