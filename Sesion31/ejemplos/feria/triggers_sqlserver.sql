@@ -1,41 +1,17 @@
--- Triggers, de lo simple a lo aplicado (SQL Server).
+-- Los triggers de la feria (SQL Server).
 -- Caso de estudio: venta de entradas para la feria gastronómica Fogón.
 -- Antes ejecuta la práctica 1 (ejemplos/practicas/sqlserver/): modelo físico y registros.
 -- CREATE TRIGGER debe ser lo primero de su lote: por eso va GO antes.
 
-USE feria_entrada;
+USE feria;
 GO
 
--- ---------------------------------------------------------------
--- 1. Tu primer trigger: se vende una entrada, queda una menos
--- ---------------------------------------------------------------
+-- ======================================================================
+-- 1. Completar los datos antes de guardar: INSTEAD OF
+-- ======================================================================
 
--- Después de cada INSERT en venta. Se ejecuta una vez por instrucción:
--- inserted tiene todas las filas nuevas, por eso se cuentan.
-CREATE OR ALTER TRIGGER dbo.venta_descuenta_disponible
-ON venta
-AFTER INSERT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    UPDATE entrada
-    SET disponibles = disponibles - (SELECT COUNT(*) FROM inserted)
-    WHERE id = 1;
-END;
-GO
-
-INSERT INTO venta (dni, nombre, correo, precio, referencia_pago)
-VALUES ('70123456', N'Luis Rojas', 'luis.rojas@example.com', 45.00, 'PAGO-0001');
-
-SELECT nombre, precio, disponibles FROM entrada;
-GO
-
--- ---------------------------------------------------------------
--- 2. Completar los datos antes de guardar: INSTEAD OF
--- ---------------------------------------------------------------
-
--- En lugar del INSERT original: guarda las filas de inserted con el
--- correo en minúsculas y el precio de la entrada.
+-- No hay BEFORE: en lugar del INSERT original, guarda las filas de
+-- inserted con el correo en minúsculas y el precio de la entrada.
 CREATE OR ALTER TRIGGER dbo.venta_completa_datos
 ON venta
 INSTEAD OF INSERT
@@ -53,12 +29,11 @@ INSERT INTO venta (dni, nombre, correo, precio, referencia_pago)
 VALUES ('70123457', N'María Torres', 'Maria.Torres@Example.com', 1.00, 'PAGO-0002');
 
 SELECT dni, nombre, correo, precio FROM venta;
-SELECT nombre, precio, disponibles FROM entrada;
 GO
 
--- ---------------------------------------------------------------
--- 3. Detener una operación: una venta no se borra
--- ---------------------------------------------------------------
+-- ======================================================================
+-- 2. Detener una operación: una venta no se borra
+-- ======================================================================
 
 -- En lugar del DELETE: lo cancela con un error propio.
 CREATE OR ALTER TRIGGER dbo.venta_no_se_borra
@@ -70,15 +45,16 @@ BEGIN
 END;
 GO
 
-DELETE FROM venta WHERE dni = '70123456';
+-- Msg 50000, Level 16, State 1, Procedure venta_no_se_borra, Line 12
+DELETE FROM venta WHERE dni = '70123457';
 GO
 
 SELECT COUNT(*) AS ventas FROM venta;
 GO
 
--- ---------------------------------------------------------------
--- 4. El historial de precios: deleted e inserted
--- ---------------------------------------------------------------
+-- ======================================================================
+-- 3. El historial de precios: deleted e inserted
+-- ======================================================================
 
 DROP TABLE IF EXISTS cambio_precio;
 
@@ -112,38 +88,24 @@ UPDATE entrada SET precio = 50.00 WHERE id = 1;
 SELECT precio_anterior, precio_nuevo FROM cambio_precio;
 GO
 
--- ---------------------------------------------------------------
--- 5. Todo junto: una compra con un solo INSERT
--- ---------------------------------------------------------------
+-- ======================================================================
+-- 4. Un INSERT con tres filas
+-- ======================================================================
 
--- Sin precio: lo pone el trigger venta_completa_datos.
+-- Sin precio. SQL Server no tiene FOR EACH ROW: venta_completa_datos se
+-- ejecuta una sola vez, e inserted trae las tres filas.
 INSERT INTO venta (dni, nombre, correo, referencia_pago)
-VALUES ('70123458', N'Pedro Huamán', ' Pedro.Huaman@Example.com ', 'PAGO-0003');
+VALUES ('70123461', N'Ana Ruiz', 'Ana.Ruiz@Example.com', 'PAGO-0011'),
+       ('70123462', N'Jorge Soto', 'JORGE.SOTO@EXAMPLE.COM', 'PAGO-0012'),
+       ('70123463', N'Lucía Vega', ' Lucia.Vega@Example.com ', 'PAGO-0013');
 
-SELECT dni, nombre, correo, precio FROM venta;
-SELECT nombre, precio, disponibles FROM entrada;
-SELECT precio_anterior, precio_nuevo FROM cambio_precio;
+SELECT dni, correo, precio FROM venta
+WHERE dni > '70123460';
 GO
 
--- ---------------------------------------------------------------
--- 6. Si el trigger falla, el INSERT tampoco se guarda
--- ---------------------------------------------------------------
+-- ======================================================================
+-- 5. Ver los triggers de la base
+-- ======================================================================
 
-UPDATE entrada SET disponibles = 0 WHERE id = 1;
-GO
-
--- El trigger de la parte 1 dejaría disponibles en -1: el CHECK lo rechaza.
-INSERT INTO venta (dni, nombre, correo, referencia_pago)
-VALUES ('70123459', N'Rosa Quispe', 'rosa.quispe@example.com', 'PAGO-0004');
-GO
-
-SELECT COUNT(*) AS ventas FROM venta;
-GO
-
--- ---------------------------------------------------------------
--- 7. Ver los triggers de la base
--- ---------------------------------------------------------------
-
-SELECT name AS trigger_name, OBJECT_NAME(parent_id) AS tabla
-FROM sys.triggers;
+SELECT name FROM sys.triggers;
 GO

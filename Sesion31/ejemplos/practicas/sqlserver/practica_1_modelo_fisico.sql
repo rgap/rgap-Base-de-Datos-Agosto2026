@@ -4,17 +4,17 @@
 USE master;
 GO
 
-IF DB_ID('feria_entrada') IS NOT NULL
+IF DB_ID('feria') IS NOT NULL
 BEGIN
-    ALTER DATABASE feria_entrada SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-    DROP DATABASE feria_entrada;
+    ALTER DATABASE feria SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE feria;
 END;
 GO
 
-CREATE DATABASE feria_entrada;
+CREATE DATABASE feria;
 GO
 
-USE feria_entrada;
+USE feria;
 GO
 
 CREATE TABLE entrada (

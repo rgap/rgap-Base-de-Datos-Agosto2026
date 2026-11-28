@@ -1,4 +1,4 @@
-USE feria_entrada;
+USE feria;
 GO
 
 INSERT INTO entrada (id, nombre, descripcion, precio, disponibles, venta_activa) VALUES

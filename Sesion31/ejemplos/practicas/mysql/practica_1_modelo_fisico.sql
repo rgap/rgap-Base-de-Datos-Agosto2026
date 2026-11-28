@@ -1,9 +1,9 @@
 -- Modelo físico de la feria (MySQL).
 -- Caso de estudio: venta de entradas para la feria gastronómica Fogón.
 
-DROP DATABASE IF EXISTS feria_entrada;
-CREATE DATABASE feria_entrada;
-USE feria_entrada;
+DROP DATABASE IF EXISTS feria;
+CREATE DATABASE feria;
+USE feria;
 
 CREATE TABLE entrada (
     -- Una sola entrada, válida para los tres días.

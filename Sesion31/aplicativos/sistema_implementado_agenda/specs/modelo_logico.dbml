@@ -1,0 +1,34 @@
+// @visual table=grupo x=0 y=40
+Table grupo {
+  id integer [pk, increment]
+  nombre varchar(50) [not null, unique]
+  descripcion text
+  color varchar(20) [default: 'gris', check: `color IN ('rojo', 'verde', 'azul', 'gris')`]
+}
+
+// @visual table=contacto x=640 y=0
+Table contacto {
+  id integer [pk, increment]
+  nombre varchar(100) [not null]
+  telefono varchar(20)
+  correo varchar(255) [unique]
+  es_favorito boolean [not null, default: false]
+  fecha_registro date [not null, default: `CURRENT_DATE`, check: `fecha_registro <= CURRENT_DATE`]
+}
+
+// @visual table=contacto_grupo x=336 y=50
+Table contacto_grupo {
+  contacto_id integer [pk]
+  grupo_id integer [pk]
+  rol varchar(50)
+}
+
+// @relation-meta
+// sourceLabel="está en"
+// manyToManyTool="true"
+Ref: contacto.id <? contacto_grupo.contacto_id
+
+// @relation-meta
+// sourceLabel="reúne"
+// manyToManyTool="true"
+Ref: grupo.id <? contacto_grupo.grupo_id

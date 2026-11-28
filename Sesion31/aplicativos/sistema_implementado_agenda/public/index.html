@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#1f4fa8" />
+    <title>Agenda | Contactos y grupos</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%20100%20100%22%3E%3Ctext%20x=%2250%22%20y=%22.9em%22%20text-anchor=%22middle%22%20font-size=%2290%22%3E%F0%9F%93%92%3C/text%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Ir al inicio">
+        <span class="brand-mark" aria-hidden="true">A</span>
+        <span><strong>Agenda</strong><small>Contactos y grupos</small></span>
+      </a>
+      <nav class="tabs" role="tablist" aria-label="Secciones de la agenda">
+        <button id="tab-contactos" class="tab" type="button" role="tab" aria-selected="true" aria-controls="vista-contactos">
+          Contactos <span id="total-contactos" class="tab-count">0</span>
+        </button>
+        <button id="tab-grupos" class="tab" type="button" role="tab" aria-selected="false" aria-controls="vista-grupos" tabindex="-1">
+          Grupos <span id="total-grupos" class="tab-count">0</span>
+        </button>
+      </nav>
+    </header>
+
+    <main class="page">
+      <section id="vista-contactos" class="view" role="tabpanel" aria-labelledby="tab-contactos">
+        <div class="view-head">
+          <div>
+            <p class="eyebrow">Mi agenda</p>
+            <h1>Contactos</h1>
+            <p class="lead">Los favoritos van primero. Toca la estrella para marcar o desmarcar uno.</p>
+          </div>
+        </div>
+        <div class="toolbar">
+          <input id="buscar-contactos" class="search" type="search" placeholder="Nombre, teléfono o correo" aria-label="Buscar contactos" aria-keyshortcuts="/" autocomplete="off" />
+          <p id="contador-contactos" class="contador" aria-live="polite"></p>
+          <button id="nuevo-contacto" class="primary-button" type="button">+ Nuevo contacto</button>
+        </div>
+        <ul id="contactos" class="cards" aria-busy="true">
+          <li class="empty">Cargando contactos…</li>
+        </ul>
+      </section>
+
+      <section id="vista-grupos" class="view" role="tabpanel" aria-labelledby="tab-grupos" hidden>
+        <div class="view-head">
+          <div>
+            <p class="eyebrow">Para ordenarlos</p>
+            <h1>Grupos</h1>
+            <p class="lead">Un contacto puede estar en varios grupos, con un rol distinto en cada uno.</p>
+          </div>
+        </div>
+        <div class="toolbar">
+          <input id="buscar-grupos" class="search" type="search" placeholder="Nombre o descripción" aria-label="Buscar grupos" aria-keyshortcuts="/" autocomplete="off" />
+          <p id="contador-grupos" class="contador" aria-live="polite"></p>
+          <button id="nuevo-grupo" class="primary-button" type="button">+ Nuevo grupo</button>
+        </div>
+        <ul id="grupos" class="group-grid" aria-busy="true">
+          <li class="empty">Cargando grupos…</li>
+        </ul>
+      </section>
+    </main>
+
+    <p id="toast" class="toast" role="status" hidden></p>
+
+    <!-- Nuevo contacto, o editar y eliminar contacto (Historias 1 y 5) -->
+    <dialog id="dialogo-contacto" class="sheet" aria-labelledby="dialogo-contacto-titulo">
+      <form id="form-contacto" class="sheet-body" novalidate>
+        <h2 id="dialogo-contacto-titulo">Nuevo contacto</h2>
+        <div class="form">
+          <label class="field wide">Nombre
+            <input name="nombre" required maxlength="100" autocomplete="off" />
+          </label>
+          <label class="field">Teléfono <small>opcional</small>
+            <input name="telefono" type="tel" maxlength="20" autocomplete="off" />
+          </label>
+          <label class="field">Correo <small>opcional</small>
+            <input name="correo" type="email" maxlength="255" autocomplete="off" />
+          </label>
+          <label class="check"><input name="es_favorito" type="checkbox" /> Favorito</label>
+        </div>
+        <p class="notice notice-error" role="alert" hidden></p>
+        <div class="sheet-actions">
+          <button class="secondary-button demo" type="button">Datos demo</button>
+          <span class="spacer"></span>
+          <button class="ghost-button" type="button" value="cancelar">Cancelar</button>
+          <button class="primary-button" type="submit">Guardar</button>
+        </div>
+        <div class="sheet-danger" hidden>
+          <button class="link-danger eliminar" type="button">Eliminar contacto</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Nuevo grupo, o editar y eliminar grupo (Historias 3 y 6) -->
+    <dialog id="dialogo-grupo" class="sheet" aria-labelledby="dialogo-grupo-titulo">
+      <form id="form-grupo" class="sheet-body" novalidate>
+        <h2 id="dialogo-grupo-titulo">Nuevo grupo</h2>
+        <div class="form">
+          <label class="field wide">Nombre
+            <input name="nombre" required maxlength="50" autocomplete="off" />
+          </label>
+          <fieldset class="field wide colors">
+            <legend>Color</legend>
+            <label><input type="radio" name="color" value="gris" checked /><span class="swatch gris"></span>Gris</label>
+            <label><input type="radio" name="color" value="rojo" /><span class="swatch rojo"></span>Rojo</label>
+            <label><input type="radio" name="color" value="verde" /><span class="swatch verde"></span>Verde</label>
+            <label><input type="radio" name="color" value="azul" /><span class="swatch azul"></span>Azul</label>
+          </fieldset>
+          <label class="field wide">Descripción <small>opcional</small>
+            <input name="descripcion" autocomplete="off" />
+          </label>
+        </div>
+        <p class="notice notice-error" role="alert" hidden></p>
+        <div class="sheet-actions">
+          <button class="secondary-button demo" type="button">Datos demo</button>
+          <span class="spacer"></span>
+          <button class="ghost-button" type="button" value="cancelar">Cancelar</button>
+          <button class="primary-button" type="submit">Crear grupo</button>
+        </div>
+        <div class="sheet-danger" hidden>
+          <button class="link-danger eliminar" type="button">Eliminar grupo</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Poner un contacto en un grupo (Historia 4) -->
+    <dialog id="dialogo-pertenencia" class="sheet" aria-labelledby="dialogo-pertenencia-titulo">
+      <form id="form-pertenencia" class="sheet-body" novalidate>
+        <h2 id="dialogo-pertenencia-titulo">Poner en un grupo</h2>
+        <div class="form">
+          <label class="field">Contacto
+            <select name="contacto_id" required></select>
+          </label>
+          <label class="field">Grupo
+            <select name="grupo_id" required></select>
+          </label>
+          <label class="field wide">Rol en ese grupo <small>opcional: prima, jefa, vecino…</small>
+            <input name="rol" maxlength="50" autocomplete="off" />
+          </label>
+        </div>
+        <p class="notice notice-error" role="alert" hidden></p>
+        <div class="sheet-actions">
+          <button class="secondary-button demo" type="button">Datos demo</button>
+          <span class="spacer"></span>
+          <button class="ghost-button" type="button" value="cancelar">Cancelar</button>
+          <button class="primary-button" type="submit">Agregar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <!-- Confirmar antes de eliminar: el formulario method="dialog" cierra el cuadro
+         y deja en returnValue el valor del botón pulsado. -->
+    <dialog id="dialogo-confirmar" class="confirm-dialog" aria-labelledby="confirmar-titulo">
+      <form method="dialog" class="confirm-body">
+        <h2 id="confirmar-titulo"></h2>
+        <p id="confirmar-detalle"></p>
+        <div class="confirm-actions">
+          <button class="secondary" value="no">Cancelar</button>
+          <button class="danger" value="si">Eliminar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/agenda.js"></script>
+    <script src="/reset.js"></script>
+  </body>
+</html>
